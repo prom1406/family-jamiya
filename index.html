@@ -1,33 +1,6 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <!-- Firebase App SDK & Firestore -->
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-
-    // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyBD_a9TrhsCL5ognnIxhv2OuyiWJmdr33o",
-  authDomain: "aljamiyahapp.firebaseapp.com",
-  projectId: "aljamiyahapp",
-  storageBucket: "aljamiyahapp.firebasestorage.app",
-  messagingSenderId: "508199870007",
-  appId: "1:508199870007:web:5aeee0d4bdbb4a4893e9b2",
-  measurementId: "G-VVFTQ15TTN"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>الجمعية الصغيرة - منصة الجمعيات العائلية الذكية</title>
@@ -63,6 +36,12 @@ const analytics = getAnalytics(app);
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     <!-- FontAwesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase App SDK & Firestore Compat (Corrected Integration) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
     <style>
         body {
             font-family: 'Cairo', sans-serif;
@@ -128,6 +107,7 @@ const analytics = getAnalytics(app);
             </div>
         </section>
 
+        <!-- SCREEN AUTH -->
         <section id="screen-auth" class="screen hide animate-fade max-w-md mx-auto">
             <div class="glass-card p-8 rounded-3xl shadow-xl">
                 <div class="text-center mb-6">
@@ -154,7 +134,7 @@ const analytics = getAnalytics(app);
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">البريد الإلكتروني</label>
-                        <input type="email5" id="authEmail" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="name@example.com">
+                        <input type="email" id="authEmail" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="name@example.com">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">كلمة المرور</label>
@@ -209,6 +189,7 @@ const analytics = getAnalytics(app);
             </div>
         </section>
 
+        <!-- SCREEN CREATE JAMIYA -->
         <section id="screen-create-jamiya" class="screen hide animate-fade max-w-xl mx-auto">
             <div class="glass-card p-8 rounded-3xl shadow-xl">
                 <div class="flex items-center justify-between mb-6">
@@ -261,6 +242,7 @@ const analytics = getAnalytics(app);
             </div>
         </section>
 
+        <!-- SCREEN BROWSE JAMIYA -->
         <section id="screen-browse-jamiya" class="screen hide animate-fade space-y-6">
             <div class="glass-card p-6 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
@@ -348,6 +330,7 @@ const analytics = getAnalytics(app);
             </div>
         </section>
 
+        <!-- SCREEN OWNER DASHBOARD -->
         <section id="screen-owner-dashboard" class="screen hide animate-fade space-y-6">
             <div class="glass-card p-6 rounded-3xl shadow-xl bg-gradient-to-r from-slate-900 to-indigo-950 text-white">
                 <div class="flex justify-between items-center">
@@ -462,11 +445,28 @@ const analytics = getAnalytics(app);
     <div id="toastContainer" class="fixed bottom-5 left-5 z-50 space-y-2"></div>
 
     <script>
+        // Firebase Configuration & Initialization
+        const firebaseConfig = {
+            apiKey: "AIzaSyBD_a9TrhsCL5ognnIxhv2OuyiWJmdr33o",
+            authDomain: "aljamiyahapp.firebaseapp.com",
+            projectId: "aljamiyahapp",
+            storageBucket: "aljamiyahapp.firebasestorage.app",
+            messagingSenderId: "508199870007",
+            appId: "1:508199870007:web:5aeee0d4bdbb4a4893e9b2",
+            measurementId: "G-VVFTQ15TTN"
+        };
+        
+        // Initialize Firebase Compat
+        if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+            const db = firebase.firestore();
+        }
+
         // Owner Email Identifier
         const OWNER_EMAIL = "owner@aljamiyah.sa";
 
         // Global Application State
-        let currentUser = null; // { name, email, phone, bank, iban }
+        let currentUser = null;
         let isAuthRegisterMode = false;
         let jamiyatList = [
             {
@@ -490,9 +490,7 @@ const analytics = getAnalytics(app);
         ];
         let activeJamiyaId = null;
 
-        // Initialize App on Window Load
         window.onload = function() {
-            // Load saved state if any
             const savedUser = localStorage.getItem('jamiyah_current_user');
             if (savedUser) {
                 currentUser = JSON.parse(savedUser);
@@ -501,7 +499,6 @@ const analytics = getAnalytics(app);
             goToHome();
         };
 
-        // Navigation Controller
         function goToScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.add('hide'));
             const target = document.getElementById(screenId);
@@ -513,12 +510,8 @@ const analytics = getAnalytics(app);
 
         function goToHome() {
             renderHomeScreen();
-            if (currentUser && currentUser.email === OWNER_EMAIL) {
-                // If owner, show option or let them see owner dash easily
-            }
         }
 
-        // Render Navigation Header Actions
         function renderNavigation() {
             const nav = document.getElementById('navActions');
             const roleBadge = document.getElementById('headerRoleBadge');
@@ -538,14 +531,12 @@ const analytics = getAnalytics(app);
             }
         }
 
-        // Render Home Screen Dynamically based on login status
         function renderHomeScreen() {
             goToScreen('screen-home');
             const container = document.getElementById('dynamicHomeButtons');
             container.innerHTML = '';
 
             if (!currentUser) {
-                // Logged out: Show Login or Join a Jamiya
                 container.innerHTML = `
                     <div class="flex flex-col sm:flex-row gap-4 justify-center">
                         <button onclick="openAuthModal(false)" class="px-6 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-2xl shadow-lg hover:from-emerald-700 hover:to-teal-700 transition flex items-center justify-center space-x-2 space-x-reverse text-sm">
@@ -559,7 +550,6 @@ const analytics = getAnalytics(app);
                     </div>
                 `;
             } else {
-                // Logged in: Show Create a New Family Jamiya and existing jamiyat list
                 let jamiyatHtml = '';
                 jamiyatList.forEach(j => {
                     const isCreator = j.creatorEmail === currentUser.email;
@@ -592,7 +582,6 @@ const analytics = getAnalytics(app);
             }
         }
 
-        // Auth Modal & Handlers
         function openAuthModal(isRegister) {
             isAuthRegisterMode = isRegister;
             document.getElementById('authTitle').innerText = isRegister ? 'تسجيل حساب جديد' : 'تسجيل الدخول';
@@ -614,7 +603,6 @@ const analytics = getAnalytics(app);
         }
 
         function simulateGoogleLogin() {
-            // Quick Google Login simulation allowing owner or regular user
             currentUser = {
                 name: 'محمد الفهيد',
                 email: OWNER_EMAIL,
@@ -647,7 +635,6 @@ const analytics = getAnalytics(app);
                 currentUser = { name, email, phone, bank, iban };
                 showToast('تم إنشاء الحساب بنجاح!', 'success');
             } else {
-                // Login check
                 currentUser = {
                     name: email === OWNER_EMAIL ? 'مالك التطبيق' : 'عضو عائلي',
                     email: email,
@@ -669,7 +656,6 @@ const analytics = getAnalytics(app);
             goToHome();
         }
 
-        // Create Jamiya Handler
         function handleCreateJamiya(event) {
             event.preventDefault();
             const name = document.getElementById('jName').value;
@@ -700,7 +686,6 @@ const analytics = getAnalytics(app);
             openJamiya(newJamiya.id);
         }
 
-        // Open Jamiya and Render Dashboard
         function openJamiya(jId) {
             const j = jamiyatList.find(item => item.id === jId);
             if (!j) return;
@@ -710,13 +695,11 @@ const analytics = getAnalytics(app);
             document.getElementById('displayJAmount').innerText = j.amount;
             document.getElementById('displayJLastDay').innerText = j.lastDay;
 
-            // Determine recipient of the month (order 1 for demo or rotation)
             const recipient = j.members.find(m => m.order === 1) || j.members[0];
             document.getElementById('currentRecipientName').innerText = recipient.name;
             document.getElementById('currentRecipientBank').innerText = recipient.bank || 'مصرف الراجحي';
             document.getElementById('currentRecipientIban').innerText = recipient.iban || 'SA12345678901234567890';
 
-            // Check if current user is recipient or payer
             const paymentArea = document.getElementById('paymentActionArea');
             const isUserRecipient = recipient.contact === currentUser?.email || recipient.name.includes(currentUser?.name || '');
 
@@ -734,7 +717,6 @@ const analytics = getAnalytics(app);
                 `;
             }
 
-            // Render members lists
             renderMembersLists(j);
             goToScreen('screen-browse-jamiya');
         }
@@ -789,7 +771,6 @@ const analytics = getAnalytics(app);
             document.getElementById('collectionProgressBar').style.width = `${Math.min(percentage, 100)}%`;
         }
 
-        // Payment Proof Workflow
         function openPaymentModal() {
             document.getElementById('paymentModal').classList.remove('hide');
         }
@@ -806,7 +787,7 @@ const analytics = getAnalytics(app);
                 const member = j.members.find(m => m.contact === currentUser.email) || j.members[0];
                 member.paid = true;
                 member.proof = file ? file.name : 'transfer_receipt.jpg';
-                showToast('تم إرسال إثبات السداد بنجاح لمستשתف الدفعة للمراجعة والتاكيد!', 'success');
+                showToast('تم إرسال إثبات السداد بنجاح لمستلم الدفعة للمراجعة والتأكيد!', 'success');
                 closePaymentModal();
                 renderMembersLists(j);
             }
@@ -815,7 +796,6 @@ const analytics = getAnalytics(app);
             showToast(`عرض مرفق الإيصال: ${proofName}`, 'info');
         }
 
-        // Invite Member Modal
         function openInviteModal() {
             document.getElementById('inviteModal').classList.remove('hide');
         }
@@ -844,7 +824,6 @@ const analytics = getAnalytics(app);
             }
         }
 
-        // AI Advisor Modal
         function openAiAdvisorModal() {
             document.getElementById('aiModal').classList.remove('hide');
         }
@@ -872,7 +851,6 @@ const analytics = getAnalytics(app);
             }, 600);
         }
 
-        // Owner Dashboard Render
         function renderOwnerDashboard() {
             document.getElementById('adminTotalJamiyat').innerText = jamiyatList.length;
             let totalUsers = 0;
@@ -898,7 +876,6 @@ const analytics = getAnalytics(app);
             document.getElementById('adminJamiyatList').innerHTML = listHtml;
         }
 
-        // Toast Notification Helper
         function showToast(message, type = 'success') {
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
