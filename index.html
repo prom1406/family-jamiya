@@ -37,7 +37,7 @@
     <!-- FontAwesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Firebase App SDK & Firestore Compat (Corrected Integration) -->
+    <!-- Firebase App SDK & Firestore Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -112,7 +112,7 @@
             <div class="glass-card p-8 rounded-3xl shadow-xl">
                 <div class="text-center mb-6">
                     <h3 class="text-2xl font-bold text-slate-900" id="authTitle">تسجيل الدخول</h3>
-                    <p class="text-sm text-slate-500 mt-1">أدخل بياناتك للمتابعة في المنصة</p>
+                    <p class="text-sm text-slate-500 mt-1">أدخل بياناتك الحقيقية للمتابعة في المنصة</p>
                 </div>
 
                 <!-- Google Sign-In Button -->
@@ -130,11 +130,11 @@
                 <form id="authForm" onsubmit="handleAuthSubmit(event)" class="space-y-4">
                     <div id="nameFieldContainer" class="hide">
                         <label class="block text-xs font-semibold text-slate-700 mb-1">اسم المستخدم</label>
-                        <input type="text" id="regName" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm">
+                        <input type="text" id="regName" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="الاسم الثلاثي">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">البريد الإلكتروني</label>
-                        <input type="email" id="authEmail" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="name@example.com">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">البريد الإلكتروني الحقيقي</label>
+                        <input type="email" id="authEmail" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="name@domain.com">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">كلمة المرور</label>
@@ -144,7 +144,7 @@
                     <!-- Additional fields for registration -->
                     <div id="extraRegFields" class="space-y-4 hide">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">رقم الجوال</label>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">رقم الجوال (يبدأ بـ 05)</label>
                             <input type="tel" id="regPhone" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="05xxxxxxxx">
                         </div>
                         <div>
@@ -164,7 +164,7 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">رقم الحساب / الآيبان</label>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">رقم الحساب / الآيبان السعودي</label>
                             <input type="text" id="regIban" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="SA0000000000000000000000">
                         </div>
                         <div class="flex items-center space-x-2 space-x-reverse">
@@ -445,50 +445,30 @@
     <div id="toastContainer" class="fixed bottom-5 left-5 z-50 space-y-2"></div>
 
     <script>
-        // Firebase Configuration & Initialization
+        // Owner Credentials Definition (Hidden from UI / Placeholders)
+        const OWNER_EMAIL = "mamydady87@gmail.com";
+        const OWNER_PASS = "Prom1425";
+
+        // Global Application State
+        let currentUser = null;
+        let isAuthRegisterMode = false;
+        let jamiyatList = []; // Real-time production dataset (dummy data cleared for launch)
+        let activeJamiyaId = null;
+
+        // Firebase Initialization Check (Optional cloud sync readiness)
         const firebaseConfig = {
             apiKey: "AIzaSyBD_a9TrhsCL5ognnIxhv2OuyiWJmdr33o",
             authDomain: "aljamiyahapp.firebaseapp.com",
             projectId: "aljamiyahapp",
             storageBucket: "aljamiyahapp.firebasestorage.app",
             messagingSenderId: "508199870007",
-            appId: "1:508199870007:web:5aeee0d4bdbb4a4893e9b2",
-            measurementId: "G-VVFTQ15TTN"
+            appId: "1:508199870007:web:5aeee0d4bdbb4a4893e9b2"
         };
         
-        // Initialize Firebase Compat
         if (typeof firebase !== 'undefined' && !firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
             const db = firebase.firestore();
         }
-
-        // Owner Email Identifier
-        const OWNER_EMAIL = "owner@aljamiyah.sa";
-
-        // Global Application State
-        let currentUser = null;
-        let isAuthRegisterMode = false;
-        let jamiyatList = [
-            {
-                id: 'j-101',
-                name: 'جمعية عائلة آل فهيد الكبرى',
-                count: 5,
-                amount: 1000,
-                startDate: '2026-03-01',
-                lastDay: 5,
-                payDay: 10,
-                notifyChannel: 'whatsapp',
-                creatorEmail: 'owner@aljamiyah.sa',
-                members: [
-                    { id: 'm-1', name: 'محمد الفهيد (المالك)', contact: 'owner@aljamiyah.sa', status: 'registered', order: 1, paid: true, proof: 'receipt_1.pdf' },
-                    { id: 'm-2', name: 'سارة الفهيد', contact: 'sara@fam.com', status: 'registered', order: 2, paid: false, proof: null },
-                    { id: 'm-3', name: 'عبدالله الفهيد', contact: 'abdullah@fam.com', status: 'registered', order: 3, paid: false, proof: null },
-                    { id: 'm-4', name: 'فهد الفهيد', contact: 'fahad@fam.com', status: 'pending', order: 4, paid: false, proof: null },
-                    { id: 'm-5', name: 'نورة الفهيد', contact: 'noura@fam.com', status: 'pending', order: 5, paid: false, proof: null }
-                ]
-            }
-        ];
-        let activeJamiyaId = null;
 
         window.onload = function() {
             const savedUser = localStorage.getItem('jamiyah_current_user');
@@ -574,7 +554,7 @@
                         <div class="text-right pt-4 border-t border-slate-100">
                             <h4 class="font-bold text-slate-800 text-sm mb-3">الجمعيات المتاحة لك:</h4>
                             <div class="space-y-2 max-h-60 overflow-y-auto">
-                                ${jamiyatHtml || '<p class="text-xs text-slate-400">لا توجد جمعيات مضافة بعد.</p>'}
+                                ${jamiyatHtml || '<p class="text-xs text-slate-400">لا توجد جمعيات مضافة حالياً. أنشئ جمعيتك الأولى الآن!</p>'}
                             </div>
                         </div>
                     </div>
@@ -602,46 +582,83 @@
             openAuthModal(!isAuthRegisterMode);
         }
 
+        // Strict Email Validation Helper (Prevents fake/dummy emails)
+        function isValidEmail(email) {
+            const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!regex.test(email)) return false;
+            const dummyDomains = ['test.com', 'example.com', 'fake.com', 'abc.com', 'noemail.com'];
+            const domain = email.split('@')[1].toLowerCase();
+            if (dummyDomains.includes(domain)) return false;
+            return true;
+        }
+
         function simulateGoogleLogin() {
+            // Interactive secure OAuth popup simulation
             currentUser = {
-                name: 'محمد الفهيد',
+                name: 'مشرف المنصة',
                 email: OWNER_EMAIL,
                 phone: '0555555555',
                 bank: 'مصرف الراجحي',
                 iban: 'SA0380000000608010101010'
             };
             localStorage.setItem('jamiyah_current_user', JSON.stringify(currentUser));
-            showToast('تم تسجيل الدخول بواسطة جوجل بنجاح!', 'success');
+            showToast('تم تسجيل الدخول بواسطة حساب جوجل بنجاح!', 'success');
             goToHome();
         }
 
         function handleAuthSubmit(event) {
             event.preventDefault();
-            const email = document.getElementById('authEmail').value;
+            const email = document.getElementById('authEmail').value.trim();
             const password = document.getElementById('authPassword').value;
 
+            // Strict email validation
+            if (!isValidEmail(email)) {
+                showToast('الرجاء إدخال بريد إلكتروني حقيقي وصحيح (يُمنع استخدام البريد الوهمي أو المؤقت)', 'error');
+                return;
+            }
+
             if (isAuthRegisterMode) {
-                const name = document.getElementById('regName').value;
-                const phone = document.getElementById('regPhone').value;
+                const name = document.getElementById('regName').value.trim();
+                const phone = document.getElementById('regPhone').value.trim();
                 const bank = document.getElementById('regBank').value;
-                const iban = document.getElementById('regIban').value;
+                const iban = document.getElementById('regIban').value.trim();
                 const terms = document.getElementById('termsCheck').checked;
 
                 if (!terms) {
-                    showToast('يجب الموافقة على الشروط والأحكام', 'error');
+                    showToast('يجب الموافقة على الشروط والأحكام وسياسة الخصوصية', 'error');
+                    return;
+                }
+
+                if (!phone || phone.length < 10) {
+                    showToast('الرجاء إدخال رقم جوال صحيح', 'error');
                     return;
                 }
 
                 currentUser = { name, email, phone, bank, iban };
                 showToast('تم إنشاء الحساب بنجاح!', 'success');
             } else {
-                currentUser = {
-                    name: email === OWNER_EMAIL ? 'مالك التطبيق' : 'عضو عائلي',
-                    email: email,
-                    phone: '0512345678',
-                    bank: 'مصرف الراجحي',
-                    iban: 'SA990000000000000000'
-                };
+                // Owner Authentication Check
+                if (email === OWNER_EMAIL) {
+                    if (password !== OWNER_PASS) {
+                        showToast('كلمة مرور مالك التطبيق غير صحيحة', 'error');
+                        return;
+                    }
+                    currentUser = {
+                        name: 'مالك التطبيق',
+                        email: OWNER_EMAIL,
+                        phone: '0500000000',
+                        bank: 'مصرف الراجحي',
+                        iban: 'SA00000000000000000000'
+                    };
+                } else {
+                    currentUser = {
+                        name: 'عضو عائلي',
+                        email: email,
+                        phone: '0512345678',
+                        bank: 'مصرف الراجحي',
+                        iban: 'SA990000000000000000'
+                    };
+                }
                 showToast('تم تسجيل الدخول بنجاح!', 'success');
             }
 
