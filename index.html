@@ -1,6 +1,33 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+    <!-- Firebase App SDK & Firestore -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+    // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyBD_a9TrhsCL5ognnIxhv2OuyiWJmdr33o",
+  authDomain: "aljamiyahapp.firebaseapp.com",
+  projectId: "aljamiyahapp",
+  storageBucket: "aljamiyahapp.firebasestorage.app",
+  messagingSenderId: "508199870007",
+  appId: "1:508199870007:web:5aeee0d4bdbb4a4893e9b2",
+  measurementId: "G-VVFTQ15TTN"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>الجمعية الصغيرة - منصة الجمعيات العائلية الذكية</title>
