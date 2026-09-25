@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الجمعية الصغيرة - منصة الجمعيات العائلية الذكية</title>
+    <!-- Tailwind CSS for modern responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            900: '#14532d',
+                        },
+                        secondary: {
+                            50: '#eef2ff',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Cairo', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts: Cairo -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            min-height: 100vh;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        .hide { display: none !important; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased flex flex-col min-h-screen">
+
+    <header class="bg-white shadow-sm sticky top-0 z-50 border-b border-slate-100">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3 space-x-reverse cursor-pointer" onclick="goToHome()">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md">
+                    <i class="fa-solid fa-hands-holding-child text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-slate-900 leading-tight">الجمعية الصغيرة</h1>
+                    <p class="text-xs text-slate-500" id="headerRoleBadge">منصة التعاون العائلي</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2 space-x-reverse" id="navActions">
+                <!-- Dynamically populated auth/profile buttons -->
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 py-6 flex-grow w-full">
+
+        <!-- SCREEN 1: Home / Splash Screen -->
+        <section id="screen-home" class="screen animate-fade py-6 text-center">
+            <div class="max-w-xl mx-auto glass-card p-8 rounded-3xl shadow-xl border border-slate-100 relative overflow-hidden">
+                <div class="absolute -top-10 -right-10 w-40 h-40 bg-emerald-100 rounded-full blur-2xl opacity-60"></div>
+                <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-100 rounded-full blur-2xl opacity-60"></div>
+                
+                <div class="relative z-10">
+                    <div class="w-24 h-24 mx-auto mb-6 bg-gradient-to-tr from-emerald-500 to-teal-600 rounded-3xl flex items-center justify-center text-white shadow-lg text-4xl animate-bounce">
+                        <i class="fa-solid fa-people-roof"></i>
+                    </div>
+                    <h2 class="text-3xl font-black text-slate-900 mb-3">الجمعية الصغيرة العائلية</h2>
+                    <p class="text-slate-600 text-sm md:text-base leading-relaxed mb-8">
+                        اربط عائلتك بروابط التعاون المالي الموثوق. إدارة التدوير المالي، تتبع السداد، وتوثيق الحوالات بسهولة وأمان تام.
+                    </p>
+
+                    <!-- Dynamic Home Buttons based on Login Status -->
+                    <div id="dynamicHomeButtons" class="space-y-4">
+                        <!-- Populated via JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="screen-auth" class="screen hide animate-fade max-w-md mx-auto">
+            <div class="glass-card p-8 rounded-3xl shadow-xl">
+                <div class="text-center mb-6">
+                    <h3 class="text-2xl font-bold text-slate-900" id="authTitle">تسجيل الدخول</h3>
+                    <p class="text-sm text-slate-500 mt-1">أدخل بياناتك للمتابعة في المنصة</p>
+                </div>
+
+                <!-- Google Sign-In Button -->
+                <button onclick="simulateGoogleLogin()" class="w-full mb-4 py-3 px-4 border border-slate-200 rounded-xl font-semibold text-slate-700 bg-white hover:bg-slate-50 shadow-sm flex items-center justify-center space-x-3 space-x-reverse transition">
+                    <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="Google">
+                    <span>المتابعة باستخدام حساب جوجل</span>
+                </button>
+
+                <div class="flex items-center my-4">
+                    <div class="flex-grow border-t border-slate-200"></div>
+                    <span class="px-3 text-xs text-slate-400 font-medium">أو بالبريد الإلكتروني</span>
+                    <div class="flex-grow border-t border-slate-200"></div>
+                </div>
+
+                <form id="authForm" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+                    <div id="nameFieldContainer" class="hide">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">اسم المستخدم</label>
+                        <input type="text" id="regName" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">البريد الإلكتروني</label>
+                        <input type="email5" id="authEmail" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="name@example.com">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">كلمة المرور</label>
+                        <input type="password" id="authPassword" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="••••••••">
+                    </div>
+
+                    <!-- Additional fields for registration -->
+                    <div id="extraRegFields" class="space-y-4 hide">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">رقم الجوال</label>
+                            <input type="tel" id="regPhone" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="05xxxxxxxx">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">البنك المفضل</label>
+                            <select id="regBank" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm bg-white">
+                                <option value="الراجحي">مصرف الراجحي</option>
+                                <option value="الأهلي">البنك الأهلي السعودي (SNB)</option>
+                                <option value="الإنماء">بنك الإنماء</option>
+                                <option value="الرياض">بنك الرياض</option>
+                                <option value="البلاد">بنك البلاد</option>
+                                <option value="الجزيرة">بنك الجزيرة</option>
+                                <option value="الفرنسي">السابي (الفرنسي)</option>
+                                <option value="العرب الوطني">البنك العربي الوطني (ANB)</option>
+                                <option value="الاول">البنك السعودي الأول ( الأول)</option>
+                                <option value="دجيتال/مرابحة">البنك الرقمي / أخرى</option>
+                                <option value="كاش">كاش (نقداً)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">رقم الحساب / الآيبان</label>
+                            <input type="text" id="regIban" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="SA0000000000000000000000">
+                        </div>
+                        <div class="flex items-center space-x-2 space-x-reverse">
+                            <input type="checkbox" id="termsCheck" class="rounded text-emerald-600 focus:ring-emerald-500">
+                            <label for="termsCheck" class="text-xs text-slate-600">أوافق على الشروط والأحكام وسياسة الخصوصية</label>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="authSubmitBtn" class="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-xl shadow-lg hover:from-emerald-700 hover:to-teal-700 transition text-sm">
+                        دخول
+                    </button>
+                </form>
+
+                <div class="text-center mt-6">
+                    <button onclick="toggleAuthMode()" id="authSwitchText" class="text-xs text-emerald-600 font-semibold hover:underline">
+                        ليس لديك حساب؟ سجل حساب جديد الآن
+                    </button>
+                </div>
+                <div class="text-center mt-2">
+                    <button onclick="goToHome()" class="text-xs text-slate-500 hover:underline">العودة للرئيسية</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="screen-create-jamiya" class="screen hide animate-fade max-w-xl mx-auto">
+            <div class="glass-card p-8 rounded-3xl shadow-xl">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-bold text-slate-900">إنشاء جمعية عائلية جديدة</h3>
+                    <button onclick="goToHome()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+
+                <form onsubmit="handleCreateJamiya(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">اسم الجمعية العائلية</label>
+                        <input type="text" id="jName" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="مثال: جمعية عائلة آل فهيد 2026">
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">عدد الأفراد المشاركين</label>
+                            <input type="number" id="jCount" min="2" max="30" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="مثال: 10">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">قيمة الاشتراك الشهري لكل فرد (ريال)</label>
+                            <input type="number" id="jAmount" min="100" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="مثال: 1000">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">تاريخ بداية الجمعية</label>
+                            <input type="date" id="jStartDate" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">آخر يوم لدفع كل شهر</label>
+                            <input type="number" id="jLastDay" min="1" max="31" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="مثال: 5">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">يوم القبض (الصرف)</label>
+                            <input type="number" id="jPayDay" min="1" max="31" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="مثال: 10">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">طريقة الإشعارات المفضلة للأعضاء</label>
+                        <select id="jNotifyChannel" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm bg-white">
+                            <option value="whatsapp">واتساب (WhatsApp)</option>
+                            <option value="sms">رسائل نصية قصيرة (SMS)</option>
+                            <option value="email">البريد الإلكتروني (Email)</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-xl shadow-lg hover:from-emerald-700 hover:to-teal-700 transition text-sm">
+                        إنشاء الجمعية ونشرها
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <section id="screen-browse-jamiya" class="screen hide animate-fade space-y-6">
+            <div class="glass-card p-6 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <span class="px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full mb-2 inline-block" id="badgeJamiyaStatus">نشطة وقيد التدوير</span>
+                    <h2 class="text-2xl font-black text-slate-900" id="displayJName">اسم الجمعية</h2>
+                    <p class="text-xs text-slate-500 mt-1">الاشتراك: <span id="displayJAmount" class="font-bold text-slate-700">0</span> ريال | موعد السداد أقصاه يوم <span id="displayJLastDay">0</span> من كل شهر</p>
+                </div>
+                <div class="flex items-center space-x-2 space-x-reverse">
+                    <button onclick="openInviteModal()" class="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow hover:bg-emerald-700 transition flex items-center space-x-2 space-x-reverse">
+                        <i class="fa-solid fa-user-plus"></i>
+                        <span>إضافة أعضاء</span>
+                    </button>
+                    <button onclick="openAiAdvisorModal()" class="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl shadow hover:bg-indigo-700 transition flex items-center space-x-2 space-x-reverse">
+                        <i class="fa-solid fa-robot"></i>
+                        <span>المساعد الذكي</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Current Month Recipient Alert Box -->
+            <div id="recipientAlertContainer" class="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-6 rounded-3xl shadow-lg relative overflow-hidden">
+                <div class="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <div class="flex items-center space-x-2 space-x-reverse mb-1">
+                            <i class="fa-solid fa-award text-yellow-200"></i>
+                            <span class="text-xs font-bold text-yellow-100 uppercase tracking-wider">مستلم دفعة هذا الشهر</span>
+                        </div>
+                        <h3 class="text-xl font-black" id="currentRecipientName">اسم المستلم</h3>
+                        <p class="text-xs text-amber-100 mt-1">البنك: <span id="currentRecipientBank">الراجحي</span> | الآيبان: <span id="currentRecipientIban">SA000...</span></p>
+                    </div>
+                    <div id="paymentActionArea">
+                        <!-- Dynamic payment or confirmation button -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Members list grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Registered Members Column -->
+                <div class="glass-card p-5 rounded-2xl shadow-sm md:col-span-2">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="font-bold text-slate-800 text-sm flex items-center space-x-2 space-x-reverse">
+                            <i class="fa-solid fa-users text-emerald-600"></i>
+                            <span>الأعضاء المسجلين وترتيب القبط</span>
+                        </h4>
+                        <span class="text-xs bg-slate-100 px-2 py-1 rounded-lg text-slate-600 font-semibold" id="memberCountBadge">0 أعضاء</span>
+                    </div>
+                    <div id="membersListContainer" class="space-y-3">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Pending Invitations & Stats Column -->
+                <div class="space-y-6">
+                    <div class="glass-card p-5 rounded-2xl shadow-sm">
+                        <h4 class="font-bold text-slate-800 text-sm mb-4 flex items-center space-x-2 space-x-reverse">
+                            <i class="fa-solid fa-clock-rotate-left text-amber-500"></i>
+                            <span>الأعضاء المنتظر قبولهم</span>
+                        </h4>
+                        <div id="pendingMembersContainer" class="space-y-2">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <div class="glass-card p-5 rounded-2xl shadow-sm">
+                        <h4 class="font-bold text-slate-800 text-sm mb-3 flex items-center space-x-2 space-x-reverse">
+                            <i class="fa-solid fa-chart-pie text-secondary-600"></i>
+                            <span>حالة التحصيل هذا الشهر</span>
+                        </h4>
+                        <div class="space-y-2 text-xs">
+                            <div class="flex justify-between text-slate-600">
+                                <span>المبلغ الإجمالي المستهدف:</span>
+                                <span class="font-bold text-slate-900" id="statTargetAmount">0 ريال</span>
+                            </div>
+                            <div class="flex justify-between text-slate-600">
+                                <span>المحصل حتى الآن:</span>
+                                <span class="font-bold text-emerald-600" id="statCollectedAmount">0 ريال</span>
+                            </div>
+                            <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden mt-2">
+                                <div id="collectionProgressBar" class="bg-emerald-500 h-full w-0 transition-all duration-500"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="screen-owner-dashboard" class="screen hide animate-fade space-y-6">
+            <div class="glass-card p-6 rounded-3xl shadow-xl bg-gradient-to-r from-slate-900 to-indigo-950 text-white">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <span class="px-3 py-1 bg-indigo-500/30 text-indigo-300 text-xs font-bold rounded-full mb-2 inline-block">لوحة تحكم مالك التطبيق</span>
+                        <h2 class="text-2xl font-black">إدارة المنصة العامة</h2>
+                        <p class="text-xs text-slate-300 mt-1">مرحباً بك يا مالك المنصة. تشرف على كافة الجمعيات والأعضاء المسجلين.</p>
+                    </div>
+                    <button onclick="goToHome()" class="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition">الرئيسية</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="glass-card p-5 rounded-2xl shadow-sm">
+                    <p class="text-xs text-slate-500">إجمالي الجمعيات النشطة</p>
+                    <h3 class="text-2xl font-black text-slate-900 mt-1" id="adminTotalJamiyat">0</h3>
+                </div>
+                <div class="glass-card p-5 rounded-2xl shadow-sm">
+                    <p class="text-xs text-slate-500">إجمالي المستخدمين المسجلين</p>
+                    <h3 class="text-2xl font-black text-slate-900 mt-1" id="adminTotalUsers">0</h3>
+                </div>
+                <div class="glass-card p-5 rounded-2xl shadow-sm">
+                    <p class="text-xs text-slate-500">إجمالي الأموال المتداولة</p>
+                    <h3 class="text-2xl font-black text-emerald-600 mt-1" id="adminTotalMoney">0 ريال</h3>
+                </div>
+            </div>
+
+            <div class="glass-card p-6 rounded-3xl shadow-xl">
+                <h3 class="font-bold text-slate-900 text-base mb-4">قائمة كافة الجمعيات في المنصة</h3>
+                <div id="adminJamiyatList" class="space-y-3">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+
+    <!-- Payment Proof Modal -->
+    <div id="paymentModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hide animate-fade">
+        <div class="bg-white max-w-md w-full p-6 rounded-3xl shadow-2xl space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-slate-900 text-lg">إثبات سداد القسط الشهري</h3>
+                <button onclick="closePaymentModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <p class="text-xs text-slate-500">قم برفع إيصال الحوالة البنكية وتأكيد القيمة المحولة لمستحق هذا الشهر.</p>
+            
+            <form onsubmit="submitPaymentProof(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">المبلغ المحول (ريال)</label>
+                    <input type="number" id="payAmountInput" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">صورة أو مرفق الإيصال (ملف أو صورة)</label>
+                    <input type="file" id="payAttachmentInput" accept="image/*,.pdf" required class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100">
+                </div>
+                <button type="submit" class="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow hover:bg-emerald-700 transition text-sm">
+                    إرسال إثبات السداد للمستلم
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Invite Members Modal -->
+    <div id="inviteModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hide animate-fade">
+        <div class="bg-white max-w-md w-full p-6 rounded-3xl shadow-2xl space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-slate-900 text-lg">إضافة أو دعوة فرد للجمعية</h3>
+                <button onclick="closeInviteModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form onsubmit="handleInviteMember(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">اسم العضو</label>
+                    <input type="text" id="invName" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="اسم العضو العائلي">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">رقم الجوال أو البريد الإلكتروني</label>
+                    <input type="text" id="invContact" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="05xxxxxxxx أو email@fam.com">
+                </div>
+                <button type="submit" class="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow hover:bg-emerald-700 transition text-sm">
+                    إرسال دعوة الانضمام
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- AI Advisor Modal -->
+    <div id="aiModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hide animate-fade">
+        <div class="bg-white max-w-lg w-full p-6 rounded-3xl shadow-2xl space-y-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-2 space-x-reverse">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <h3 class="font-bold text-slate-900 text-base">المساعد المالي الذكي (Gemini)</h3>
+                </div>
+                <button onclick="closeAiAdvisorModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div id="aiChatBox" class="bg-slate-50 p-4 rounded-2xl h-64 overflow-y-auto space-y-3 text-xs text-slate-700 border border-slate-100">
+                <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-100">
+                    أهلاً بك! أنا مستشارك الذكي لإدارة الجمعيات العائلية. كيف يمكنني مساعدتك في حساب ترتيب القبط أو نصائح الادخار اليوم؟
+                </div>
+            </div>
+            <div class="flex space-x-2 space-x-reverse">
+                <input type="text" id="aiQueryInput" placeholder="اطرح سؤالاً مالياً أو اطلب صياغة تذكير..." class="flex-grow px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xs">
+                <button onclick="sendAiQuery()" class="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-xs hover:bg-indigo-700 transition">إرسال</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-5 left-5 z-50 space-y-2"></div>
+
+    <script>
+        // Owner Email Identifier
+        const OWNER_EMAIL = "owner@aljamiyah.sa";
+
+        // Global Application State
+        let currentUser = null; // { name, email, phone, bank, iban }
+        let isAuthRegisterMode = false;
+        let jamiyatList = [
+            {
+                id: 'j-101',
+                name: 'جمعية عائلة آل فهيد الكبرى',
+                count: 5,
+                amount: 1000,
+                startDate: '2026-03-01',
+                lastDay: 5,
+                payDay: 10,
+                notifyChannel: 'whatsapp',
+                creatorEmail: 'owner@aljamiyah.sa',
+                members: [
+                    { id: 'm-1', name: 'محمد الفهيد (المالك)', contact: 'owner@aljamiyah.sa', status: 'registered', order: 1, paid: true, proof: 'receipt_1.pdf' },
+                    { id: 'm-2', name: 'سارة الفهيد', contact: 'sara@fam.com', status: 'registered', order: 2, paid: false, proof: null },
+                    { id: 'm-3', name: 'عبدالله الفهيد', contact: 'abdullah@fam.com', status: 'registered', order: 3, paid: false, proof: null },
+                    { id: 'm-4', name: 'فهد الفهيد', contact: 'fahad@fam.com', status: 'pending', order: 4, paid: false, proof: null },
+                    { id: 'm-5', name: 'نورة الفهيد', contact: 'noura@fam.com', status: 'pending', order: 5, paid: false, proof: null }
+                ]
+            }
+        ];
+        let activeJamiyaId = null;
+
+        // Initialize App on Window Load
+        window.onload = function() {
+            // Load saved state if any
+            const savedUser = localStorage.getItem('jamiyah_current_user');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+            }
+            renderNavigation();
+            goToHome();
+        };
+
+        // Navigation Controller
+        function goToScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.add('hide'));
+            const target = document.getElementById(screenId);
+            if (target) {
+                target.classList.remove('hide');
+            }
+            renderNavigation();
+        }
+
+        function goToHome() {
+            renderHomeScreen();
+            if (currentUser && currentUser.email === OWNER_EMAIL) {
+                // If owner, show option or let them see owner dash easily
+            }
+        }
+
+        // Render Navigation Header Actions
+        function renderNavigation() {
+            const nav = document.getElementById('navActions');
+            const roleBadge = document.getElementById('headerRoleBadge');
+            nav.innerHTML = '';
+
+            if (currentUser) {
+                if (currentUser.email === OWNER_EMAIL) {
+                    roleBadge.innerHTML = '<span class="text-indigo-600 font-bold"><i class="fa-solid fa-shield-halved ml-1"></i>مالك التطبيق</span>';
+                    nav.innerHTML += `<button onclick="goToScreen('screen-owner-dashboard'); renderOwnerDashboard();" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-bold hover:bg-indigo-100 transition">لوحة المالك</button>`;
+                } else {
+                    roleBadge.innerText = currentUser.name || currentUser.email;
+                }
+                nav.innerHTML += `<button onclick="handleLogout()" class="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-xl text-xs font-bold hover:bg-rose-100 transition"><i class="fa-solid fa-right-from-bracket ml-1"></i>خروج</button>`;
+            } else {
+                roleBadge.innerText = 'منصة التعاون العائلي';
+                nav.innerHTML += `<button onclick="openAuthModal(false)" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition">تسجيل الدخول</button>`;
+            }
+        }
+
+        // Render Home Screen Dynamically based on login status
+        function renderHomeScreen() {
+            goToScreen('screen-home');
+            const container = document.getElementById('dynamicHomeButtons');
+            container.innerHTML = '';
+
+            if (!currentUser) {
+                // Logged out: Show Login or Join a Jamiya
+                container.innerHTML = `
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                        <button onclick="openAuthModal(false)" class="px-6 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-2xl shadow-lg hover:from-emerald-700 hover:to-teal-700 transition flex items-center justify-center space-x-2 space-x-reverse text-sm">
+                            <i class="fa-solid fa-right-to-bracket"></i>
+                            <span>تسجيل الدخول</span>
+                        </button>
+                        <button onclick="openAuthModal(true)" class="px-6 py-3.5 bg-white border border-emerald-200 text-emerald-700 font-bold rounded-2xl shadow-sm hover:bg-emerald-50 transition flex items-center justify-center space-x-2 space-x-reverse text-sm">
+                            <i class="fa-solid fa-user-plus"></i>
+                            <span>انضمام لجمعية عائلية</span>
+                        </button>
+                    </div>
+                `;
+            } else {
+                // Logged in: Show Create a New Family Jamiya and existing jamiyat list
+                let jamiyatHtml = '';
+                jamiyatList.forEach(j => {
+                    const isCreator = j.creatorEmail === currentUser.email;
+                    jamiyatHtml += `
+                        <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex justify-between items-center text-right">
+                            <div>
+                                <h4 class="font-bold text-slate-800 text-sm">${j.name}</h4>
+                                <p class="text-xs text-slate-500 mt-0.5">القيمة: ${j.amount} ريال | الأعضاء: ${j.count}</p>
+                                ${isCreator ? '<span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md font-bold mt-1 inline-block">أنت مشرف الجمعية</span>' : ''}
+                            </div>
+                            <button onclick="openJamiya('${j.id}')" class="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition">دخول الجمعية</button>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = `
+                    <div class="space-y-4">
+                        <button onclick="goToScreen('screen-create-jamiya')" class="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-2xl shadow-xl hover:from-emerald-700 hover:to-teal-700 transition flex items-center justify-center space-x-2 space-x-reverse text-base">
+                            <i class="fa-solid fa-circle-plus text-lg"></i>
+                            <span>إنشاء جمعية عائلية جديدة</span>
+                        </button>
+                        <div class="text-right pt-4 border-t border-slate-100">
+                            <h4 class="font-bold text-slate-800 text-sm mb-3">الجمعيات المتاحة لك:</h4>
+                            <div class="space-y-2 max-h-60 overflow-y-auto">
+                                ${jamiyatHtml || '<p class="text-xs text-slate-400">لا توجد جمعيات مضافة بعد.</p>'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Auth Modal & Handlers
+        function openAuthModal(isRegister) {
+            isAuthRegisterMode = isRegister;
+            document.getElementById('authTitle').innerText = isRegister ? 'تسجيل حساب جديد' : 'تسجيل الدخول';
+            document.getElementById('authSubmitBtn').innerText = isRegister ? 'إنشاء الحساب' : 'دخول';
+            document.getElementById('authSwitchText').innerText = isRegister ? 'لديك حساب بالفعل؟ سجل دخولك' : 'ليس لديك حساب؟ سجل حساب جديد الآن';
+            
+            if (isRegister) {
+                document.getElementById('nameFieldContainer').classList.remove('hide');
+                document.getElementById('extraRegFields').classList.remove('hide');
+            } else {
+                document.getElementById('nameFieldContainer').classList.add('hide');
+                document.getElementById('extraRegFields').classList.add('hide');
+            }
+            goToScreen('screen-auth');
+        }
+
+        function toggleAuthMode() {
+            openAuthModal(!isAuthRegisterMode);
+        }
+
+        function simulateGoogleLogin() {
+            // Quick Google Login simulation allowing owner or regular user
+            currentUser = {
+                name: 'محمد الفهيد',
+                email: OWNER_EMAIL,
+                phone: '0555555555',
+                bank: 'مصرف الراجحي',
+                iban: 'SA0380000000608010101010'
+            };
+            localStorage.setItem('jamiyah_current_user', JSON.stringify(currentUser));
+            showToast('تم تسجيل الدخول بواسطة جوجل بنجاح!', 'success');
+            goToHome();
+        }
+
+        function handleAuthSubmit(event) {
+            event.preventDefault();
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+
+            if (isAuthRegisterMode) {
+                const name = document.getElementById('regName').value;
+                const phone = document.getElementById('regPhone').value;
+                const bank = document.getElementById('regBank').value;
+                const iban = document.getElementById('regIban').value;
+                const terms = document.getElementById('termsCheck').checked;
+
+                if (!terms) {
+                    showToast('يجب الموافقة على الشروط والأحكام', 'error');
+                    return;
+                }
+
+                currentUser = { name, email, phone, bank, iban };
+                showToast('تم إنشاء الحساب بنجاح!', 'success');
+            } else {
+                // Login check
+                currentUser = {
+                    name: email === OWNER_EMAIL ? 'مالك التطبيق' : 'عضو عائلي',
+                    email: email,
+                    phone: '0512345678',
+                    bank: 'مصرف الراجحي',
+                    iban: 'SA990000000000000000'
+                };
+                showToast('تم تسجيل الدخول بنجاح!', 'success');
+            }
+
+            localStorage.setItem('jamiyah_current_user', JSON.stringify(currentUser));
+            goToHome();
+        }
+
+        function handleLogout() {
+            currentUser = null;
+            localStorage.removeItem('jamiyah_current_user');
+            showToast('تم تسجيل الخروج بنجاح', 'info');
+            goToHome();
+        }
+
+        // Create Jamiya Handler
+        function handleCreateJamiya(event) {
+            event.preventDefault();
+            const name = document.getElementById('jName').value;
+            const count = parseInt(document.getElementById('jCount').value);
+            const amount = parseFloat(document.getElementById('jAmount').value);
+            const startDate = document.getElementById('jStartDate').value;
+            const lastDay = parseInt(document.getElementById('jLastDay').value);
+            const payDay = parseInt(document.getElementById('jPayDay').value);
+            const notifyChannel = document.getElementById('jNotifyChannel').value;
+
+            const newJamiya = {
+                id: 'j-' + Date.now(),
+                name,
+                count,
+                amount,
+                startDate,
+                lastDay,
+                payDay,
+                notifyChannel,
+                creatorEmail: currentUser.email,
+                members: [
+                    { id: 'm-creator', name: currentUser.name || 'مشرف الجمعية', contact: currentUser.email, status: 'registered', order: 1, paid: false, proof: null }
+                ]
+            };
+
+            jamiyatList.push(newJamiya);
+            showToast('تم إنشاء الجمعية بنجاح وتم إرسال الإشعارات للأعضاء عبر ' + notifyChannel, 'success');
+            openJamiya(newJamiya.id);
+        }
+
+        // Open Jamiya and Render Dashboard
+        function openJamiya(jId) {
+            const j = jamiyatList.find(item => item.id === jId);
+            if (!j) return;
+            activeJamiyaId = jId;
+
+            document.getElementById('displayJName').innerText = j.name;
+            document.getElementById('displayJAmount').innerText = j.amount;
+            document.getElementById('displayJLastDay').innerText = j.lastDay;
+
+            // Determine recipient of the month (order 1 for demo or rotation)
+            const recipient = j.members.find(m => m.order === 1) || j.members[0];
+            document.getElementById('currentRecipientName').innerText = recipient.name;
+            document.getElementById('currentRecipientBank').innerText = recipient.bank || 'مصرف الراجحي';
+            document.getElementById('currentRecipientIban').innerText = recipient.iban || 'SA12345678901234567890';
+
+            // Check if current user is recipient or payer
+            const paymentArea = document.getElementById('paymentActionArea');
+            const isUserRecipient = recipient.contact === currentUser?.email || recipient.name.includes(currentUser?.name || '');
+
+            if (isUserRecipient) {
+                paymentArea.innerHTML = `
+                    <span class="px-3 py-1 bg-yellow-400 text-slate-900 text-xs font-bold rounded-xl inline-block mb-2">أنت مستلم دفعة هذا الشهر</span>
+                    <p class="text-xs text-amber-100">قم بمراجعة الإيصالات الواردة وتأكيد استلام الدفعات من الأعضاء.</p>
+                `;
+            } else {
+                paymentArea.innerHTML = `
+                    <button onclick="openPaymentModal()" class="px-5 py-2.5 bg-white text-orange-600 font-bold rounded-xl shadow hover:bg-amber-50 transition text-xs flex items-center space-x-2 space-x-reverse">
+                        <i class="fa-solid fa-file-arrow-up"></i>
+                        <span>رفع إثبات سداد القسط</span>
+                    </button>
+                `;
+            }
+
+            // Render members lists
+            renderMembersLists(j);
+            goToScreen('screen-browse-jamiya');
+        }
+
+        function renderMembersLists(j) {
+            const membersContainer = document.getElementById('membersListContainer');
+            const pendingContainer = document.getElementById('pendingMembersContainer');
+            membersContainer.innerHTML = '';
+            pendingContainer.innerHTML = '';
+
+            let collected = 0;
+            let registeredCount = 0;
+
+            j.members.forEach(m => {
+                if (m.status === 'registered') {
+                    registeredCount++;
+                    if (m.paid) collected += j.amount;
+
+                    membersContainer.innerHTML += `
+                        <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center text-xs">
+                            <div class="flex items-center space-x-3 space-x-reverse">
+                                <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center">${m.order}</span>
+                                <div>
+                                    <p class="font-bold text-slate-800">${m.name}</p>
+                                    <p class="text-[10px] text-slate-400">${m.contact}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2 space-x-reverse">
+                                ${m.paid ? '<span class="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-lg font-bold">تم السداد والتأكيد</span>' : '<span class="px-2 py-1 bg-amber-100 text-amber-700 rounded-lg">بانتظار السداد</span>'}
+                                ${m.proof ? `<button onclick="showProof('${m.proof}')" class="text-indigo-600 hover:underline"><i class="fa-solid fa-paperclip"></i></button>` : ''}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    pendingContainer.innerHTML += `
+                        <div class="p-3 bg-amber-50/50 border border-amber-100 rounded-xl flex justify-between items-center text-xs">
+                            <div>
+                                <p class="font-bold text-slate-800">${m.name}</p>
+                                <p class="text-[10px] text-slate-400">${m.contact}</p>
+                            </div>
+                            <span class="text-amber-600 font-semibold">بانتظار التسجيل</span>
+                        </div>
+                    `;
+                }
+            });
+
+            document.getElementById('memberCountBadge').innerText = `${registeredCount} أعضاء`;
+            document.getElementById('statTargetAmount').innerText = `${j.count * j.amount} ريال`;
+            document.getElementById('statCollectedAmount').innerText = `${collected} ريال`;
+            
+            const percentage = (collected / (j.count * j.amount)) * 100;
+            document.getElementById('collectionProgressBar').style.width = `${Math.min(percentage, 100)}%`;
+        }
+
+        // Payment Proof Workflow
+        function openPaymentModal() {
+            document.getElementById('paymentModal').classList.remove('hide');
+        }
+        function closePaymentModal() {
+            document.getElementById('paymentModal').classList.add('hide');
+        }
+        function submitPaymentProof(event) {
+            event.preventDefault();
+            const amount = document.getElementById('payAmountInput').value;
+            const file = document.getElementById('payAttachmentInput').files[0];
+
+            const j = jamiyatList.find(item => item.id === activeJamiyaId);
+            if (j && currentUser) {
+                const member = j.members.find(m => m.contact === currentUser.email) || j.members[0];
+                member.paid = true;
+                member.proof = file ? file.name : 'transfer_receipt.jpg';
+                showToast('تم إرسال إثبات السداد بنجاح لمستשתف الدفعة للمراجعة والتاكيد!', 'success');
+                closePaymentModal();
+                renderMembersLists(j);
+            }
+        }
+        function showProof(proofName) {
+            showToast(`عرض مرفق الإيصال: ${proofName}`, 'info');
+        }
+
+        // Invite Member Modal
+        function openInviteModal() {
+            document.getElementById('inviteModal').classList.remove('hide');
+        }
+        function closeInviteModal() {
+            document.getElementById('inviteModal').classList.add('hide');
+        }
+        function handleInviteMember(event) {
+            event.preventDefault();
+            const name = document.getElementById('invName').value;
+            const contact = document.getElementById('invContact').value;
+
+            const j = jamiyatList.find(item => item.id === activeJamiyaId);
+            if (j) {
+                j.members.push({
+                    id: 'm-' + Date.now(),
+                    name,
+                    contact,
+                    status: 'pending',
+                    order: j.members.length + 1,
+                    paid: false,
+                    proof: null
+                });
+                showToast(`تم إرسال دعوة الانضمام إلى ${name} عبر ${j.notifyChannel}`, 'success');
+                closeInviteModal();
+                renderMembersLists(j);
+            }
+        }
+
+        // AI Advisor Modal
+        function openAiAdvisorModal() {
+            document.getElementById('aiModal').classList.remove('hide');
+        }
+        function closeAiAdvisorModal() {
+            document.getElementById('aiModal').classList.add('hide');
+        }
+        function sendAiQuery() {
+            const input = document.getElementById('aiQueryInput');
+            const box = document.getElementById('aiChatBox');
+            const query = input.value.trim();
+            if (!query) return;
+
+            box.innerHTML += `<div class="bg-indigo-50 p-3 rounded-xl text-indigo-900 text-right">${query}</div>`;
+            input.value = '';
+
+            setTimeout(() => {
+                let aiReply = "بناءً على المعطيات الحالية لجمعيتك العائلية، أنصح بالالتزام بموعد السداد في الخامس من كل شهر لضمان استلام المستحق في وقته المحدد بدون أي تأخير.";
+                if (query.includes('ترتيب') || query.includes('دور')) {
+                    aiReply = "تم ترتيب الأعضاء بناءً على أولوية التسجيل وموافقة الأفراد لتجنب أي تعارض عائلي.";
+                } else if (query.includes('رسالة') || query.includes('تذكير')) {
+                    aiReply = "صيغة التذكير المقترحة: 'السلام عليكم، تنبيه ودي بسداد قسط الجمعية العائلية لهذا الشهر وشكراً لالتزامكم.'";
+                }
+                box.innerHTML += `<div class="bg-white p-3 rounded-xl shadow-sm border border-slate-100 text-slate-800">${aiReply}</div>`;
+                box.scrollTop = box.scrollHeight;
+            }, 600);
+        }
+
+        // Owner Dashboard Render
+        function renderOwnerDashboard() {
+            document.getElementById('adminTotalJamiyat').innerText = jamiyatList.length;
+            let totalUsers = 0;
+            let totalMoney = 0;
+            let listHtml = '';
+
+            jamiyatList.forEach(j => {
+                totalUsers += j.members.length;
+                totalMoney += j.count * j.amount;
+                listHtml += `
+                    <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex justify-between items-center text-xs">
+                        <div>
+                            <h4 class="font-bold text-slate-800 text-sm">${j.name}</h4>
+                            <p class="text-slate-500 mt-1">المشرف: ${j.creatorEmail} | الأعضاء: ${j.count} | الاشتراك: ${j.amount} ريال</p>
+                        </div>
+                        <span class="px-3 py-1 bg-emerald-100 text-emerald-800 font-bold rounded-lg">نشطة</span>
+                    </div>
+                `;
+            });
+
+            document.getElementById('adminTotalUsers').innerText = totalUsers;
+            document.getElementById('adminTotalMoney').innerText = totalMoney + ' ريال';
+            document.getElementById('adminJamiyatList').innerHTML = listHtml;
+        }
+
+        // Toast Notification Helper
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-rose-600' : 'bg-slate-800';
+            toast.className = `${bgClass} text-white px-4 py-3 rounded-2xl shadow-xl text-xs font-bold animate-fade flex items-center space-x-2 space-x-reverse`;
+            toast.innerHTML = `<i class="fa-solid fa-circle-info"></i><span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+    </script>
+</body>
+</html>
