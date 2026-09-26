@@ -306,7 +306,7 @@
                     <div class="flex justify-between items-center mb-4">
                         <h4 class="font-bold text-slate-800 text-sm flex items-center space-x-2 space-x-reverse">
                             <i class="fa-solid fa-users text-emerald-600"></i>
-                            <span>الأعضاء المسجلين وترتيب القبط</span>
+                            <span>الأعضاء المسجلين وترتيب القبض</span>
                         </h4>
                         <span class="text-xs bg-slate-100 px-2 py-1 rounded-lg text-slate-600 font-semibold" id="memberCountBadge">0 أعضاء</span>
                     </div>
@@ -579,7 +579,7 @@
             if (savedJamiyat) jamiyatList = JSON.parse(savedJamiyat);
 
             // Ensure owner exists in registered users
-            if (!registeredUsersList.some(u => u.email === OWNER_EMAIL)) {
+            if (!registeredUsersList.some(u => u.email.toLowerCase() === OWNER_EMAIL.toLowerCase())) {
                 registeredUsersList.push({
                     name: 'محمد الفهيد (المالك)',
                     email: OWNER_EMAIL,
@@ -614,7 +614,7 @@
             nav.innerHTML = '';
 
             if (currentUser) {
-                if (currentUser.email === OWNER_EMAIL) {
+                if (currentUser.email.toLowerCase() === OWNER_EMAIL.toLowerCase()) {
                     roleBadge.innerHTML = '<span class="text-indigo-600 font-bold"><i class="fa-solid fa-shield-halved ml-1"></i>مالك التطبيق</span>';
                     nav.innerHTML += `<button onclick="goToScreen('screen-owner-dashboard'); renderOwnerDashboard();" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-bold hover:bg-indigo-100 transition">لوحة المالك</button>`;
                 } else {
@@ -648,8 +648,8 @@
             } else {
                 let jamiyatHtml = '';
                 jamiyatList.forEach(j => {
-                    const isCreator = j.creatorEmail === currentUser.email;
-                    const isMember = j.members.some(m => m.contact === currentUser.email || m.name.includes(currentUser.name));
+                    const isCreator = j.creatorEmail.toLowerCase() === currentUser.email.toLowerCase();
+                    const isMember = j.members.some(m => (m.contact || '').toLowerCase() === currentUser.email.toLowerCase() || m.name.includes(currentUser.name));
                     if (isCreator || isMember) {
                         jamiyatHtml += `
                             <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex justify-between items-center text-right">
@@ -673,7 +673,7 @@
                         <div class="text-right pt-4 border-t border-slate-100">
                             <h4 class="font-bold text-slate-800 text-sm mb-3">الجمعيات الخاصة بك:</h4>
                             <div class="space-y-2 max-h-60 overflow-y-auto">
-                                ${jamiyatHtml || '<p class="text-xs text-slate-400">لست منضمًا لأي جمعية بعد. أنشئ جمعيتك الأولى أو انتظر دعوة!</p>'}
+                                ${jamiyatHtml || '<p class="text-xs text-slate-400">لست منضمًا لأي جمعية بعد. أنشئ جمعيتك الأولى أو انتظر قبول دعوة!</p>'}
                             </div>
                         </div>
                     </div>
@@ -768,7 +768,7 @@
 
         async function handleAuthSubmit(event) {
             event.preventDefault();
-            const email = document.getElementById('authEmail').value.trim();
+            const email = document.getElementById('authEmail').value.trim().toLowerCase();
             const password = document.getElementById('authPassword').value;
 
             if (!isValidEmail(email)) {
@@ -796,7 +796,7 @@
                 pendingUser = { name, email, phone, bank, iban, password };
                 goToScreen('screen-verify');
             } else {
-                if (email === OWNER_EMAIL) {
+                if (email === OWNER_EMAIL.toLowerCase()) {
                     if (password !== OWNER_PASS) {
                         showToast('كلمة مرور مالك التطبيق غير صحيحة', 'error');
                         return;
@@ -809,7 +809,7 @@
                         iban: 'SA000000000000000000'
                     };
                 } else {
-                    let found = registeredUsersList.find(u => u.email === email);
+                    let found = registeredUsersList.find(u => u.email.toLowerCase() === email);
                     if (!found) {
                         currentUser = {
                             name: 'عضو عائلي',
@@ -834,8 +834,10 @@
         function completeVerification() {
             if (pendingUser) {
                 currentUser = pendingUser;
-                registeredUsersList.push(currentUser);
-                localStorage.setItem('jamiyah_all_users', JSON.stringify(registeredUsersList));
+                if (!registeredUsersList.some(u => u.email.toLowerCase() === currentUser.email.toLowerCase())) {
+                    registeredUsersList.push(currentUser);
+                    localStorage.setItem('jamiyah_all_users', JSON.stringify(registeredUsersList));
+                }
                 localStorage.setItem('jamiyah_current_user', JSON.stringify(currentUser));
                 pendingUser = null;
                 showToast('تم التحقق من البريد وتفعيل الحساب بنجاح!', 'success');
@@ -888,7 +890,9 @@
             const j = jamiyatList.find(item => item.id === jId);
             if (j) {
                 j.members.forEach(m => {
-                    if (m.contact === currentUser.email || m.contact === currentUser.phone) {
+                    const mContact = (m.contact || '').toLowerCase().trim();
+                    const uEmail = (currentUser.email || '').toLowerCase().trim();
+                    if (mContact === uEmail || (currentUser.phone && m.contact.trim() === currentUser.phone)) {
                         m.status = 'registered';
                     }
                 });
@@ -945,7 +949,7 @@
             document.getElementById('currentRecipientIban').innerText = recipient.iban || 'SA12345678901234567890';
 
             const paymentArea = document.getElementById('paymentActionArea');
-            const isUserRecipient = recipient.contact === currentUser?.email || recipient.name.includes(currentUser?.name || '');
+            const isUserRecipient = recipient.contact.toLowerCase() === currentUser?.email.toLowerCase() || recipient.name.includes(currentUser?.name || '');
 
             if (isUserRecipient) {
                 paymentArea.innerHTML = `
@@ -980,7 +984,7 @@
                     if (m.paid) collected += j.amount;
 
                     const isRecipient = index === 0;
-                    const isUserRecipient = (j.members.find(mem => mem.order === 1)?.contact === currentUser?.email);
+                    const isUserRecipient = (j.members.find(mem => mem.order === 1)?.contact.toLowerCase() === currentUser?.email.toLowerCase());
 
                     membersContainer.innerHTML += `
                         <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center text-xs">
@@ -1000,12 +1004,15 @@
                     `;
                 } else {
                     pendingContainer.innerHTML += `
-                        <div class="p-3 bg-amber-50/50 border border-amber-100 rounded-xl flex justify-between items-center text-xs">
+                        <div class="p-3 bg-amber-50/60 border border-amber-200 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs">
                             <div>
-                                <p class="font-bold text-slate-800">${m.name}</p>
-                                <p class="text-[10px] text-slate-400">${m.contact}</p>
+                                <p class="font-bold text-slate-900">${m.name}</p>
+                                <p class="text-[11px] text-slate-500 break-all">${m.contact}</p>
                             </div>
-                            <span class="text-amber-600 font-semibold">بانتظار قبول الدعوة</span>
+                            <div class="flex items-center space-x-1.5 space-x-reverse self-end sm:self-center">
+                                <button onclick="resendInvitation('${j.id}', '${m.contact}')" class="px-2.5 py-1 bg-white border border-amber-300 text-amber-700 rounded-lg text-[10px] font-bold hover:bg-amber-100 transition">إعادة إرسال</button>
+                                <button onclick="cancelInvitation('${j.id}', '${m.contact}')" class="px-2.5 py-1 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-bold hover:bg-rose-100 transition">إلغاء</button>
+                            </div>
                         </div>
                     `;
                 }
@@ -1032,7 +1039,7 @@
 
             const j = jamiyatList.find(item => item.id === activeJamiyaId);
             if (j && currentUser) {
-                const member = j.members.find(m => m.contact === currentUser.email || m.contact === currentUser.phone) || j.members[0];
+                const member = j.members.find(m => m.contact.toLowerCase() === currentUser.email.toLowerCase() || m.contact === currentUser.phone) || j.members[0];
                 member.proof = file ? file.name : 'transfer_receipt.jpg';
                 localStorage.setItem('jamiyah_all_list', JSON.stringify(jamiyatList));
                 showToast('تم إرسال إثبات السداد بنجاح لمستلم الدفعة للمراجعة والتاكيد!', 'success');
@@ -1064,13 +1071,20 @@
         function closeInviteModal() {
             document.getElementById('inviteModal').classList.add('hide');
         }
+
         function handleInviteMember(event) {
             event.preventDefault();
             const name = document.getElementById('invName').value.trim();
-            const contact = document.getElementById('invContact').value.trim();
+            const contact = document.getElementById('invContact').value.trim().toLowerCase();
 
             const j = jamiyatList.find(item => item.id === activeJamiyaId);
             if (j) {
+                // Prevent duplicate email/contact in the same Jamiya
+                if (j.members.some(m => m.contact.toLowerCase() === contact)) {
+                    showToast('هذا البريد أو رقم الجوال مسجل مسبقاً في هذه الجمعية!', 'error');
+                    return;
+                }
+
                 j.members.push({
                     id: 'm-' + Date.now(),
                     name,
@@ -1082,10 +1096,25 @@
                 });
                 localStorage.setItem('jamiyah_all_list', JSON.stringify(jamiyatList));
                 
-                // Simulate sending official email notification
-                showToast(`📧 تم إرسال بريد إلكتروني رسمي إلى (${contact}) يتضمن دعوة الانضمام للجمعية بنجاح!`, 'success');
-                
+                showToast(`📧 تم إرسال بريد دعوة رسمي بنجاح إلى (${contact}) وسيظهر لديه فور تسجيل دخوله!`, 'success');
                 closeInviteModal();
+                renderMembersLists(j);
+            }
+        }
+
+        function resendInvitation(jId, contact) {
+            const j = jamiyatList.find(item => item.id === jId);
+            if (j) {
+                showToast(`📧 تم إعادة إرسال بريد دعوة الانضمام بنجاح إلى (${contact})`, 'success');
+            }
+        }
+
+        function cancelInvitation(jId, contact) {
+            const j = jamiyatList.find(item => item.id === jId);
+            if (j) {
+                j.members = j.members.filter(m => m.contact.toLowerCase() !== contact.toLowerCase());
+                localStorage.setItem('jamiyah_all_list', JSON.stringify(jamiyatList));
+                showToast('تم إلغاء وحذف طلب الانضمام بنجاح', 'info');
                 renderMembersLists(j);
             }
         }
@@ -1144,7 +1173,7 @@
                     <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-1">
                         <div class="flex justify-between items-center">
                             <h4 class="font-bold text-slate-900 text-sm">${u.name || 'بدون اسم'}</h4>
-                            <span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold">${u.email === OWNER_EMAIL ? 'المالك' : 'عضو'}</span>
+                            <span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold">${u.email.toLowerCase() === OWNER_EMAIL.toLowerCase() ? 'المالك' : 'عضو'}</span>
                         </div>
                         <p class="text-slate-600">الإيميل: ${u.email} | الجوال: ${u.phone || 'غير مسجل'}</p>
                         <p class="text-[10px] text-slate-400">البنك: ${u.bank || '-'} | الآيبان: ${u.iban || '-'}</p>
