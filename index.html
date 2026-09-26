@@ -726,7 +726,7 @@
         }
 
         function handleGoogleUser(email, name) {
-            let existing = registeredUsersList.find(u => u.email === email);
+            let existing = registeredUsersList.find(u => u.email.toLowerCase() === email.toLowerCase());
             if (!existing) {
                 pendingUser = { name, email, phone: '', bank: 'مصرف الراجحي', iban: '' };
                 document.getElementById('profileCompletionModal').classList.remove('hide');
@@ -854,9 +854,13 @@
         function checkPendingInvitations() {
             if (!currentUser) return;
             let pendingJamiyat = [];
+            const userEmail = (currentUser.email || '').toLowerCase().trim();
+            const userPhone = (currentUser.phone || '').trim();
+
             jamiyatList.forEach(j => {
                 j.members.forEach(m => {
-                    if ((m.contact === currentUser.email || m.contact === currentUser.phone) && m.status === 'pending') {
+                    const mContact = (m.contact || '').toLowerCase().trim();
+                    if (((mContact === userEmail) || (userPhone && m.contact.trim() === userPhone)) && m.status === 'pending') {
                         pendingJamiyat.push(j);
                     }
                 });
@@ -1077,7 +1081,10 @@
                     proof: null
                 });
                 localStorage.setItem('jamiyah_all_list', JSON.stringify(jamiyatList));
-                showToast(`تم إرسال دعوة الانضمام الرسمية عبر البريد الإلكتروني إلى ${name} (${contact}) بنجاح!`, 'success');
+                
+                // Simulate sending official email notification
+                showToast(`📧 تم إرسال بريد إلكتروني رسمي إلى (${contact}) يتضمن دعوة الانضمام للجمعية بنجاح!`, 'success');
+                
                 closeInviteModal();
                 renderMembersLists(j);
             }
