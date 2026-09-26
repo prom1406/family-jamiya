@@ -119,7 +119,7 @@
                 <!-- Google Sign-In Button -->
                 <button onclick="loginWithGoogle()" class="w-full mb-4 py-3 px-4 border border-slate-200 rounded-xl font-semibold text-slate-700 bg-white hover:bg-slate-50 shadow-sm flex items-center justify-center space-x-3 space-x-reverse transition">
                     <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="Google">
-                    <span>المتابعة باستخدام حساب جوجل</span>
+                    <span>المتابعة باستخدام حساب جوجل الحقيقي</span>
                 </button>
 
                 <div class="flex items-center my-4">
@@ -196,9 +196,9 @@
                 <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-2xl">
                     <i class="fa-solid fa-envelope-circle-check"></i>
                 </div>
-                <h3 class="text-2xl font-bold text-slate-900">التحقق من البريد الإلكتروني</h3>
+                <h3 class="text-2xl font-bold text-slate-900">التحقق من البريد الإلكتروني الحقيقي</h3>
                 <p class="text-xs text-slate-600 leading-relaxed">
-                    تم إرسال رابط التحقق إلى بريدك الإلكتروني الحقيقي. يرجى تأكيد البريد للمتابعة في تفعيل حسابك بالمنصة.
+                    تم إرسال رابط التحقق إلى بريدك الإلكتروني. يرجى تأكيد البريد للمتابعة في تفعيل حسابك بالمنصة.
                 </p>
                 <div class="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-xs text-emerald-800">
                     تم التحقق من أن البريد صحيح وغير وهمي، جاهز للتفعيل.
@@ -406,36 +406,6 @@
 
     </main>
 
-    <!-- Google Account Picker / Fallback Modal -->
-    <div id="googlePickerModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hide animate-fade">
-        <div class="bg-white max-w-sm w-full p-6 rounded-3xl shadow-2xl space-y-4 text-center">
-            <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto text-xl">
-                <i class="fa-brands fa-google"></i>
-            </div>
-            <h3 class="font-bold text-slate-900 text-lg">اختر حساب جوجل للمتابعة</h3>
-            <p class="text-xs text-slate-500">اختر أحد الحسابات أو سجل كمالك المنصة:</p>
-            
-            <div class="space-y-2 text-right">
-                <button onclick="selectGoogleAccount('mamydady87@gmail.com', 'محمد الفهيد (المالك)')" class="w-full p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl flex items-center space-x-3 space-x-reverse transition">
-                    <div class="w-8 h-8 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center text-xs">م</div>
-                    <div>
-                        <p class="font-bold text-xs text-slate-800">محمد الفهيد (مالك التطبيق)</p>
-                        <p class="text-[10px] text-slate-500">mamydady87@gmail.com</p>
-                    </div>
-                </button>
-                <button onclick="selectGoogleAccount('user.family@gmail.com', 'عضو عائلي (تجريبي)')" class="w-full p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl flex items-center space-x-3 space-x-reverse transition">
-                    <div class="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs">ع</div>
-                    <div>
-                        <p class="font-bold text-xs text-slate-800">عضو عائلي</p>
-                        <p class="text-[10px] text-slate-500">user.family@gmail.com</p>
-                    </div>
-                </button>
-            </div>
-
-            <button onclick="document.getElementById('googlePickerModal').classList.add('hide')" class="w-full py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-300 transition">إلغاء</button>
-        </div>
-    </div>
-
     <!-- First-Time Google Profile Completion Modal -->
     <div id="profileCompletionModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hide animate-fade">
         <div class="bg-white max-w-md w-full p-6 rounded-3xl shadow-2xl space-y-4">
@@ -540,7 +510,7 @@
                     <input type="text" id="invContact" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="05xxxxxxxx أو email@domain.com">
                 </div>
                 <button type="submit" class="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow hover:bg-emerald-700 transition text-sm">
-                    إرسال دعوة الانضمام عبر الإيميل
+                    إرسال دعوة الانضمام عبر البريد الإلكتروني
                 </button>
             </form>
         </div>
@@ -751,20 +721,13 @@
                 }
                 throw new Error("Auth not initialized");
             } catch (error) {
-                document.getElementById('googlePickerModal').classList.remove('hide');
+                showToast('فشل تسجيل الدخول بجوجل: ' + error.message, 'error');
             }
         }
 
-        function selectGoogleAccount(email, name) {
-            document.getElementById('googlePickerModal').classList.add('hide');
-            handleGoogleUser(email, name);
-        }
-
         function handleGoogleUser(email, name) {
-            // Check if user already exists in registered users list
             let existing = registeredUsersList.find(u => u.email === email);
             if (!existing) {
-                // First time Google Login: Force profile completion
                 pendingUser = { name, email, phone: '', bank: 'مصرف الراجحي', iban: '' };
                 document.getElementById('profileCompletionModal').classList.remove('hide');
             } else {
@@ -1012,7 +975,7 @@
                     registeredCount++;
                     if (m.paid) collected += j.amount;
 
-                    const isRecipient = index === 0; // order 1
+                    const isRecipient = index === 0;
                     const isUserRecipient = (j.members.find(mem => mem.order === 1)?.contact === currentUser?.email);
 
                     membersContainer.innerHTML += `
