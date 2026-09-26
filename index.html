@@ -65,7 +65,6 @@
 </head>
 <body class="text-slate-800 antialiased flex flex-col min-h-screen">
 
-    <!-- Header -->
     <header class="bg-white shadow-sm sticky top-0 z-50 border-b border-slate-100">
         <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
             <div class="flex items-center space-x-3 space-x-reverse cursor-pointer" onclick="goToHome()">
@@ -404,6 +403,80 @@
             </div>
         </section>
 
+        <!-- SCREEN PROFILE & NOTIFICATIONS -->
+        <section id="screen-profile" class="screen hide animate-fade max-w-xl mx-auto space-y-6">
+            <div class="glass-card p-6 rounded-3xl shadow-xl space-y-6">
+                <div class="flex justify-between items-center border-b border-slate-100 pb-4">
+                    <div class="flex items-center space-x-3 space-x-reverse">
+                        <div id="profileAvatarDisplay" class="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold text-xl shadow-md overflow-hidden">
+                            <span id="profileInitial">م</span>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-lg" id="profileTitleName">اسم المستخدم</h3>
+                            <p class="text-xs text-slate-500" id="profileTitleEmail">email@domain.com</p>
+                        </div>
+                    </div>
+                    <button onclick="goToHome()" class="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-200 transition">الرئيسية</button>
+                </div>
+
+                <!-- Profile Update Form -->
+                <div>
+                    <h4 class="font-bold text-slate-800 text-sm mb-3 flex items-center space-x-2 space-x-reverse">
+                        <i class="fa-solid fa-user-pen text-emerald-600"></i>
+                        <span>تعديل البيانات الشخصية والبنكية</span>
+                    </h4>
+                    <form onsubmit="updateUserProfile(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">اسم العضو</label>
+                            <input type="text" id="pName" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">رقم الجوال</label>
+                            <input type="tel" id="pPhone" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">البنك المفضل</label>
+                            <select id="pBank" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                                <option value="الراجحي">مصرف الراجحي</option>
+                                <option value="الأهلي">البنك الأهلي السعودي (SNB)</option>
+                                <option value="الإنماء">بنك الإنماء</option>
+                                <option value="الرياض">بنك الرياض</option>
+                                <option value="البلاد">بنك البلاد</option>
+                                <option value="الجزيرة">بنك الجزيرة</option>
+                                <option value="الفرنسي">السابي (الفرنسي)</option>
+                                <option value="العرب الوطني">البنك العربي الوطني (ANB)</option>
+                                <option value="الاول">البنك السعودي الأول ( الأول)</option>
+                                <option value="دجيتال/مرابحة">البنك الرقمي / أخرى</option>
+                                <option value="كاش">كاش (نقداً)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">رقم الحساب / الآيبان السعودي</label>
+                            <input type="text" id="pIban" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">صورة البروفايل (رابط صورة أو رفع)</label>
+                            <input type="text" id="pAvatar" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="https://example.com/avatar.jpg">
+                        </div>
+                        <button type="submit" class="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow hover:bg-emerald-700 transition text-sm">
+                            حفظ التعديلات
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Notifications Inbox Section -->
+                <div class="pt-4 border-t border-slate-100">
+                    <h4 class="font-bold text-slate-800 text-sm mb-3 flex items-center space-x-2 space-x-reverse">
+                        <i class="fa-solid fa-bell text-amber-500"></i>
+                        <span>سجل الإشعارات والتنبيهات الواردة</span>
+                    </h4>
+                    <div id="userNotificationsInbox" class="space-y-2 max-h-60 overflow-y-auto">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
     </main>
 
     <!-- First-Time Google Profile Completion Modal -->
@@ -585,7 +658,8 @@
                     email: OWNER_EMAIL,
                     phone: '0500000000',
                     bank: 'مصرف الراجحي',
-                    iban: 'SA000000000000000000'
+                    iban: 'SA000000000000000000',
+                    avatar: ''
                 });
                 localStorage.setItem('jamiyah_all_users', JSON.stringify(registeredUsersList));
             }
@@ -620,7 +694,13 @@
                 } else {
                     roleBadge.innerText = currentUser.name || currentUser.email;
                 }
-                nav.innerHTML += `<button onclick="handleLogout()" class="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-xl text-xs font-bold hover:bg-rose-100 transition"><i class="fa-solid fa-right-from-bracket ml-1"></i>خروج</button>`;
+                nav.innerHTML += `
+                    <button onclick="openProfileScreen()" class="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition flex items-center space-x-1.5 space-x-reverse">
+                        <i class="fa-solid fa-user-gear"></i>
+                        <span>حسابي</span>
+                    </button>
+                    <button onclick="handleLogout()" class="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-xl text-xs font-bold hover:bg-rose-100 transition"><i class="fa-solid fa-right-from-bracket ml-1"></i>خروج</button>
+                `;
             } else {
                 roleBadge.innerText = 'منصة التعاون العائلي';
                 nav.innerHTML += `<button onclick="openAuthModal(false)" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition">تسجيل الدخول</button>`;
@@ -728,7 +808,7 @@
         function handleGoogleUser(email, name) {
             let existing = registeredUsersList.find(u => u.email.toLowerCase() === email.toLowerCase());
             if (!existing) {
-                pendingUser = { name, email, phone: '', bank: 'مصرف الراجحي', iban: '' };
+                pendingUser = { name, email, phone: '', bank: 'مصرف الراجحي', iban: '', avatar: '' };
                 document.getElementById('profileCompletionModal').classList.remove('hide');
             } else {
                 currentUser = existing;
@@ -793,7 +873,7 @@
                     return;
                 }
 
-                pendingUser = { name, email, phone, bank, iban, password };
+                pendingUser = { name, email, phone, bank, iban, password, avatar: '' };
                 goToScreen('screen-verify');
             } else {
                 if (email === OWNER_EMAIL.toLowerCase()) {
@@ -806,7 +886,8 @@
                         email: OWNER_EMAIL,
                         phone: '0500000000',
                         bank: 'مصرف الراجحي',
-                        iban: 'SA000000000000000000'
+                        iban: 'SA000000000000000000',
+                        avatar: ''
                     };
                 } else {
                     let found = registeredUsersList.find(u => u.email.toLowerCase() === email);
@@ -816,7 +897,8 @@
                             email: email,
                             phone: '0512345678',
                             bank: 'مصرف الراجحي',
-                            iban: 'SA990000000000000000'
+                            iban: 'SA990000000000000000',
+                            avatar: ''
                         };
                         registeredUsersList.push(currentUser);
                         localStorage.setItem('jamiyah_all_users', JSON.stringify(registeredUsersList));
@@ -851,6 +933,18 @@
             localStorage.removeItem('jamiyah_current_user');
             showToast('تم تسجيل الخروج بنجاح', 'info');
             goToHome();
+        }
+
+        function addNotification(userEmail, title, body) {
+            let notifications = JSON.parse(localStorage.getItem('jamiyah_notifications') || '[]');
+            notifications.push({
+                id: 'notif-' + Date.now(),
+                email: userEmail.toLowerCase(),
+                title,
+                body,
+                date: new Date().toLocaleDateString('ar-SA')
+            });
+            localStorage.setItem('jamiyah_notifications', JSON.stringify(notifications));
         }
 
         function checkPendingInvitations() {
@@ -1004,14 +1098,14 @@
                     `;
                 } else {
                     pendingContainer.innerHTML += `
-                        <div class="p-3 bg-amber-50/60 border border-amber-200 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs">
-                            <div>
+                        <div class="p-3 bg-amber-50/60 border border-amber-200 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
+                            <div class="overflow-hidden">
                                 <p class="font-bold text-slate-900">${m.name}</p>
                                 <p class="text-[11px] text-slate-500 break-all">${m.contact}</p>
                             </div>
-                            <div class="flex items-center space-x-1.5 space-x-reverse self-end sm:self-center">
-                                <button onclick="resendInvitation('${j.id}', '${m.contact}')" class="px-2.5 py-1 bg-white border border-amber-300 text-amber-700 rounded-lg text-[10px] font-bold hover:bg-amber-100 transition">إعادة إرسال</button>
-                                <button onclick="cancelInvitation('${j.id}', '${m.contact}')" class="px-2.5 py-1 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-bold hover:bg-rose-100 transition">إلغاء</button>
+                            <div class="flex items-center space-x-1.5 space-x-reverse self-end sm:self-center shrink-0">
+                                <button onclick="resendInvitation('${j.id}', '${m.contact}')" class="px-2.5 py-1.5 bg-white border border-amber-300 text-amber-700 rounded-lg text-[10px] font-bold hover:bg-amber-100 transition shadow-sm">إعادة إرسال</button>
+                                <button onclick="cancelInvitation('${j.id}', '${m.contact}')" class="px-2.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-bold hover:bg-rose-100 transition shadow-sm">إلغاء</button>
                             </div>
                         </div>
                     `;
@@ -1095,8 +1189,11 @@
                     proof: null
                 });
                 localStorage.setItem('jamiyah_all_list', JSON.stringify(jamiyatList));
+
+                // Add notification to member inbox
+                addNotification(contact, `دعوة انضمام للجمعية: ${j.name}`, `تمت دعوتك للانضمام إلى جمعية "${j.name}" برئاسة ${currentUser.name}. يرجى قبول الدعوة.`);
                 
-                showToast(`📧 تم إرسال بريد دعوة رسمي بنجاح إلى (${contact}) وسيظهر لديه فور تسجيل دخوله!`, 'success');
+                showToast(`📧 تم إرسال بريد دعوة رسمي وإشعار إلى (${contact}) بنجاح!`, 'success');
                 closeInviteModal();
                 renderMembersLists(j);
             }
@@ -1105,6 +1202,7 @@
         function resendInvitation(jId, contact) {
             const j = jamiyatList.find(item => item.id === jId);
             if (j) {
+                addNotification(contact, `إعادة إرسال دعوة: ${j.name}`, `تذكير: تمت دعوتك للانضمام إلى جمعية "${j.name}".`);
                 showToast(`📧 تم إعادة إرسال بريد دعوة الانضمام بنجاح إلى (${contact})`, 'success');
             }
         }
@@ -1117,6 +1215,71 @@
                 showToast('تم إلغاء وحذف طلب الانضمام بنجاح', 'info');
                 renderMembersLists(j);
             }
+        }
+
+        function openProfileScreen() {
+            if (!currentUser) return;
+            document.getElementById('profileTitleName').innerText = currentUser.name || 'عضو عائلي';
+            document.getElementById('profileTitleEmail').innerText = currentUser.email || '';
+            document.getElementById('profileInitial').innerText = (currentUser.name || 'ع')[0];
+            
+            document.getElementById('pName').value = currentUser.name || '';
+            document.getElementById('pPhone').value = currentUser.phone || '';
+            document.getElementById('pBank').value = currentUser.bank || 'مصرف الراجحي';
+            document.getElementById('pIban').value = currentUser.iban || '';
+            document.getElementById('pAvatar').value = currentUser.avatar || '';
+
+            if (currentUser.avatar) {
+                document.getElementById('profileAvatarDisplay').innerHTML = `<img src="${currentUser.avatar}" class="w-full h-full object-cover">`;
+            }
+
+            // Render notifications inbox
+            const inboxEl = document.getElementById('userNotificationsInbox');
+            inboxEl.innerHTML = '';
+            let notifications = JSON.parse(localStorage.getItem('jamiyah_notifications') || '[]');
+            let userNotifs = notifications.filter(n => n.email.toLowerCase() === currentUser.email.toLowerCase());
+
+            if (userNotifs.length === 0) {
+                inboxEl.innerHTML = `<p class="text-xs text-slate-400">لا توجد إشعارات أو تنبيهات واردة حالياً.</p>`;
+            } else {
+                userNotifs.reverse().forEach(n => {
+                    inboxEl.innerHTML += `
+                        <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1 text-xs">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-slate-900">${n.title}</span>
+                                <span class="text-[10px] text-slate-400">${n.date}</span>
+                            </div>
+                            <p class="text-slate-600">${n.body}</p>
+                        </div>
+                    `;
+                });
+            }
+
+            goToScreen('screen-profile');
+        }
+
+        function updateUserProfile(event) {
+            event.preventDefault();
+            if (!currentUser) return;
+
+            currentUser.name = document.getElementById('pName').value.trim();
+            currentUser.phone = document.getElementById('pPhone').value.trim();
+            currentUser.bank = document.getElementById('pBank').value;
+            currentUser.iban = document.getElementById('pIban').value.trim();
+            currentUser.avatar = document.getElementById('pAvatar').value.trim();
+
+            localStorage.setItem('jamiyah_current_user', JSON.stringify(currentUser));
+            
+            // Update in registered users list
+            let index = registeredUsersList.findIndex(u => u.email.toLowerCase() === currentUser.email.toLowerCase());
+            if (index !== -1) {
+                registeredUsersList[index] = currentUser;
+                localStorage.setItem('jamiyah_all_users', JSON.stringify(registeredUsersList));
+            }
+
+            showToast('تم تحديث البيانات الشخصية بنجاح!', 'success');
+            openProfileScreen();
+            renderNavigation();
         }
 
         function openAiAdvisorModal() {
