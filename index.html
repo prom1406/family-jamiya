@@ -4,6 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>الجمعية الصغيرة - منصة الجمعيات العائلية الذكية</title>
+
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<script type="text/javascript">
+   (function(){
+      emailjs.init("o2fIFJJYtmnzK2XKg");
+   })();
+</script>
+
+    
     <!-- Tailwind CSS for modern responsive styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -1321,29 +1330,44 @@
             document.getElementById('emailDispatcherModal').classList.add('hide');
         }
         function sendBroadcastEmail(event) {
-            event.preventDefault();
-            const target = document.getElementById('emailTargetSelect').value;
-            const subject = document.getElementById('emailSubjectInput').value.trim();
-            const body = document.getElementById('emailBodyInput').value.trim();
+    event.preventDefault();
+    const target = document.getElementById('emailTargetSelect').value;
+    const subject = document.getElementById('emailSubjectInput').value.trim();
+    const body = document.getElementById('emailBodyInput').value.trim();
 
-            const j = jamiyatList.find(item => item.id === activeJamiyaId);
-            if (!j) return;
+    const j = jamiyatList.find(item => item.id === activeJamiyaId);
+    if (!j) return;
 
-            let recipientCount = 0;
-            j.members.forEach(m => {
-                if (target === 'all' || (target === 'pending' && m.status === 'pending')) {
-                    if (m.contact && m.contact.includes('@')) {
-                        addNotification(m.contact, subject, body);
-                        recipientCount++;
-                    }
-                }
-            });
+    let recipientCount = 0;
 
-            showToast(`✅ تم إرسال البريد الإلكتروني بنجاح إلى (${recipientCount}) من المشتركين!`, 'success');
-            closeEmailDispatcherModal();
-            document.getElementById('emailSubjectInput').value = '';
-            document.getElementById('emailBodyInput').value = '';
+    j.members.forEach(m => {
+        if (target === 'all' || (target === 'pending' && m.status === 'pending')) {
+            if (m.contact && m.contact.includes('@')) {
+                // 1. إضافة للإشعارات داخل التطبيق
+                addNotification(m.contact, subject, body);
+
+                // 2. إرسال بريد حقيقي عبر EmailJS للمشترك
+                emailjs.send("service_5dxkih9", "template_mr4lkca", {
+                    to_email: m.contact,
+                    to_name: m.name,
+                    subject: subject,
+                    message: body
+                }).then(function(response) {
+                    console.log('تم إرسال البريد بنجاح لـ:', m.contact);
+                }, function(error) {
+                    console.error('فشل إرسال البريد:', error);
+                });
+
+                recipientCount++;
+            }
         }
+    });
+
+    showToast(`✅ جاري إرسال البريد الإلكتروني الفعلي إلى (${recipientCount}) من المشتركين!`, 'success');
+    closeEmailDispatcherModal();
+    document.getElementById('emailSubjectInput').value = '';
+    document.getElementById('emailBodyInput').value = '';
+}
 
         function openModificationModal() {
             document.getElementById('modificationModal').classList.remove('hide');
