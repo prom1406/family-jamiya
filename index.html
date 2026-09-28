@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>الجمعية الصغيرة - منصة الجمعيات العائلية الذكية</title>
 
+    <!-- EmailJS SDK -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-<script type="text/javascript">
-   (function(){
-      emailjs.init("o2fIFJJYtmnzK2XKg");
-   })();
-</script>
+    <script type="text/javascript">
+       (function(){
+          emailjs.init("o2fIFJJYtmnzK2XKg");
+       })();
+    </script>
 
-    
     <!-- Tailwind CSS for modern responsive styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -1279,7 +1279,6 @@
 
             const j = jamiyatList.find(item => item.id === activeJamiyaId);
             if (j) {
-                // Prevent duplicate email/contact in the same Jamiya
                 if (j.members.some(m => m.contact.toLowerCase() === contact)) {
                     showToast('هذا البريد مسجل مسبقاً في هذه الجمعية!', 'error');
                     return;
@@ -1296,10 +1295,9 @@
                 });
                 localStorage.setItem('jamiyah_all_list', JSON.stringify(jamiyatList));
 
-                // Add notification to member inbox & simulate actual email dispatch
                 addNotification(contact, `دعوة رسمية للانضمام للجمعية: ${j.name}`, `عزيزي ${name}، تمت دعوتك للانضمام إلى جمعية "${j.name}" برئاسة ${currentUser.name}. يرجى تسجيل الدخول وقبول الدعوة.`);
                 
-                showToast(`📧 تم إرسال بريد دعوة رسمي (Email) إلى (${contact}) بنجاح!`, 'success');
+                showToast(`📧 تم تسجيل الدعوة وإضافتها للأعضاء بانتظار القبول!`, 'success');
                 closeInviteModal();
                 renderMembersLists(j);
             }
@@ -1309,7 +1307,7 @@
             const j = jamiyatList.find(item => item.id === jId);
             if (j) {
                 addNotification(contact, `إعادة إرسال دعوة رسمية: ${j.name}`, `تذكير: تمت دعوتك للانضمام إلى جمعية "${j.name}".`);
-                showToast(`📧 تم إعادة إرسال بريد دعوة الانضمام بنجاح إلى (${contact})`, 'success');
+                showToast(`📧 تم إعادة إرسال الدعوة بنجاح إلى (${contact})`, 'success');
             }
         }
 
@@ -1329,45 +1327,47 @@
         function closeEmailDispatcherModal() {
             document.getElementById('emailDispatcherModal').classList.add('hide');
         }
+
         function sendBroadcastEmail(event) {
-    event.preventDefault();
-    const target = document.getElementById('emailTargetSelect').value;
-    const subject = document.getElementById('emailSubjectInput').value.trim();
-    const body = document.getElementById('emailBodyInput').value.trim();
+            event.preventDefault();
+            const target = document.getElementById('emailTargetSelect').value;
+            const subject = document.getElementById('emailSubjectInput').value.trim();
+            const body = document.getElementById('emailBodyInput').value.trim();
 
-    const j = jamiyatList.find(item => item.id === activeJamiyaId);
-    if (!j) return;
+            const j = jamiyatList.find(item => item.id === activeJamiyaId);
+            if (!j) return;
 
-    let recipientCount = 0;
+            let recipientCount = 0;
 
-    j.members.forEach(m => {
-        if (target === 'all' || (target === 'pending' && m.status === 'pending')) {
-            if (m.contact && m.contact.includes('@')) {
-                // 1. إضافة للإشعارات داخل التطبيق
-                addNotification(m.contact, subject, body);
+            j.members.forEach(m => {
+                if (target === 'all' || (target === 'pending' && m.status === 'pending')) {
+                    if (m.contact && m.contact.includes('@')) {
+                        // 1. إضافة للإشعارات داخل التطبيق
+                        addNotification(m.contact, subject, body);
 
-                // 2. إرسال بريد حقيقي عبر EmailJS للمشترك
-                emailjs.send("service_5dxkih9", "template_mr4lkca", {
-                    to_email: m.contact,
-                    to_name: m.name,
-                    subject: subject,
-                    message: body
-                }).then(function(response) {
-                    console.log('تم إرسال البريد بنجاح لـ:', m.contact);
-                }, function(error) {
-                    console.error('فشل إرسال البريد:', error);
-                });
+                        // 2. إرسال بريد حقيقي عبر EmailJS للمشترك مع معالجة الأخطاء بوضوح
+                        emailjs.send("service_5dxkih9", "template_mr4lkca", {
+                            to_email: m.contact,
+                            to_name: m.name,
+                            subject: subject,
+                            message: body
+                        }).then(function(response) {
+                            console.log('تم إرسال البريد بنجاح لـ:', m.contact);
+                        }, function(error) {
+                            console.error('فشل إرسال البريد:', error);
+                            showToast(`⚠️ فشل إرسال البريد إلى ${m.contact}: تحقق من Service ID أو Template ID`, 'error');
+                        });
 
-                recipientCount++;
-            }
+                        recipientCount++;
+                    }
+                }
+            });
+
+            showToast(`✅ جاري إرسال البريد الإلكتروني الفعلي إلى (${recipientCount}) من المشتركين!`, 'success');
+            closeEmailDispatcherModal();
+            document.getElementById('emailSubjectInput').value = '';
+            document.getElementById('emailBodyInput').value = '';
         }
-    });
-
-    showToast(`✅ جاري إرسال البريد الإلكتروني الفعلي إلى (${recipientCount}) من المشتركين!`, 'success');
-    closeEmailDispatcherModal();
-    document.getElementById('emailSubjectInput').value = '';
-    document.getElementById('emailBodyInput').value = '';
-}
 
         function openModificationModal() {
             document.getElementById('modificationModal').classList.remove('hide');
@@ -1417,7 +1417,6 @@
                 document.getElementById('profileAvatarDisplay').innerHTML = `<img src="${currentUser.avatar}" class="w-full h-full object-cover">`;
             }
 
-            // Render notifications inbox
             const inboxEl = document.getElementById('userNotificationsInbox');
             inboxEl.innerHTML = '';
             let notifications = JSON.parse(localStorage.getItem('jamiyah_notifications') || '[]');
@@ -1454,7 +1453,6 @@
 
             localStorage.setItem('jamiyah_current_user', JSON.stringify(currentUser));
             
-            // Update in registered users list
             let index = registeredUsersList.findIndex(u => u.email.toLowerCase() === currentUser.email.toLowerCase());
             if (index !== -1) {
                 registeredUsersList[index] = currentUser;
