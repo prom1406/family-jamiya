@@ -269,15 +269,30 @@
                     <h2 class="text-2xl font-black text-slate-900" id="displayJName">اسم الجمعية</h2>
                     <p class="text-xs text-slate-500 mt-1">الاشتراك: <span id="displayJAmount" class="font-bold text-slate-700">0</span> ريال | موعد السداد أقصاه يوم <span id="displayJLastDay">0</span> من كل شهر</p>
                 </div>
-                <div class="flex items-center space-x-2 space-x-reverse">
+                <div class="flex items-center space-x-2 space-x-reverse flex-wrap gap-2">
                     <button onclick="openInviteModal()" class="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow hover:bg-emerald-700 transition flex items-center space-x-2 space-x-reverse">
                         <i class="fa-solid fa-user-plus"></i>
                         <span>إضافة أعضاء</span>
+                    </button>
+                    <button onclick="openModificationModal()" class="px-4 py-2 bg-amber-600 text-white text-xs font-bold rounded-xl shadow hover:bg-amber-700 transition flex items-center space-x-2 space-x-reverse">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                        <span>طلب تعديل الشروط</span>
                     </button>
                     <button onclick="openAiAdvisorModal()" class="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl shadow hover:bg-indigo-700 transition flex items-center space-x-2 space-x-reverse">
                         <i class="fa-solid fa-robot"></i>
                         <span>المساعد الذكي</span>
                     </button>
+                </div>
+            </div>
+
+            <!-- Active Modification Request Banner if any -->
+            <div id="modificationRequestBanner" class="hide bg-indigo-50 border border-indigo-200 p-4 rounded-2xl flex justify-between items-center text-xs">
+                <div>
+                    <p class="font-bold text-indigo-900"><i class="fa-solid fa-circle-exclamation ml-1"></i> يوجد طلب تعديل شروط معلق لهذه الجمعية:</p>
+                    <p id="modRequestText" class="text-indigo-700 mt-0.5">تفاصيل الطلب...</p>
+                </div>
+                <div id="modRequestActions" class="flex space-x-2 space-x-reverse">
+                    <!-- Populated dynamically -->
                 </div>
             </div>
 
@@ -321,7 +336,7 @@
                             <i class="fa-solid fa-clock-rotate-left text-amber-500"></i>
                             <span>الأعضاء المنتظر قبولهم</span>
                         </h4>
-                        <div id="pendingMembersContainer" class="space-y-2">
+                        <div id="pendingMembersContainer" class="space-y-3">
                             <!-- Populated by JS -->
                         </div>
                     </div>
@@ -584,6 +599,25 @@
                 </div>
                 <button type="submit" class="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow hover:bg-emerald-700 transition text-sm">
                     إرسال دعوة الانضمام عبر البريد الإلكتروني
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Jamiya Modification Request Modal -->
+    <div id="modificationModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hide animate-fade">
+        <div class="bg-white max-w-md w-full p-6 rounded-3xl shadow-2xl space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-slate-900 text-lg">طلب تعديل شروط أو قواعد الجمعية</h3>
+                <button onclick="closeModificationModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form onsubmit="submitModificationRequest(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">تفاصيل التعديل المطلوب (مثل: تغيير قيمة الاشتراك أو موعد الدفع)</label>
+                    <textarea id="modInputText" rows="3" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500 focus:outline-none text-xs" placeholder="اكتب التعديل المقترح بوضوح..."></textarea>
+                </div>
+                <button type="submit" class="w-full py-3 bg-amber-600 text-white font-bold rounded-xl shadow hover:bg-amber-700 transition text-sm">
+                    إرسال طلب التعديل لموافقة الأعضاء
                 </button>
             </form>
         </div>
@@ -1017,6 +1051,7 @@
                 payDay,
                 notifyChannel,
                 creatorEmail: currentUser.email,
+                modificationRequest: null,
                 members: [
                     { id: 'm-creator', name: currentUser.name || 'مشرف الجمعية', contact: currentUser.email, bank: currentUser.bank, iban: currentUser.iban, status: 'registered', order: 1, paid: false, proof: null }
                 ]
@@ -1036,6 +1071,24 @@
             document.getElementById('displayJName').innerText = j.name;
             document.getElementById('displayJAmount').innerText = j.amount;
             document.getElementById('displayJLastDay').innerText = j.lastDay;
+
+            // Render modification request banner if exists
+            const banner = document.getElementById('modificationRequestBanner');
+            if (j.modificationRequest && j.modificationRequest.status === 'pending') {
+                banner.classList.remove('hide');
+                document.getElementById('modRequestText').innerText = `طلب من (${j.modificationRequest.by}): ${j.modificationRequest.text}`;
+                const actionsEl = document.getElementById('modRequestActions');
+                if (j.creatorEmail.toLowerCase() === currentUser?.email.toLowerCase()) {
+                    actionsEl.innerHTML = `
+                        <button onclick="resolveModification('${j.id}', true)" class="px-3 py-1 bg-emerald-600 text-white rounded-lg font-bold">موافقة</button>
+                        <button onclick="resolveModification('${j.id}', false)" class="px-3 py-1 bg-rose-600 text-white rounded-lg font-bold">رفض</button>
+                    `;
+                } else {
+                    actionsEl.innerHTML = `<span class="text-xs text-indigo-600 font-semibold">بانتظار موافقة المشرف</span>`;
+                }
+            } else {
+                banner.classList.add('hide');
+            }
 
             const recipient = j.members.find(m => m.order === 1) || j.members[0];
             document.getElementById('currentRecipientName').innerText = recipient.name;
@@ -1214,6 +1267,38 @@
                 localStorage.setItem('jamiyah_all_list', JSON.stringify(jamiyatList));
                 showToast('تم إلغاء وحذف طلب الانضمام بنجاح', 'info');
                 renderMembersLists(j);
+            }
+        }
+
+        function openModificationModal() {
+            document.getElementById('modificationModal').classList.remove('hide');
+        }
+        function closeModificationModal() {
+            document.getElementById('modificationModal').classList.add('hide');
+        }
+        function submitModificationRequest(event) {
+            event.preventDefault();
+            const text = document.getElementById('modInputText').value.trim();
+            const j = jamiyatList.find(item => item.id === activeJamiyaId);
+            if (j && currentUser) {
+                j.modificationRequest = {
+                    text,
+                    by: currentUser.name || currentUser.email,
+                    status: 'pending'
+                };
+                localStorage.setItem('jamiyah_all_list', JSON.stringify(jamiyatList));
+                showToast('تم إرسال طلب تعديل الشروط بنجاح للمشرف والأعضاء للموافقة', 'success');
+                closeModificationModal();
+                openJamiya(j.id);
+            }
+        }
+        function resolveModification(jId, approved) {
+            const j = jamiyatList.find(item => item.id === jId);
+            if (j && j.modificationRequest) {
+                j.modificationRequest.status = approved ? 'approved' : 'rejected';
+                localStorage.setItem('jamiyah_all_list', JSON.stringify(jamiyatList));
+                showToast(approved ? 'تمت الموافقة على طلب التعديل بنجاح!' : 'تم رفض طلب التعديل', approved ? 'success' : 'error');
+                openJamiya(j.id);
             }
         }
 
