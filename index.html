@@ -11,6 +11,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 <style>
   body{font-family:'Cairo',sans-serif;background:linear-gradient(135deg,#f8fafc,#e2e8f0);min-height:100vh}
   .card{background:rgba(255,255,255,.96);border:1px solid #e2e8f0;border-radius:1.25rem;box-shadow:0 4px 18px rgba(15,23,42,.06)}
@@ -56,8 +57,7 @@ const EMAILJS_SERVICE_ID = "service_5dxkih9";
 const EMAILJS_TEMPLATE_ID = "template_mr4lkca";
 
 firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth(), db = firebase.firestore();
-const OWNER_EMAIL = "mamydady87@gmail.com"; // بريد المالك: لا توجد كلمة مرور هنا، الهوية تُتحقق من Firebase
+const auth = firebase.auth(), db = firebase.firestore(), storage = firebase.storage();
 const FV = firebase.firestore.FieldValue;
 emailjs.init(EMAILJS_PUBLIC_KEY);
 
@@ -108,18 +108,6 @@ function authErr(e) {
 async function sendMail(to, name, subject, message) {
   return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, { to_email: to, to_name: name, subject, message });
 }
-function mailErrHint(e) {
-  const raw = String((e && (e.text || e.message)) || e || 'خطأ غير معروف');
-  const st = e && e.status;
-  let hint = '';
-  if (/recipient/i.test(raw)) hint = 'حقل "To Email" في قالب EmailJS فارغ. افتح القالب واجعله {{to_email}}.';
-  else if (st === 412 || /invalid grant|authenticat|insufficient/i.test(raw)) hint = 'ربط خدمة البريد انتهى. في EmailJS ← Email Services ← أعد ربط الخدمة (Reconnect).';
-  else if (st === 403 || /origin|domain|not allowed/i.test(raw)) hint = 'الدومين غير مسموح. في EmailJS ← Account ← Security أضف دومين موقعك أو عطّل التقييد.';
-  else if (st === 400 || /template|service/i.test(raw)) hint = 'تحقق من Service ID وTemplate ID وPublic Key في أعلى الكود.';
-  else if (st === 429 || /limit|quota/i.test(raw)) hint = 'تجاوزت حد الرسائل في باقتك (200 شهرياً في المجانية).';
-  else if (st === 0 || /network|fetch/i.test(raw)) hint = 'مشكلة اتصال أو حظر من مانع إعلانات/إضافة في المتصفح.';
-  return { raw: (st ? st + ' — ' : '') + raw, hint };
-}
 const appUrl = () => location.origin + location.pathname;
 
 /* ============ منطق الجمعية ============ */
@@ -165,12 +153,11 @@ auth.onAuthStateChanged(async user => {
     const snap = await db.collection('users').doc(user.uid).get();
     state.profile = snap.exists ? snap.data() : null;
     const adm = await db.collection('admins').doc(user.uid).get().catch(() => ({ exists: false }));
-    state.isAdmin = adm.exists || (lc(user.email) === OWNER_EMAIL && user.emailVerified);
+    state.isAdmin = adm.exists;
   } catch (e) { toast('تعذر تحميل الحساب: ' + e.message, 'error'); }
 
   if (!state.profile) { state.view = 'complete'; return render(); }
   startListeners();
-  if (state.isAdmin) { state.view = 'admin'; render(); loadAdmin(); toast('مرحباً بك في لوحة المالك', 'info'); return; }
   state.view = 'home'; render();
 });
 
@@ -234,8 +221,7 @@ async function doCompleteProfile(f) {
   const profile = { name: u.displayName || 'عضو', email: lc(u.email), phone, bank, iban: bank.startsWith('كاش') ? '' : iban, avatar: u.photoURL || '', createdAt: FV.serverTimestamp() };
   try {
     await db.collection('users').doc(u.uid).set(profile);
-    state.profile = profile; startListeners();
-    if (state.isAdmin) { state.view = 'admin'; render(); loadAdmin(); } else { state.view = 'home'; render(); }
+    state.profile = profile; startListeners(); state.view = 'home'; render();
   } catch (e) { toast(e.message, 'error'); }
 }
 async function recheckVerification() {
@@ -262,25 +248,11 @@ async function handleInvite(f) {
     sendInviteMail({ email, name, jamiyaName: c.j.name, inviterName: state.profile.name, amount: c.j.amount });
   } catch (e) { toast('تعذر إنشاء الدعوة: ' + e.message, 'error'); }
 }
-function inviteText(i) {
-  return `السلام عليكم ${i.name}،\nدعاك ${i.inviterName} للانضمام إلى جمعية "${i.jamiyaName}" بقيمة اشتراك ${i.amount} ريال شهرياً.\n\nلقبول الدعوة افتح الرابط وسجّل الدخول بنفس هذا البريد (${i.email}):\n${appUrl()}`;
-}
-async function sendInviteMail(i) {
-  state.lastInvite = i;
-  try {
-    await sendMail(i.email, i.name, `دعوة للانضمام إلى جمعية ${i.jamiyaName}`, inviteText(i));
-    toast('✉️ أُرسل بريد الدعوة إلى ' + i.email);
-  } catch (e) {
-    const { raw, hint } = mailErrHint(e);
-    console.error('EmailJS error', e);
-    showModal('تعذر إرسال بريد الدعوة', `<div class="space-y-3 text-xs">
-      <p class="text-slate-600">الدعوة محفوظة وستظهر لـ <b dir="ltr">${esc(i.email)}</b> داخل التطبيق عند دخوله بنفس البريد. لكن البريد لم يُرسل.</p>
-      <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800" dir="ltr">${esc(raw)}</div>
-      ${hint ? `<div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">${esc(hint)}</div>` : ''}
-      <p class="font-bold">أرسل الدعوة بطريقة أخرى:</p>
-      <div class="flex gap-2 flex-wrap"><a class="btn b-pri" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(inviteText(i))}"><i class="fa-brands fa-whatsapp"></i> واتساب</a>
-      <button class="btn b-sec" data-act="copy-invite"><i class="fa-solid fa-copy"></i> نسخ نص الدعوة</button></div></div>`);
-  }
+function sendInviteMail(i) {
+  return sendMail(i.email, i.name, `دعوة للانضمام إلى جمعية ${i.jamiyaName}`,
+    `السلام عليكم ${i.name}،\nدعاك ${i.inviterName} للانضمام إلى جمعية "${i.jamiyaName}" بقيمة اشتراك ${i.amount} ريال شهرياً.\n\nلقبول الدعوة افتح الرابط وسجّل الدخول بنفس هذا البريد (${i.email}):\n${appUrl()}`)
+    .then(() => toast('✉️ أُرسل بريد الدعوة إلى ' + i.email))
+    .catch(e => toast('تم حفظ الدعوة لكن فشل إرسال البريد (' + (e.text || e.message || 'خطأ EmailJS') + '). المدعو سيراها عند دخوله.', 'error'));
 }
 async function acceptInvite(inviteId) {
   const inv = state.invites.find(i => i.id === inviteId); if (!inv) return;
@@ -338,55 +310,21 @@ function subscribeInvites(id) {
 async function submitPayment(f) {
   const c = ctx(); const amount = parseFloat(f.amount.value); const file = f.file.files[0];
   if (!(amount > 0)) return toast('المبلغ غير صحيح', 'error');
-  if (!file) return toast('أرفق صورة الإيصال', 'error');
-  if (!file.type.startsWith('image/')) return toast('ارفع صورة للإيصال (لقطة شاشة أو صورة). ملفات PDF غير مدعومة بدون Storage.', 'error');
-  const btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'جارٍ المعالجة...';
+  if (!file) return toast('أرفق الإيصال', 'error');
+  if (file.size > 5 * 1024 * 1024) return toast('حجم الملف يجب ألا يتجاوز 5MB', 'error');
+  const btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'جارٍ الرفع...';
   try {
-    const dataUrl = await compressImage(file);
-    const ref = db.collection('jamiyat').doc(c.j.id), pid = `${c.cur}_${state.user.uid}`;
-    const batch = db.batch();
-    // الصورة المضغوطة في مستند منفصل حتى لا يثقل تحميل قائمة المدفوعات
-    batch.set(ref.collection('proofs').doc(pid), { uid: state.user.uid, data: dataUrl });
-    batch.set(ref.collection('payments').doc(pid), {
-      month: c.cur, uid: state.user.uid, name: state.profile.name, amount, ref: f.ref.value.trim(), hasProof: true,
+    const safe = file.name.replace(/[^\w.\-]/g, '_');
+    const path = `receipts/${c.j.id}/${state.user.uid}/${c.cur}_${Date.now()}_${safe}`;
+    const snap = await storage.ref(path).put(file);
+    const url = await snap.ref.getDownloadURL();
+    await db.collection('jamiyat').doc(c.j.id).collection('payments').doc(`${c.cur}_${state.user.uid}`).set({
+      month: c.cur, uid: state.user.uid, name: state.profile.name, amount, proofUrl: url, proofName: file.name,
       status: 'pending', recipientUid: c.recUid, createdAt: FV.serverTimestamp()
     });
-    await batch.commit();
     closeModal(); toast('أُرسل الإيصال للمستلم للتأكيد');
     if (c.rec && c.rec.email) sendMail(c.rec.email, c.rec.name, `إيصال سداد جديد - ${c.j.name}`, `رفع ${state.profile.name} إيصال سداد بقيمة ${amount} ريال لجمعية "${c.j.name}". افتح التطبيق للمراجعة والتأكيد:\n${appUrl()}`).catch(() => {});
   } catch (e) { toast('تعذر الرفع: ' + e.message, 'error'); btn.disabled = false; btn.textContent = 'إرسال الإيصال'; }
-}
-// ضغط الصورة في المتصفح: أقصى بُعد 1000px وجودة JPEG متدرجة حتى يقل الحجم عن ~600KB
-function compressImage(file) {
-  return new Promise((resolve, reject) => {
-    const img = new Image(), url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      let scale = Math.min(1, 1000 / Math.max(img.width, img.height));
-      for (let attempt = 0; attempt < 6; attempt++) {
-        const cv = document.createElement('canvas');
-        cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
-        const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0, cv.width, cv.height);
-        for (const q of [0.75, 0.6, 0.45]) {
-          const out = cv.toDataURL('image/jpeg', q);
-          if (out.length < 600000) return resolve(out);
-        }
-        scale *= 0.75;
-      }
-      reject(new Error('تعذر تصغير الصورة بما يكفي، جرّب صورة أخرى'));
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('تعذر قراءة الصورة')); };
-    img.src = url;
-  });
-}
-async function viewProof(payId) {
-  try {
-    const s = await db.collection('jamiyat').doc(state.j.id).collection('proofs').doc(payId).get();
-    const d = s.exists ? s.data().data : '';
-    if (!d.startsWith('data:image/')) return toast('لا يوجد إيصال مرفق', 'error');
-    const p = state.payments.find(x => x.id === payId);
-    showModal('إيصال السداد', `<p class="text-xs text-slate-500">${esc(p?.name)} • ${money(p?.amount)} ${p?.ref ? '• مرجع: ' + esc(p.ref) : ''}</p><img src="${d}" class="w-full rounded-xl border" alt="إيصال">`);
-  } catch (e) { toast('تعذر فتح الإيصال: ' + e.message, 'error'); }
 }
 async function confirmPayment(payId) {
   try { await db.collection('jamiyat').doc(state.j.id).collection('payments').doc(payId).update({ status: 'confirmed' }); toast('تم تأكيد الاستلام'); }
@@ -397,54 +335,15 @@ async function remindUnpaid() {
   c.turns.forEach(uid => {
     const m = state.members[uid]; if (!m || payStatus(c, uid) !== 'unpaid') return;
     n++;
-    sendMail(m.email, m.name, `تذكير بسداد قسط ${c.j.name}`, `السلام عليكم ${m.name}،\nتذكير ودي بسداد قسط جمعية "${c.j.name}" (${c.j.amount} ريال) قبل ${fmtDate(dayIn(c.j, c.cur, c.j.lastDay))}.\n${appUrl()}`).catch(e => toast('فشل إرسال التذكير إلى ' + m.email + ': ' + (mailErrHint(e).hint || mailErrHint(e).raw), 'error'));
+    sendMail(m.email, m.name, `تذكير بسداد قسط ${c.j.name}`, `السلام عليكم ${m.name}،\nتذكير ودي بسداد قسط جمعية "${c.j.name}" (${c.j.amount} ريال) قبل ${fmtDate(dayIn(c.j, c.cur, c.j.lastDay))}.\n${appUrl()}`).catch(() => toast('فشل إرسال التذكير إلى ' + m.email, 'error'));
   });
   toast(n ? `جارٍ إرسال التذكير إلى ${n} عضو` : 'لا يوجد أعضاء متأخرون', n ? 'success' : 'info');
 }
 
 /* ============ ترتيب الأدوار وتعديل الشروط ============ */
-/* ===== تعديل ترتيب القبض (للمشرف) ===== */
-function lockedCount(c) {
-  if (c.finished) return c.turns.length;
-  if (!c.started) return 0;
-  return c.cur + (c.pays.length > 0 ? 1 : 0); // الأشهر الماضية، وشهر جارٍ فيه سداد، مقفلة
-}
-function openOrderModal() {
-  const c = ctx(); if (!c || !c.isCreator) return;
-  state.orderDraft = [...c.turns];
-  showOrderModal();
-}
-function showOrderModal() {
-  const c = ctx(), d = state.orderDraft, lock = lockedCount(c);
-  const rows = d.map((u, i) => {
-    const m = state.members[u] || { name: '...' }, locked = i < lock;
-    return `<div class="flex items-center justify-between p-2.5 rounded-xl text-xs ${locked ? 'bg-slate-100 text-slate-400' : 'bg-slate-50 border border-slate-100'}">
-      <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full ${locked ? 'bg-slate-200' : 'bg-emerald-100 text-emerald-800'} font-bold flex items-center justify-center">${i + 1}</span>
-      <div><b>${esc(m.name)}</b><div class="text-[10px]">${fmtMonth(dayIn(c.j, i, 1))}${locked ? ' • مقفل' : ''}</div></div></div>
-      ${locked ? '<i class="fa-solid fa-lock"></i>' : `<div class="flex gap-1"><button class="btn b-sec" data-act="od-up" data-i="${i}" ${i <= lock ? 'disabled' : ''}>▲</button><button class="btn b-sec" data-act="od-down" data-i="${i}" ${i >= d.length - 1 ? 'disabled' : ''}>▼</button></div>`}</div>`;
-  }).join('');
-  showModal('تعديل ترتيب القبض', `<div class="space-y-3">
-    <p class="text-[11px] text-slate-500">حرّك الأعضاء بالأسهم. الأشهر المنتهية أو التي بدأ فيها السداد مقفلة لحماية سجل المدفوعات.</p>
-    <div class="space-y-2">${rows}</div>
-    <div class="flex gap-2"><button class="btn b-sec" data-act="od-shuffle"><i class="fa-solid fa-shuffle"></i> عشوائي للمتاح</button><button class="btn b-pri flex-1" data-act="od-save">حفظ الترتيب</button></div></div>`);
-}
-function orderMove(i, dlt) {
-  const c = ctx(), d = state.orderDraft, k = i + dlt;
-  if (i < lockedCount(c) || k < lockedCount(c) || k >= d.length) return;
-  [d[i], d[k]] = [d[k], d[i]]; showOrderModal();
-}
-function orderShuffle() {
-  const c = ctx(), d = state.orderDraft, lock = lockedCount(c);
-  const free = d.slice(lock);
-  for (let i = free.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [free[i], free[k]] = [free[k], free[i]]; }
-  state.orderDraft = d.slice(0, lock).concat(free); showOrderModal();
-}
-async function orderSave() {
-  const c = ctx();
-  if (state.orderDraft.slice(0, lockedCount(c)).join() !== c.turns.slice(0, lockedCount(c)).join()) return toast('لا يمكن تغيير الأشهر المقفلة', 'error');
-  try { await db.collection('jamiyat').doc(c.j.id).update({ turns: state.orderDraft }); closeModal(); toast('تم حفظ ترتيب القبض'); }
-  catch (e) { toast(e.message, 'error'); }
-}
+async function saveTurns(turns) { try { await db.collection('jamiyat').doc(state.j.id).update({ turns }); } catch (e) { toast(e.message, 'error'); } }
+function moveTurn(i, d) { const t = [...state.j.turns], k = i + d; if (k < 0 || k >= t.length) return; [t[i], t[k]] = [t[k], t[i]]; saveTurns(t); }
+function shuffleTurns() { const t = [...state.j.turns]; for (let i = t.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [t[i], t[k]] = [t[k], t[i]]; } saveTurns(t); toast('تم الترتيب عشوائياً'); }
 
 async function submitMod(f) {
   const text = f.text.value.trim(); if (!text) return;
@@ -481,11 +380,6 @@ async function saveProfile(f) {
   } catch (e) { toast(e.message, 'error'); }
 }
 
-async function testMail() {
-  try { await sendMail(state.user.email, state.profile.name, 'اختبار البريد - الجمعية الصغيرة', 'هذه رسالة اختبار. إذا وصلتك فإعدادات EmailJS سليمة.'); toast('✉️ أُرسلت رسالة الاختبار إلى بريدك، تحقق من الوارد والمزعج'); }
-  catch (e) { const { raw, hint } = mailErrHint(e); showModal('فشل إرسال رسالة الاختبار', `<div class="space-y-3 text-xs"><div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800" dir="ltr">${esc(raw)}</div>${hint ? `<div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">${esc(hint)}</div>` : ''}</div>`); }
-}
-
 /* ============ لوحة المشرف العام ============ */
 async function loadAdmin() {
   try {
@@ -506,7 +400,7 @@ function renderNav() {
   const nav = $('nav'), sub = $('hdrSub');
   if (!state.user || !state.profile) { nav.innerHTML = ''; sub.textContent = 'منصة التعاون العائلي'; return; }
   sub.textContent = state.profile.name;
-  nav.innerHTML = `${state.isAdmin ? '<button class="btn b-pri" data-act="go-admin"><i class="fa-solid fa-shield-halved"></i> لوحة المالك</button><button class="btn b-sec" data-act="go-home"><i class="fa-solid fa-house"></i> جمعياتي</button>' : ''}
+  nav.innerHTML = `${state.isAdmin ? '<button class="btn b-sec" data-act="go-admin"><i class="fa-solid fa-shield-halved"></i> المشرف</button>' : ''}
     <button class="btn b-sec" data-act="go-profile"><i class="fa-solid fa-user-gear"></i> حسابي</button>
     <button class="btn b-red" data-act="logout"><i class="fa-solid fa-right-from-bracket"></i></button>`;
 }
@@ -597,7 +491,7 @@ function vJamiya() {
       ${c.rec ? `<p class="text-xs text-amber-100 mt-1">${esc(c.rec.bank)} ${c.rec.iban ? '• <span dir="ltr">' + esc(c.rec.iban) + '</span>' : ''}</p>` : ''}
       <p class="text-xs text-amber-100 mt-1">آخر موعد للسداد: ${fmtDate(due)} • الصرف: ${fmtDate(payout)}</p></div>
       <div>${c.isRec ? '<span class="px-3 py-1 bg-yellow-300 text-slate-900 text-xs font-bold rounded-xl">أنت مستلم هذا الشهر</span>'
-        : !c.started || !j.memberUids.includes(uid) ? ''
+        : !c.started ? ''
         : c.myPay ? `<span class="px-3 py-1.5 bg-white/20 rounded-xl text-xs font-bold">${c.myPay.status === 'confirmed' ? 'تم تأكيد سدادك ✓' : 'إيصالك بانتظار تأكيد المستلم'}</span>`
         : '<button class="btn bg-white text-orange-600" data-act="pay-modal"><i class="fa-solid fa-file-arrow-up"></i> رفع إثبات السداد</button>'}</div></div></div>`;
 
@@ -611,8 +505,9 @@ function vJamiya() {
       <div><p class="font-bold">${esc(m.name)} ${u === j.creatorUid ? '<span class="text-[10px] text-indigo-600">(مشرف)</span>' : ''}</p><p class="text-[10px] text-slate-400">دوره: ${month}</p></div></div>
       <div class="flex items-center gap-2 flex-wrap">
         ${c.finished ? '' : `<span class="px-2 py-1 rounded-lg font-bold ${b[1]}">${b[0]}</span>`}
-        ${pay ? `<button class="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg" data-act="view-proof" data-id="${esc(pay.id)}"><i class="fa-solid fa-paperclip"></i> إيصال</button>` : ''}
+        ${pay ? `<a href="${esc(pay.proofUrl)}" target="_blank" rel="noopener" class="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg"><i class="fa-solid fa-paperclip"></i> إيصال</a>` : ''}
         ${pay && pay.status === 'pending' && (c.isRec || c.isCreator) ? `<button class="btn bg-emerald-600 text-white" data-act="confirm-pay" data-id="${esc(pay.id)}">تأكيد الاستلام</button>` : ''}
+        ${canReorder ? `<button class="btn b-sec" data-act="up" data-i="${i}">▲</button><button class="btn b-sec" data-act="down" data-i="${i}">▼</button>` : ''}
       </div></div>`;
   }).join('');
 
@@ -643,7 +538,7 @@ function vJamiya() {
     <div class="grid md:grid-cols-3 gap-5">
       <div class="card p-5 md:col-span-2"><div class="flex justify-between items-center mb-3"><h4 class="font-bold text-sm"><i class="fa-solid fa-users text-emerald-600"></i> الأعضاء وترتيب القبض</h4>
         <span class="text-xs bg-slate-100 px-2 py-1 rounded-lg font-semibold">${c.turns.length}/${j.count}</span></div>
-        ${c.isCreator && c.turns.length > 1 ? '<button class="btn b-sec mb-3" data-act="order-modal"><i class="fa-solid fa-arrow-down-1-9"></i> تعديل ترتيب القبض</button>' : ''}
+        ${canReorder ? '<button class="btn b-sec mb-3" data-act="shuffle"><i class="fa-solid fa-shuffle"></i> ترتيب عشوائي</button>' : ''}
         <div class="space-y-2">${rows}</div></div>
       <div class="space-y-5">
         <div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-chart-pie text-indigo-600"></i> تحصيل هذا الشهر</h4>
@@ -664,17 +559,12 @@ function vProfile() {
 function vAdmin() {
   const { jamiyat, users } = state.admin;
   const total = jamiyat.reduce((s, j) => s + j.count * j.amount, 0);
-  const totalMembers = jamiyat.reduce((s, j) => s + (j.memberUids || []).length, 0);
-  return `<div class="space-y-5"><div class="card p-6 !bg-slate-900 text-white flex flex-wrap justify-between items-center gap-3">
-    <div><span class="px-3 py-1 bg-indigo-500/30 text-indigo-200 text-xs font-bold rounded-full inline-block mb-2"><i class="fa-solid fa-shield-halved"></i> لوحة المالك</span><h2 class="text-xl font-black">إدارة المنصة</h2>
-    <p class="text-xs text-slate-300 mt-1" dir="ltr">${esc(state.user.email)}</p></div>
-    <div class="flex gap-2 flex-wrap"><button class="btn b-sec" data-act="refresh-admin"><i class="fa-solid fa-rotate"></i> تحديث</button><button class="btn b-pri" data-act="test-mail"><i class="fa-solid fa-envelope"></i> اختبار البريد</button></div></div>
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4"><div class="card p-4"><p class="text-xs text-slate-500">الجمعيات</p><h3 class="text-2xl font-black">${jamiyat.length}</h3></div>
+  return `<div class="space-y-5"><div class="card p-6 bg-slate-900 text-white !bg-slate-900"><h2 class="text-xl font-black">لوحة المشرف العام</h2></div>
+  <div class="grid grid-cols-3 gap-4"><div class="card p-4"><p class="text-xs text-slate-500">الجمعيات</p><h3 class="text-2xl font-black">${jamiyat.length}</h3></div>
   <div class="card p-4"><p class="text-xs text-slate-500">المستخدمون</p><h3 class="text-2xl font-black">${users.length}</h3></div>
-  <div class="card p-4"><p class="text-xs text-slate-500">عضويات الجمعيات</p><h3 class="text-2xl font-black">${totalMembers}</h3></div>
   <div class="card p-4"><p class="text-xs text-slate-500">إجمالي الدورات</p><h3 class="text-lg font-black text-emerald-600">${money(total)}</h3></div></div>
-  <div class="grid md:grid-cols-2 gap-5"><div class="card p-5"><h3 class="font-bold text-sm mb-3">الجمعيات</h3><div class="space-y-2 max-h-96 overflow-y-auto">${jamiyat.map(j => `<div class="p-3 bg-slate-50 rounded-xl text-xs flex justify-between items-center gap-2"><div><b>${esc(j.name)}</b><p class="text-slate-500">المشرف: ${esc(j.creatorName)} • ${(j.memberUids || []).length}/${j.count} • ${money(j.amount)}</p></div><button class="btn b-sec" data-act="open" data-id="${j.id}">فتح</button></div>`).join('') || '<p class="text-xs text-slate-400">لا توجد جمعيات.</p>'}</div></div>
-  <div class="card p-5"><h3 class="font-bold text-sm mb-3">المستخدمون</h3><div class="space-y-2 max-h-96 overflow-y-auto">${users.map(u => `<div class="p-3 bg-slate-50 rounded-xl text-xs"><b>${esc(u.name)}</b><p class="text-slate-500" dir="ltr">${esc(u.email)} • ${esc(u.phone || '')}</p></div>`).join('') || '<p class="text-xs text-slate-400">لا يوجد مستخدمون.</p>'}</div></div></div></div>`;
+  <div class="grid md:grid-cols-2 gap-5"><div class="card p-5"><h3 class="font-bold text-sm mb-3">الجمعيات</h3><div class="space-y-2 max-h-96 overflow-y-auto">${jamiyat.map(j => `<div class="p-3 bg-slate-50 rounded-xl text-xs"><b>${esc(j.name)}</b><p class="text-slate-500">المشرف: ${esc(j.creatorName)} • ${j.memberUids.length}/${j.count} • ${money(j.amount)}</p></div>`).join('')}</div></div>
+  <div class="card p-5"><h3 class="font-bold text-sm mb-3">المستخدمون</h3><div class="space-y-2 max-h-96 overflow-y-auto">${users.map(u => `<div class="p-3 bg-slate-50 rounded-xl text-xs"><b>${esc(u.name)}</b><p class="text-slate-500" dir="ltr">${esc(u.email)}</p></div>`).join('')}</div></div></div></div>`;
 }
 
 /* ============ النوافذ المنبثقة ============ */
@@ -691,8 +581,7 @@ function openModal(kind) {
     <button class="btn b-pri w-full py-3" type="submit">إرسال الدعوة</button></form>`);
   if (kind === 'pay') showModal('إثبات سداد القسط', `<form id="f-pay" class="space-y-3"><p class="text-xs text-slate-500">حوّل إلى: <b>${esc(c.rec?.name)}</b> — ${esc(c.rec?.bank)} <span dir="ltr">${esc(c.rec?.iban || '')}</span></p>
     <div><label class="text-xs font-semibold block mb-1">المبلغ المحوّل (ريال)</label><input name="amount" type="number" class="inp" value="${c.j.amount}" required></div>
-    <div><label class="text-xs font-semibold block mb-1">صورة الإيصال (لقطة شاشة أو صورة)</label><input name="file" type="file" accept="image/*" class="inp" required></div>
-    <div><label class="text-xs font-semibold block mb-1">رقم مرجع الحوالة (اختياري)</label><input name="ref" class="inp" dir="ltr"></div>
+    <div><label class="text-xs font-semibold block mb-1">صورة الإيصال (صورة أو PDF، حتى 5MB)</label><input name="file" type="file" accept="image/*,.pdf" class="inp" required></div>
     <button class="btn b-pri w-full py-3" type="submit">إرسال الإيصال</button></form>`);
   if (kind === 'mod') showModal('اقتراح تعديل على الشروط', `<form id="f-mod" class="space-y-3"><textarea name="text" rows="3" class="inp" required placeholder="اكتب التعديل المقترح بوضوح..."></textarea>
     <p class="text-[11px] text-slate-500">يُقبل الطلب عند موافقة أكثر من نصف الأعضاء، ثم يطبّقه المشرف.</p><button class="btn b-pri w-full py-3" type="submit">إرسال للتصويت</button></form>`);
@@ -725,12 +614,7 @@ const actions = {
   'remind': remindUnpaid,
   'resend': (el) => { const i = state.jInvites.find(x => x.id === el.dataset.id); if (i) sendInviteMail({ ...i, amount: state.j.amount }); },
   'cancel-inv': (el) => db.collection('invites').doc(el.dataset.id).delete().then(() => toast('أُلغيت الدعوة', 'info')).catch(e => toast(e.message, 'error')),
-  'order-modal': openOrderModal,
-  'od-up': (el) => orderMove(+el.dataset.i, -1), 'od-down': (el) => orderMove(+el.dataset.i, 1),
-  'od-shuffle': orderShuffle, 'od-save': orderSave,
-  'view-proof': (el) => viewProof(el.dataset.id),
-  'refresh-admin': loadAdmin, 'test-mail': testMail,
-  'copy-invite': () => navigator.clipboard.writeText(inviteText(state.lastInvite)).then(() => toast('تم نسخ نص الدعوة')).catch(() => toast('تعذر النسخ', 'error')),
+  'up': (el) => moveTurn(+el.dataset.i, -1), 'down': (el) => moveTurn(+el.dataset.i, 1), 'shuffle': shuffleTurns,
   'vote-yes': () => voteMod(true), 'vote-no': () => voteMod(false), 'close-mod': closeMod
 };
 document.addEventListener('click', e => {
