@@ -1,1548 +1,631 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>الجمعية الصغيرة - منصة الجمعيات العائلية الذكية</title>
-
-    <!-- EmailJS SDK -->
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-    <script type="text/javascript">
-       (function(){
-          emailjs.init("o2fIFJJYtmnzK2XKg");
-       })();
-    </script>
-
-    <!-- Tailwind CSS for modern responsive styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#f0fdf4',
-                            100: '#dcfce7',
-                            500: '#22c55e',
-                            600: '#16a34a',
-                            700: '#15803d',
-                            900: '#14532d',
-                        },
-                        secondary: {
-                            50: '#eef2ff',
-                            600: '#4f46e5',
-                            700: '#4338ca',
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['Cairo', 'sans-serif']
-                    }
-                }
-            }
-        }
-    </script>
-    <!-- Google Fonts: Cairo -->
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-    <!-- FontAwesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <!-- Firebase App SDK & Firestore & Auth Compat -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-
-    <style>
-        body {
-            font-family: 'Cairo', sans-serif;
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-            min-height: 100vh;
-        }
-        .glass-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(226, 232, 240, 0.8);
-        }
-        .hide { display: none !important; }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade {
-            animation: fadeIn 0.3s ease-out forwards;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>الجمعية الصغيرة</title>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+<style>
+  body{font-family:'Cairo',sans-serif;background:linear-gradient(135deg,#f8fafc,#e2e8f0);min-height:100vh}
+  .card{background:rgba(255,255,255,.96);border:1px solid #e2e8f0;border-radius:1.25rem;box-shadow:0 4px 18px rgba(15,23,42,.06)}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .fade{animation:fade .25s ease-out}
+  .inp{width:100%;padding:.7rem 1rem;border:1px solid #e2e8f0;border-radius:.75rem;font-size:.85rem;background:#fff}
+  .inp:focus{outline:2px solid #10b981;outline-offset:0}
+  .btn{padding:.6rem 1rem;border-radius:.75rem;font-weight:700;font-size:.8rem;transition:.15s;cursor:pointer}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .b-pri{background:linear-gradient(90deg,#059669,#0d9488);color:#fff}.b-pri:hover{filter:brightness(.93)}
+  .b-sec{background:#f1f5f9;color:#334155}.b-sec:hover{background:#e2e8f0}
+  .b-red{background:#fff1f2;color:#e11d48}.b-red:hover{background:#ffe4e6}
+</style>
 </head>
-<body class="text-slate-800 antialiased flex flex-col min-h-screen">
+<body class="text-slate-800 antialiased">
 
-    <header class="bg-white shadow-sm sticky top-0 z-50 border-b border-slate-100">
-        <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
-            <div class="flex items-center space-x-3 space-x-reverse cursor-pointer" onclick="goToHome()">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md">
-                    <i class="fa-solid fa-hands-holding-child text-xl"></i>
-                </div>
-                <div>
-                    <h1 class="font-bold text-lg text-slate-900 leading-tight">الجمعية الصغيرة</h1>
-                    <p class="text-xs text-slate-500" id="headerRoleBadge">منصة التعاون العائلي</p>
-                </div>
-            </div>
-            <div class="flex items-center space-x-2 space-x-reverse" id="navActions">
-                <!-- Dynamically populated auth/profile buttons -->
-            </div>
-        </div>
-    </header>
-
-    <main class="max-w-4xl mx-auto px-4 py-6 flex-grow w-full">
-
-        <!-- SCREEN 1: Home / Splash Screen -->
-        <section id="screen-home" class="screen animate-fade py-6 text-center">
-            <div class="max-w-xl mx-auto glass-card p-8 rounded-3xl shadow-xl border border-slate-100 relative overflow-hidden">
-                <div class="absolute -top-10 -right-10 w-40 h-40 bg-emerald-100 rounded-full blur-2xl opacity-60"></div>
-                <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-100 rounded-full blur-2xl opacity-60"></div>
-                
-                <div class="relative z-10">
-                    <div class="w-24 h-24 mx-auto mb-6 bg-gradient-to-tr from-emerald-500 to-teal-600 rounded-3xl flex items-center justify-center text-white shadow-lg text-4xl animate-bounce">
-                        <i class="fa-solid fa-people-roof"></i>
-                    </div>
-                    <h2 class="text-3xl font-black text-slate-900 mb-3">الجمعية الصغيرة العائلية</h2>
-                    <p class="text-slate-600 text-sm md:text-base leading-relaxed mb-8">
-                        اربط عائلتك بروابط التعاون المالي الموثوق. إدارة التدوير المالي، تتبع السداد، وتوثيق الحوالات بسهولة وأمان تام.
-                    </p>
-
-                    <!-- Dynamic Home Buttons based on Login Status -->
-                    <div id="dynamicHomeButtons" class="space-y-4">
-                        <!-- Populated via JS -->
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- SCREEN AUTH -->
-        <section id="screen-auth" class="screen hide animate-fade max-w-md mx-auto">
-            <div class="glass-card p-8 rounded-3xl shadow-xl">
-                <div class="text-center mb-6">
-                    <h3 class="text-2xl font-bold text-slate-900" id="authTitle">تسجيل الدخول</h3>
-                    <p class="text-sm text-slate-500 mt-1">أدخل بياناتك الحقيقية للمتابعة في المنصة</p>
-                </div>
-
-                <!-- Google Sign-In Button -->
-                <button onclick="loginWithGoogle()" class="w-full mb-4 py-3 px-4 border border-slate-200 rounded-xl font-semibold text-slate-700 bg-white hover:bg-slate-50 shadow-sm flex items-center justify-center space-x-3 space-x-reverse transition">
-                    <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="Google">
-                    <span>المتابعة باستخدام حساب جوجل الحقيقي</span>
-                </button>
-
-                <div class="flex items-center my-4">
-                    <div class="flex-grow border-t border-slate-200"></div>
-                    <span class="px-3 text-xs text-slate-400 font-medium">أو بالبريد الإلكتروني</span>
-                    <div class="flex-grow border-t border-slate-200"></div>
-                </div>
-
-                <form id="authForm" onsubmit="handleAuthSubmit(event)" class="space-y-4">
-                    <div id="nameFieldContainer" class="hide">
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">اسم المستخدم</label>
-                        <input type="text" id="regName" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="الاسم الثلاثي">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">البريد الإلكتروني الحقيقي</label>
-                        <input type="email" id="authEmail" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="name@domain.com">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">كلمة المرور</label>
-                        <input type="password" id="authPassword" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="••••••••">
-                    </div>
-
-                    <!-- Additional fields for registration -->
-                    <div id="extraRegFields" class="space-y-4 hide">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">رقم الجوال (يبدأ بـ 05)</label>
-                            <input type="tel" id="regPhone" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="05xxxxxxxx">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">البنك المفضل</label>
-                            <select id="regBank" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm bg-white">
-                                <option value="الراجحي">مصرف الراجحي</option>
-                                <option value="الأهلي">البنك الأهلي السعودي (SNB)</option>
-                                <option value="الإنماء">بنك الإنماء</option>
-                                <option value="الرياض">بنك الرياض</option>
-                                <option value="البلاد">بنك البلاد</option>
-                                <option value="الجزيرة">بنك الجزيرة</option>
-                                <option value="الفرنسي">السابي (الفرنسي)</option>
-                                <option value="العرب الوطني">البنك العربي الوطني (ANB)</option>
-                                <option value="الاول">البنك السعودي الأول ( الأول)</option>
-                                <option value="دجيتال/مرابحة">البنك الرقمي / أخرى</option>
-                                <option value="كاش">كاش (نقداً)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">رقم الحساب / الآيبان السعودي</label>
-                            <input type="text" id="regIban" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="SA0000000000000000000000">
-                        </div>
-                        <div class="flex items-center space-x-2 space-x-reverse">
-                            <input type="checkbox" id="termsCheck" class="rounded text-emerald-600 focus:ring-emerald-500">
-                            <label for="termsCheck" class="text-xs text-slate-600">أوافق على الشروط والأحكام وسياسة الخصوصية</label>
-                        </div>
-                    </div>
-
-                    <button type="submit" id="authSubmitBtn" class="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-xl shadow-lg hover:from-emerald-700 hover:to-teal-700 transition text-sm">
-                        دخول
-                    </button>
-                </form>
-
-                <div class="text-center mt-6">
-                    <button onclick="toggleAuthMode()" id="authSwitchText" class="text-xs text-emerald-600 font-semibold hover:underline">
-                        ليس لديك حساب؟ سجل حساب جديد الآن
-                    </button>
-                </div>
-                <div class="text-center mt-2">
-                    <button onclick="goToHome()" class="text-xs text-slate-500 hover:underline">العودة للرئيسية</button>
-                </div>
-            </div>
-        </section>
-
-        <!-- SCREEN VERIFY -->
-        <section id="screen-verify" class="screen hide animate-fade max-w-md mx-auto py-10">
-            <div class="glass-card p-8 rounded-3xl shadow-xl text-center space-y-6">
-                <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-2xl">
-                    <i class="fa-solid fa-envelope-circle-check"></i>
-                </div>
-                <h3 class="text-2xl font-bold text-slate-900">التحقق من البريد الإلكتروني الحقيقي</h3>
-                <p class="text-xs text-slate-600 leading-relaxed">
-                    تم إرسال رابط التحقق إلى بريدك الإلكتروني. يرجى تأكيد البريد للمتابعة في تفعيل حسابك بالمنصة.
-                </p>
-                <div class="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-xs text-emerald-800">
-                    تم التحقق من أن البريد صحيح وغير وهمي، جاهز للتفعيل.
-                </div>
-                <button onclick="completeVerification()" class="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow hover:bg-emerald-700 transition text-sm">
-                    تم تأكيد البريد، متابعة للدخول
-                </button>
-            </div>
-        </section>
-
-        <!-- SCREEN CREATE JAMIYA -->
-        <section id="screen-create-jamiya" class="screen hide animate-fade max-w-xl mx-auto">
-            <div class="glass-card p-8 rounded-3xl shadow-xl">
-                <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-xl font-bold text-slate-900">إنشاء جمعية عائلية جديدة</h3>
-                    <button onclick="goToHome()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
-                </div>
-
-                <form onsubmit="handleCreateJamiya(event)" class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">اسم الجمعية العائلية</label>
-                        <input type="text" id="jName" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="مثال: جمعية عائلة آل فهيد 2026">
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">عدد الأفراد المشاركين</label>
-                            <input type="number" id="jCount" min="2" max="30" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="مثال: 10">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">قيمة الاشتراك الشهري لكل فرد (ريال)</label>
-                            <input type="number" id="jAmount" min="100" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="مثال: 1000">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">تاريخ بداية الجمعية</label>
-                            <input type="date" id="jStartDate" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">آخر يوم لدفع كل شهر</label>
-                            <input type="number" id="jLastDay" min="1" max="31" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="مثال: 5">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">يوم القبض (الصرف)</label>
-                            <input type="number" id="jPayDay" min="1" max="31" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="مثال: 10">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">طريقة الإشعارات المفضلة للأعضاء</label>
-                        <select id="jNotifyChannel" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm bg-white">
-                            <option value="email">البريد الإلكتروني (Email - مفعل)</option>
-                            <option value="whatsapp">واتساب (WhatsApp)</option>
-                            <option value="sms">رسائل نصية قصيرة (SMS)</option>
-                        </select>
-                    </div>
-
-                    <button type="submit" class="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-xl shadow-lg hover:from-emerald-700 hover:to-teal-700 transition text-sm">
-                        إنشاء الجمعية ونشرها
-                    </button>
-                </form>
-            </div>
-        </section>
-
-        <!-- SCREEN BROWSE JAMIYA -->
-        <section id="screen-browse-jamiya" class="screen hide animate-fade space-y-6">
-            <div class="glass-card p-6 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <span class="px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full mb-2 inline-block" id="badgeJamiyaStatus">نشطة وقيد التدوير</span>
-                    <h2 class="text-2xl font-black text-slate-900" id="displayJName">اسم الجمعية</h2>
-                    <p class="text-xs text-slate-500 mt-1">الاشتراك: <span id="displayJAmount" class="font-bold text-slate-700">0</span> ريال | موعد السداد أقصاه يوم <span id="displayJLastDay">0</span> من كل شهر</p>
-                </div>
-                <div class="flex items-center space-x-2 space-x-reverse flex-wrap gap-2">
-                    <button onclick="openInviteModal()" class="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow hover:bg-emerald-700 transition flex items-center space-x-2 space-x-reverse">
-                        <i class="fa-solid fa-user-plus"></i>
-                        <span>إضافة أعضاء</span>
-                    </button>
-                    <button onclick="openEmailDispatcherModal()" class="px-4 py-2 bg-teal-600 text-white text-xs font-bold rounded-xl shadow hover:bg-teal-700 transition flex items-center space-x-2 space-x-reverse">
-                        <i class="fa-solid fa-envelope"></i>
-                        <span>إرسال بريد للأعضاء</span>
-                    </button>
-                    <button onclick="openModificationModal()" class="px-4 py-2 bg-amber-600 text-white text-xs font-bold rounded-xl shadow hover:bg-amber-700 transition flex items-center space-x-2 space-x-reverse">
-                        <i class="fa-solid fa-pen-to-square"></i>
-                        <span>طلب تعديل الشروط</span>
-                    </button>
-                    <button onclick="openAiAdvisorModal()" class="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl shadow hover:bg-indigo-700 transition flex items-center space-x-2 space-x-reverse">
-                        <i class="fa-solid fa-robot"></i>
-                        <span>المساعد الذكي</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Active Modification Request Banner if any -->
-            <div id="modificationRequestBanner" class="hide bg-indigo-50 border border-indigo-200 p-4 rounded-2xl flex justify-between items-center text-xs">
-                <div>
-                    <p class="font-bold text-indigo-900"><i class="fa-solid fa-circle-exclamation ml-1"></i> يوجد طلب تعديل شروط معلق لهذه الجمعية:</p>
-                    <p id="modRequestText" class="text-indigo-700 mt-0.5">تفاصيل الطلب...</p>
-                </div>
-                <div id="modRequestActions" class="flex space-x-2 space-x-reverse">
-                    <!-- Populated dynamically -->
-                </div>
-            </div>
-
-            <!-- Current Month Recipient Alert Box -->
-            <div id="recipientAlertContainer" class="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-6 rounded-3xl shadow-lg relative overflow-hidden">
-                <div class="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div>
-                        <div class="flex items-center space-x-2 space-x-reverse mb-1">
-                            <i class="fa-solid fa-award text-yellow-200"></i>
-                            <span class="text-xs font-bold text-yellow-100 uppercase tracking-wider">مستلم دفعة هذا الشهر</span>
-                        </div>
-                        <h3 class="text-xl font-black" id="currentRecipientName">اسم المستلم</h3>
-                        <p class="text-xs text-amber-100 mt-1">البنك: <span id="currentRecipientBank">الراجحي</span> | الآيبان: <span id="currentRecipientIban">SA000...</span></p>
-                    </div>
-                    <div id="paymentActionArea">
-                        <!-- Dynamic payment or confirmation button -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Members list grid -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- Registered Members Column -->
-                <div class="glass-card p-5 rounded-2xl shadow-sm md:col-span-2">
-                    <div class="flex justify-between items-center mb-4">
-                        <h4 class="font-bold text-slate-800 text-sm flex items-center space-x-2 space-x-reverse">
-                            <i class="fa-solid fa-users text-emerald-600"></i>
-                            <span>الأعضاء المسجلين وترتيب القبض</span>
-                        </h4>
-                        <span class="text-xs bg-slate-100 px-2 py-1 rounded-lg text-slate-600 font-semibold" id="memberCountBadge">0 أعضاء</span>
-                    </div>
-                    <div id="membersListContainer" class="space-y-3">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-
-                <!-- Pending Invitations & Stats Column -->
-                <div class="space-y-6">
-                    <div class="glass-card p-5 rounded-2xl shadow-sm">
-                        <h4 class="font-bold text-slate-800 text-sm mb-4 flex items-center space-x-2 space-x-reverse">
-                            <i class="fa-solid fa-clock-rotate-left text-amber-500"></i>
-                            <span>الأعضاء المنتظر قبولهم</span>
-                        </h4>
-                        <div id="pendingMembersContainer" class="space-y-3">
-                            <!-- Populated by JS -->
-                        </div>
-                    </div>
-
-                    <div class="glass-card p-5 rounded-2xl shadow-sm">
-                        <h4 class="font-bold text-slate-800 text-sm mb-3 flex items-center space-x-2 space-x-reverse">
-                            <i class="fa-solid fa-chart-pie text-secondary-600"></i>
-                            <span>حالة التحصيل هذا الشهر</span>
-                        </h4>
-                        <div class="space-y-2 text-xs">
-                            <div class="flex justify-between text-slate-600">
-                                <span>المبلغ الإجمالي المستهدف:</span>
-                                <span class="font-bold text-slate-900" id="statTargetAmount">0 ريال</span>
-                            </div>
-                            <div class="flex justify-between text-slate-600">
-                                <span>المحصل حتى الآن:</span>
-                                <span class="font-bold text-emerald-600" id="statCollectedAmount">0 ريال</span>
-                            </div>
-                            <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden mt-2">
-                                <div id="collectionProgressBar" class="bg-emerald-500 h-full w-0 transition-all duration-500"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- SCREEN OWNER DASHBOARD -->
-        <section id="screen-owner-dashboard" class="screen hide animate-fade space-y-6">
-            <div class="glass-card p-6 rounded-3xl shadow-xl bg-gradient-to-r from-slate-900 to-indigo-950 text-white">
-                <div class="flex justify-between items-center">
-                    <div>
-                        <span class="px-3 py-1 bg-indigo-500/30 text-indigo-300 text-xs font-bold rounded-full mb-2 inline-block">لوحة تحكم مالك التطبيق</span>
-                        <h2 class="text-2xl font-black">إدارة المنصة العامة</h2>
-                        <p class="text-xs text-slate-300 mt-1">مرحباً بك يا مالك المنصة. تشرف على كافة الجمعيات والأعضاء المسجلين.</p>
-                    </div>
-                    <button onclick="goToHome()" class="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition">الرئيسية</button>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="glass-card p-5 rounded-2xl shadow-sm">
-                    <p class="text-xs text-slate-500">إجمالي الجمعيات المسجلة</p>
-                    <h3 class="text-2xl font-black text-slate-900 mt-1" id="adminTotalJamiyat">0</h3>
-                </div>
-                <div class="glass-card p-5 rounded-2xl shadow-sm">
-                    <p class="text-xs text-slate-500">إجمالي الأعضاء المسجلين</p>
-                    <h3 class="text-2xl font-black text-slate-900 mt-1" id="adminTotalUsers">0</h3>
-                </div>
-                <div class="glass-card p-5 rounded-2xl shadow-sm">
-                    <p class="text-xs text-slate-500">إجمالي الأموال المتداولة</p>
-                    <h3 class="text-2xl font-black text-emerald-600 mt-1" id="adminTotalMoney">0 ريال</h3>
-                </div>
-            </div>
-
-            <!-- Admin Detailed Tabs -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Registered Jamiyat List -->
-                <div class="glass-card p-6 rounded-3xl shadow-xl">
-                    <h3 class="font-bold text-slate-900 text-base mb-4 flex items-center space-x-2 space-x-reverse">
-                        <i class="fa-solid fa-people-roof text-emerald-600"></i>
-                        <span>الجمعيات المسجلة وبياناتها</span>
-                    </h3>
-                    <div id="adminJamiyatList" class="space-y-3 max-h-96 overflow-y-auto">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-
-                <!-- Registered Users List -->
-                <div class="glass-card p-6 rounded-3xl shadow-xl">
-                    <h3 class="font-bold text-slate-900 text-base mb-4 flex items-center space-x-2 space-x-reverse">
-                        <i class="fa-solid fa-users text-indigo-600"></i>
-                        <span>الأعضاء المسجلين بالمنصة وبياناتهم</span>
-                    </h3>
-                    <div id="adminUsersList" class="space-y-3 max-h-96 overflow-y-auto">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- SCREEN PROFILE & NOTIFICATIONS -->
-        <section id="screen-profile" class="screen hide animate-fade max-w-xl mx-auto space-y-6">
-            <div class="glass-card p-6 rounded-3xl shadow-xl space-y-6">
-                <div class="flex justify-between items-center border-b border-slate-100 pb-4">
-                    <div class="flex items-center space-x-3 space-x-reverse">
-                        <div id="profileAvatarDisplay" class="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold text-xl shadow-md overflow-hidden">
-                            <span id="profileInitial">م</span>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-slate-900 text-lg" id="profileTitleName">اسم المستخدم</h3>
-                            <p class="text-xs text-slate-500" id="profileTitleEmail">email@domain.com</p>
-                        </div>
-                    </div>
-                    <button onclick="goToHome()" class="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-200 transition">الرئيسية</button>
-                </div>
-
-                <!-- Profile Update Form -->
-                <div>
-                    <h4 class="font-bold text-slate-800 text-sm mb-3 flex items-center space-x-2 space-x-reverse">
-                        <i class="fa-solid fa-user-pen text-emerald-600"></i>
-                        <span>تعديل البيانات الشخصية والبنكية</span>
-                    </h4>
-                    <form onsubmit="updateUserProfile(event)" class="space-y-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">اسم العضو</label>
-                            <input type="text" id="pName" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">رقم الجوال</label>
-                            <input type="tel" id="pPhone" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">البنك المفضل</label>
-                            <select id="pBank" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-                                <option value="الراجحي">مصرف الراجحي</option>
-                                <option value="الأهلي">البنك الأهلي السعودي (SNB)</option>
-                                <option value="الإنماء">بنك الإنماء</option>
-                                <option value="الرياض">بنك الرياض</option>
-                                <option value="البلاد">بنك البلاد</option>
-                                <option value="الجزيرة">بنك الجزيرة</option>
-                                <option value="الفرنسي">السابي (الفرنسي)</option>
-                                <option value="العرب الوطني">البنك العربي الوطني (ANB)</option>
-                                <option value="الاول">البنك السعودي الأول ( الأول)</option>
-                                <option value="دجيتال/مرابحة">البنك الرقمي / أخرى</option>
-                                <option value="كاش">كاش (نقداً)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">رقم الحساب / الآيبان السعودي</label>
-                            <input type="text" id="pIban" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">صورة البروفايل (رابط صورة أو رفع)</label>
-                            <input type="text" id="pAvatar" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="https://example.com/avatar.jpg">
-                        </div>
-                        <button type="submit" class="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow hover:bg-emerald-700 transition text-sm">
-                            حفظ التعديلات
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Notifications Inbox Section -->
-                <div class="pt-4 border-t border-slate-100">
-                    <h4 class="font-bold text-slate-800 text-sm mb-3 flex items-center space-x-2 space-x-reverse">
-                        <i class="fa-solid fa-bell text-amber-500"></i>
-                        <span>سجل الإشعارات والبريد الوارد</span>
-                    </h4>
-                    <div id="userNotificationsInbox" class="space-y-2 max-h-60 overflow-y-auto">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-            </div>
-        </section>
-
-    </main>
-
-    <!-- First-Time Google Profile Completion Modal -->
-    <div id="profileCompletionModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hide animate-fade">
-        <div class="bg-white max-w-md w-full p-6 rounded-3xl shadow-2xl space-y-4">
-            <div class="text-center">
-                <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl mb-2">
-                    <i class="fa-solid fa-user-pen"></i>
-                </div>
-                <h3 class="font-bold text-slate-900 text-lg">إكمال بيانات الحساب</h3>
-                <p class="text-xs text-slate-500 mt-1">نظراً لتسجيلك لأول مرة عبر جوجل، يرجى استكمال بياناتك البنكية والجوال للمتابعة:</p>
-            </div>
-            
-            <form onsubmit="saveGoogleProfile(event)" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">رقم الجوال (يبدأ بـ 05)</label>
-                    <input type="tel" id="gpPhone" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="05xxxxxxxx">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">البنك المفضل</label>
-                    <select id="gpBank" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm bg-white">
-                        <option value="الراجحي">مصرف الراجحي</option>
-                        <option value="الأهلي">البنك الأهلي السعودي (SNB)</option>
-                        <option value="الإنماء">بنك الإنماء</option>
-                        <option value="الرياض">بنك الرياض</option>
-                        <option value="البلاد">بنك البلاد</option>
-                        <option value="الجزيرة">بنك الجزيرة</option>
-                        <option value="الفرنسي">السابي (الفرنسي)</option>
-                        <option value="العرب الوطني">البنك العربي الوطني (ANB)</option>
-                        <option value="الاول">البنك السعودي الأول ( الأول)</option>
-                        <option value="دجيتال/مرابحة">البنك الرقمي / أخرى</option>
-                        <option value="كاش">كاش (نقداً)</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">رقم الحساب / الآيبان السعودي</label>
-                    <input type="text" id="gpIban" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="SA0000000000000000000000">
-                </div>
-                <button type="submit" class="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow hover:bg-emerald-700 transition text-sm">
-                    حفظ البيانات والدخول
-                </button>
-            </form>
-        </div>
+<header class="bg-white shadow-sm sticky top-0 z-40 border-b border-slate-100">
+  <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+    <div class="flex items-center gap-3 cursor-pointer" data-act="go-home">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md"><i class="fa-solid fa-people-roof"></i></div>
+      <div><h1 class="font-bold text-slate-900 leading-tight">الجمعية الصغيرة</h1><p class="text-xs text-slate-500" id="hdrSub">منصة التعاون العائلي</p></div>
     </div>
-
-    <!-- Pending Invitations Modal -->
-    <div id="pendingInvitationsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hide animate-fade">
-        <div class="bg-white max-w-md w-full p-6 rounded-3xl shadow-2xl space-y-4">
-            <div class="flex items-center space-x-3 space-x-reverse">
-                <div class="w-10 h-10 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-lg">
-                    <i class="fa-solid fa-envelope-open-text"></i>
-                </div>
-                <div>
-                    <h3 class="font-bold text-slate-900 text-base">لديك دعوات انضمام للجمعيات!</h3>
-                    <p class="text-xs text-slate-500">تمت دعوتك للانضمام للجمعيات التالية:</p>
-                </div>
-            </div>
-            <div id="pendingInvitationsList" class="space-y-3 max-h-60 overflow-y-auto">
-                <!-- Populated via JS -->
-            </div>
-            <button onclick="document.getElementById('pendingInvitationsModal').classList.add('hide')" class="w-full py-2.5 bg-slate-200 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-300 transition">إغلاق</button>
-        </div>
-    </div>
-
-    <!-- Payment Proof Modal -->
-    <div id="paymentModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hide animate-fade">
-        <div class="bg-white max-w-md w-full p-6 rounded-3xl shadow-2xl space-y-4">
-            <div class="flex justify-between items-center">
-                <h3 class="font-bold text-slate-900 text-lg">إثبات سداد القسط الشهري</h3>
-                <button onclick="closePaymentModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <p class="text-xs text-slate-500">قم برفع إيصال الحوالة البنكية وتأكيد القيمة المحولة لمستحق هذا الشهر.</p>
-            
-            <form onsubmit="submitPaymentProof(event)" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">المبلغ المحول (ريال)</label>
-                    <input type="number" id="payAmountInput" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">صورة أو مرفق الإيصال (ملف أو صورة)</label>
-                    <input type="file" id="payAttachmentInput" accept="image/*,.pdf" required class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100">
-                </div>
-                <button type="submit" class="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow hover:bg-emerald-700 transition text-sm">
-                    إرسال إثبات السداد للمستلم
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Invite Members Modal -->
-    <div id="inviteModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hide animate-fade">
-        <div class="bg-white max-w-md w-full p-6 rounded-3xl shadow-2xl space-y-4">
-            <div class="flex justify-between items-center">
-                <h3 class="font-bold text-slate-900 text-lg">إضافة أو دعوة فرد للجمعية</h3>
-                <button onclick="closeInviteModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <form onsubmit="handleInviteMember(event)" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">اسم العضو</label>
-                    <input type="text" id="invName" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="اسم العضو العائلي">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">البريد الإلكتروني الحقيقي للعضو</label>
-                    <input type="email" id="invContact" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm" placeholder="member@domain.com">
-                </div>
-                <button type="submit" class="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow hover:bg-emerald-700 transition text-sm">
-                    إرسال بريد دعوة الانضمام رسمياً
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Email Dispatcher Modal (Advanced Email Sending to Subscribers) -->
-    <div id="emailDispatcherModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hide animate-fade">
-        <div class="bg-white max-w-md w-full p-6 rounded-3xl shadow-2xl space-y-4">
-            <div class="flex justify-between items-center">
-                <div class="flex items-center space-x-2 space-x-reverse">
-                    <div class="w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center">
-                        <i class="fa-solid fa-envelope"></i>
-                    </div>
-                    <h3 class="font-bold text-slate-900 text-base">إرسال بريد إلكتروني للمشتركين</h3>
-                </div>
-                <button onclick="closeEmailDispatcherModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <form onsubmit="sendBroadcastEmail(event)" class="space-y-3 text-xs">
-                <div>
-                    <label class="block font-semibold text-slate-700 mb-1">المستلمون:</label>
-                    <select id="emailTargetSelect" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white">
-                        <option value="all">جميع أعضاء الجمعية (بريد جماعي)</option>
-                        <option value="pending">الأعضاء المنتظر قبولهم فقط</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block font-semibold text-slate-700 mb-1">عنوان البريد الإلكتروني (Subject):</label>
-                    <input type="text" id="emailSubjectInput" required class="w-full px-3 py-2 rounded-xl border border-slate-200" placeholder="تذكير بسداد قسط الجمعية لشهر مارس">
-                </div>
-                <div>
-                    <label class="block font-semibold text-slate-700 mb-1">محتوى الرسالة (Body):</label>
-                    <textarea id="emailBodyInput" rows="4" required class="w-full px-3 py-2 rounded-xl border border-slate-200" placeholder="السلام عليكم، نود تذكيركم بموعد سداد القسط الشهري..."></textarea>
-                </div>
-                <button type="submit" class="w-full py-3 bg-teal-600 text-white font-bold rounded-xl shadow hover:bg-teal-700 transition text-sm">
-                    إرسال البريد الإلكتروني الفعلي للمشتركين
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Jamiya Modification Request Modal -->
-    <div id="modificationModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hide animate-fade">
-        <div class="bg-white max-w-md w-full p-6 rounded-3xl shadow-2xl space-y-4">
-            <div class="flex justify-between items-center">
-                <h3 class="font-bold text-slate-900 text-lg">طلب تعديل شروط أو قواعد الجمعية</h3>
-                <button onclick="closeModificationModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <form onsubmit="submitModificationRequest(event)" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">تفاصيل التعديل المطلوب (مثل: تغيير قيمة الاشتراك أو موعد الدفع)</label>
-                    <textarea id="modInputText" rows="3" required class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500 focus:outline-none text-xs" placeholder="اكتب التعديل المقترح بوضوح..."></textarea>
-                </div>
-                <button type="submit" class="w-full py-3 bg-amber-600 text-white font-bold rounded-xl shadow hover:bg-amber-700 transition text-sm">
-                    إرسال طلب التعديل لموافقة الأعضاء
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- AI Advisor Modal -->
-    <div id="aiModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hide animate-fade">
-        <div class="bg-white max-w-lg w-full p-6 rounded-3xl shadow-2xl space-y-4">
-            <div class="flex justify-between items-center">
-                <div class="flex items-center space-x-2 space-x-reverse">
-                    <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
-                        <i class="fa-solid fa-robot"></i>
-                    </div>
-                    <h3 class="font-bold text-slate-900 text-base">المساعد المالي الذكي (Gemini)</h3>
-                </div>
-                <button onclick="closeAiAdvisorModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <div id="aiChatBox" class="bg-slate-50 p-4 rounded-2xl h-64 overflow-y-auto space-y-3 text-xs text-slate-700 border border-slate-100">
-                <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-100">
-                    أهلاً بك! أنا مستشارك الذكي لإدارة الجمعيات العائلية. كيف يمكنني مساعدتك في حساب ترتيب القبط أو نصائح الادخار اليوم؟
-                </div>
-            </div>
-            <div class="flex space-x-2 space-x-reverse">
-                <input type="text" id="aiQueryInput" placeholder="اطرح سؤالاً مالياً أو اطلب صياغة تذكير..." class="flex-grow px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xs">
-                <button onclick="sendAiQuery()" class="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-xs hover:bg-indigo-700 transition">إرسال</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast Notification Container -->
-    <div id="toastContainer" class="fixed bottom-5 left-5 z-50 space-y-2"></div>
-
-    <script>
-        const OWNER_EMAIL = "mamydady87@gmail.com";
-        const OWNER_PASS = "Prom1425";
-
-        let currentUser = null;
-        let pendingUser = null;
-        let isAuthRegisterMode = false;
-        let jamiyatList = [];
-        let registeredUsersList = [];
-        let activeJamiyaId = null;
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyBD_a9TrhsCL5ognnIxhv2OuyiWJmdr33o",
-            authDomain: "aljamiyahapp.firebaseapp.com",
-            projectId: "aljamiyahapp",
-            storageBucket: "aljamiyahapp.firebasestorage.app",
-            messagingSenderId: "508199870007",
-            appId: "1:508199870007:web:5aeee0d4bdbb4a4893e9b2"
-        };
-        
-        if (typeof firebase !== 'undefined' && !firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-            const db = firebase.firestore();
-            const auth = firebase.auth();
-        }
-
-        window.onload = function() {
-            const savedUser = localStorage.getItem('jamiyah_current_user');
-            const savedUsers = localStorage.getItem('jamiyah_all_users');
-            const savedJamiyat = localStorage.getItem('jamiyah_all_list');
-
-            if (savedUser) currentUser = JSON.parse(savedUser);
-            if (savedUsers) registeredUsersList = JSON.parse(savedUsers);
-            if (savedJamiyat) jamiyatList = JSON.parse(savedJamiyat);
-
-            // Ensure owner exists in registered users
-            if (!registeredUsersList.some(u => u.email.toLowerCase() === OWNER_EMAIL.toLowerCase())) {
-                registeredUsersList.push({
-                    name: 'محمد الفهيد (المالك)',
-                    email: OWNER_EMAIL,
-                    phone: '0500000000',
-                    bank: 'مصرف الراجحي',
-                    iban: 'SA000000000000000000',
-                    avatar: ''
-                });
-                localStorage.setItem('jamiyah_all_users', JSON.stringify(registeredUsersList));
-            }
-
-            renderNavigation();
-            goToHome();
-            checkPendingInvitations();
-        };
-
-        function goToScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.add('hide'));
-            const target = document.getElementById(screenId);
-            if (target) {
-                target.classList.remove('hide');
-            }
-            renderNavigation();
-        }
-
-        function goToHome() {
-            renderHomeScreen();
-        }
-
-        function renderNavigation() {
-            const nav = document.getElementById('navActions');
-            const roleBadge = document.getElementById('headerRoleBadge');
-            nav.innerHTML = '';
-
-            if (currentUser) {
-                if (currentUser.email.toLowerCase() === OWNER_EMAIL.toLowerCase()) {
-                    roleBadge.innerHTML = '<span class="text-indigo-600 font-bold"><i class="fa-solid fa-shield-halved ml-1"></i>مالك التطبيق</span>';
-                    nav.innerHTML += `<button onclick="goToScreen('screen-owner-dashboard'); renderOwnerDashboard();" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-bold hover:bg-indigo-100 transition">لوحة المالك</button>`;
-                } else {
-                    roleBadge.innerText = currentUser.name || currentUser.email;
-                }
-                nav.innerHTML += `
-                    <button onclick="openProfileScreen()" class="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition flex items-center space-x-1.5 space-x-reverse">
-                        <i class="fa-solid fa-user-gear"></i>
-                        <span>حسابي</span>
-                    </button>
-                    <button onclick="handleLogout()" class="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-xl text-xs font-bold hover:bg-rose-100 transition"><i class="fa-solid fa-right-from-bracket ml-1"></i>خروج</button>
-                `;
-            } else {
-                roleBadge.innerText = 'منصة التعاون العائلي';
-                nav.innerHTML += `<button onclick="openAuthModal(false)" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition">تسجيل الدخول</button>`;
-            }
-        }
-
-        function renderHomeScreen() {
-            goToScreen('screen-home');
-            const container = document.getElementById('dynamicHomeButtons');
-            container.innerHTML = '';
-
-            if (!currentUser) {
-                container.innerHTML = `
-                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                        <button onclick="openAuthModal(false)" class="px-6 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-2xl shadow-lg hover:from-emerald-700 hover:to-teal-700 transition flex items-center justify-center space-x-2 space-x-reverse text-sm">
-                            <i class="fa-solid fa-right-to-bracket"></i>
-                            <span>تسجيل الدخول</span>
-                        </button>
-                        <button onclick="openAuthModal(true)" class="px-6 py-3.5 bg-white border border-emerald-200 text-emerald-700 font-bold rounded-2xl shadow-sm hover:bg-emerald-50 transition flex items-center justify-center space-x-2 space-x-reverse text-sm">
-                            <i class="fa-solid fa-user-plus"></i>
-                            <span>انضمام لجمعية عائلية</span>
-                        </button>
-                    </div>
-                `;
-            } else {
-                let jamiyatHtml = '';
-                jamiyatList.forEach(j => {
-                    const isCreator = j.creatorEmail.toLowerCase() === currentUser.email.toLowerCase();
-                    const isMember = j.members.some(m => (m.contact || '').toLowerCase() === currentUser.email.toLowerCase() || m.name.includes(currentUser.name));
-                    if (isCreator || isMember) {
-                        jamiyatHtml += `
-                            <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex justify-between items-center text-right">
-                                <div>
-                                    <h4 class="font-bold text-slate-800 text-sm">${j.name}</h4>
-                                    <p class="text-xs text-slate-500 mt-0.5">القيمة: ${j.amount} ريال | الأعضاء: ${j.count}</p>
-                                    ${isCreator ? '<span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md font-bold mt-1 inline-block">أنت مشرف الجمعية</span>' : '<span class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md font-bold mt-1 inline-block">عضو مشارك</span>'}
-                                </div>
-                                <button onclick="openJamiya('${j.id}')" class="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition">دخول الجمعية</button>
-                            </div>
-                        `;
-                    }
-                });
-
-                container.innerHTML = `
-                    <div class="space-y-4">
-                        <button onclick="goToScreen('screen-create-jamiya')" class="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-2xl shadow-xl hover:from-emerald-700 hover:to-teal-700 transition flex items-center justify-center space-x-2 space-x-reverse text-base">
-                            <i class="fa-solid fa-circle-plus text-lg"></i>
-                            <span>إنشاء جمعية عائلية جديدة</span>
-                        </button>
-                        <div class="text-right pt-4 border-t border-slate-100">
-                            <h4 class="font-bold text-slate-800 text-sm mb-3">الجمعيات الخاصة بك:</h4>
-                            <div class="space-y-2 max-h-60 overflow-y-auto">
-                                ${jamiyatHtml || '<p class="text-xs text-slate-400">لست منضمًا لأي جمعية بعد. أنشئ جمعيتك الأولى أو انتظر قبول دعوة!</p>'}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-        }
-
-        function openAuthModal(isRegister) {
-            isAuthRegisterMode = isRegister;
-            document.getElementById('authTitle').innerText = isRegister ? 'تسجيل حساب جديد' : 'تسجيل الدخول';
-            document.getElementById('authSubmitBtn').innerText = isRegister ? 'إنشاء الحساب' : 'دخول';
-            document.getElementById('authSwitchText').innerText = isRegister ? 'لديك حساب بالفعل؟ سجل دخولك' : 'ليس لديك حساب؟ سجل حساب جديد الآن';
-            
-            if (isRegister) {
-                document.getElementById('nameFieldContainer').classList.remove('hide');
-                document.getElementById('extraRegFields').classList.remove('hide');
-            } else {
-                document.getElementById('nameFieldContainer').classList.add('hide');
-                document.getElementById('extraRegFields').classList.add('hide');
-            }
-            goToScreen('screen-auth');
-        }
-
-        function toggleAuthMode() {
-            openAuthModal(!isAuthRegisterMode);
-        }
-
-        function isValidEmail(email) {
-            const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!regex.test(email)) return false;
-            const dummyDomains = ['test.com', 'example.com', 'fake.com', 'abc.com', 'noemail.com', 'mail.com'];
-            const domain = email.split('@')[1].toLowerCase();
-            if (dummyDomains.includes(domain)) return false;
-            return true;
-        }
-
-        async function loginWithGoogle() {
-            try {
-                if (typeof firebase !== 'undefined' && firebase.auth) {
-                    const provider = new firebase.auth.GoogleAuthProvider();
-                    const result = await firebase.auth().signInWithPopup(provider);
-                    const user = result.user;
-                    handleGoogleUser(user.email, user.displayName || 'مستخدم جوجل');
-                    return;
-                }
-                throw new Error("Auth not initialized");
-            } catch (error) {
-                showToast('فشل تسجيل الدخول بجوجل: ' + error.message, 'error');
-            }
-        }
-
-        function handleGoogleUser(email, name) {
-            let existing = registeredUsersList.find(u => u.email.toLowerCase() === email.toLowerCase());
-            if (!existing) {
-                pendingUser = { name, email, phone: '', bank: 'مصرف الراجحي', iban: '', avatar: '' };
-                document.getElementById('profileCompletionModal').classList.remove('hide');
-            } else {
-                currentUser = existing;
-                localStorage.setItem('jamiyah_current_user', JSON.stringify(currentUser));
-                showToast(`تم تسجيل الدخول بنجاح (${email})!`, 'success');
-                goToHome();
-                checkPendingInvitations();
-            }
-        }
-
-        function saveGoogleProfile(event) {
-            event.preventDefault();
-            const phone = document.getElementById('gpPhone').value.trim();
-            const bank = document.getElementById('gpBank').value;
-            const iban = document.getElementById('gpIban').value.trim();
-
-            if (!phone || phone.length < 10) {
-                showToast('الرجاء إدخال رقم جوال سعودي صحيح', 'error');
-                return;
-            }
-
-            pendingUser.phone = phone;
-            pendingUser.bank = bank;
-            pendingUser.iban = iban;
-
-            currentUser = pendingUser;
-            registeredUsersList.push(currentUser);
-            localStorage.setItem('jamiyah_all_users', JSON.stringify(registeredUsersList));
-            localStorage.setItem('jamiyah_current_user', JSON.stringify(currentUser));
-
-            document.getElementById('profileCompletionModal').classList.add('hide');
-            pendingUser = null;
-            showToast('تم استكمال بيانات الحساب وتسجيل الدخول بنجاح!', 'success');
-            goToHome();
-            checkPendingInvitations();
-        }
-
-        async function handleAuthSubmit(event) {
-            event.preventDefault();
-            const email = document.getElementById('authEmail').value.trim().toLowerCase();
-            const password = document.getElementById('authPassword').value;
-
-            if (!isValidEmail(email)) {
-                showToast('الرجاء إدخال بريد إلكتروني حقيقي وصحيح (يُمنع استخدام البريد الوهمي)', 'error');
-                return;
-            }
-
-            if (isAuthRegisterMode) {
-                const name = document.getElementById('regName').value.trim();
-                const phone = document.getElementById('regPhone').value.trim();
-                const bank = document.getElementById('regBank').value;
-                const iban = document.getElementById('regIban').value.trim();
-                const terms = document.getElementById('termsCheck').checked;
-
-                if (!terms) {
-                    showToast('يجب الموافقة على الشروط والأحكام وسياسة الخصوصية', 'error');
-                    return;
-                }
-
-                if (!phone || phone.length < 10) {
-                    showToast('الرجاء إدخال رقم جوال سعودي صحيح', 'error');
-                    return;
-                }
-
-                pendingUser = { name, email, phone, bank, iban, password, avatar: '' };
-                goToScreen('screen-verify');
-            } else {
-                if (email === OWNER_EMAIL.toLowerCase()) {
-                    if (password !== OWNER_PASS) {
-                        showToast('كلمة مرور مالك التطبيق غير صحيحة', 'error');
-                        return;
-                    }
-                    currentUser = {
-                        name: 'محمد الفهيد (المالك)',
-                        email: OWNER_EMAIL,
-                        phone: '0500000000',
-                        bank: 'مصرف الراجحي',
-                        iban: 'SA000000000000000000',
-                        avatar: ''
-                    };
-                } else {
-                    let found = registeredUsersList.find(u => u.email.toLowerCase() === email);
-                    if (!found) {
-                        currentUser = {
-                            name: 'عضو عائلي',
-                            email: email,
-                            phone: '0512345678',
-                            bank: 'مصرف الراجحي',
-                            iban: 'SA990000000000000000',
-                            avatar: ''
-                        };
-                        registeredUsersList.push(currentUser);
-                        localStorage.setItem('jamiyah_all_users', JSON.stringify(registeredUsersList));
-                    } else {
-                        currentUser = found;
-                    }
-                }
-                localStorage.setItem('jamiyah_current_user', JSON.stringify(currentUser));
-                showToast('تم تسجيل الدخول بنجاح!', 'success');
-                goToHome();
-                checkPendingInvitations();
-            }
-        }
-
-        function completeVerification() {
-            if (pendingUser) {
-                currentUser = pendingUser;
-                if (!registeredUsersList.some(u => u.email.toLowerCase() === currentUser.email.toLowerCase())) {
-                    registeredUsersList.push(currentUser);
-                    localStorage.setItem('jamiyah_all_users', JSON.stringify(registeredUsersList));
-                }
-                localStorage.setItem('jamiyah_current_user', JSON.stringify(currentUser));
-                pendingUser = null;
-                showToast('تم التحقق من البريد وتفعيل الحساب بنجاح!', 'success');
-                goToHome();
-                checkPendingInvitations();
-            }
-        }
-
-        function handleLogout() {
-            currentUser = null;
-            localStorage.removeItem('jamiyah_current_user');
-            showToast('تم تسجيل الخروج بنجاح', 'info');
-            goToHome();
-        }
-
-        function addNotification(userEmail, title, body) {
-            let notifications = JSON.parse(localStorage.getItem('jamiyah_notifications') || '[]');
-            notifications.push({
-                id: 'notif-' + Date.now(),
-                email: userEmail.toLowerCase(),
-                title,
-                body,
-                date: new Date().toLocaleDateString('ar-SA')
-            });
-            localStorage.setItem('jamiyah_notifications', JSON.stringify(notifications));
-        }
-
-        function checkPendingInvitations() {
-            if (!currentUser) return;
-            let pendingJamiyat = [];
-            const userEmail = (currentUser.email || '').toLowerCase().trim();
-            const userPhone = (currentUser.phone || '').trim();
-
-            jamiyatList.forEach(j => {
-                j.members.forEach(m => {
-                    const mContact = (m.contact || '').toLowerCase().trim();
-                    if (((mContact === userEmail) || (userPhone && m.contact.trim() === userPhone)) && m.status === 'pending') {
-                        pendingJamiyat.push(j);
-                    }
-                });
-            });
-
-            if (pendingJamiyat.length > 0) {
-                const listEl = document.getElementById('pendingInvitationsList');
-                listEl.innerHTML = '';
-                pendingJamiyat.forEach(j => {
-                    listEl.innerHTML += `
-                        <div class="p-3 bg-amber-50 border border-amber-200 rounded-2xl flex justify-between items-center text-xs">
-                            <div>
-                                <p class="font-bold text-slate-900">${j.name}</p>
-                                <p class="text-[10px] text-slate-500">الاشتراك: ${j.amount} ريال</p>
-                            </div>
-                            <button onclick="acceptInvitation('${j.id}')" class="px-3 py-1.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition">قبول الانضمام</button>
-                        </div>
-                    `;
-                });
-                document.getElementById('pendingInvitationsModal').classList.remove('hide');
-            }
-        }
-
-        function acceptInvitation(jId) {
-            const j = jamiyatList.find(item => item.id === jId);
-            if (j) {
-                j.members.forEach(m => {
-                    const mContact = (m.contact || '').toLowerCase().trim();
-                    const uEmail = (currentUser.email || '').toLowerCase().trim();
-                    if (mContact === uEmail || (currentUser.phone && m.contact.trim() === currentUser.phone)) {
-                        m.status = 'registered';
-                    }
-                });
-                localStorage.setItem('jamiyah_all_list', JSON.stringify(jamiyatList));
-                showToast('تم قبول الانضمام للجمعية بنجاح!', 'success');
-                document.getElementById('pendingInvitationsModal').classList.add('hide');
-                renderHomeScreen();
-            }
-        }
-
-        function handleCreateJamiya(event) {
-            event.preventDefault();
-            const name = document.getElementById('jName').value;
-            const count = parseInt(document.getElementById('jCount').value);
-            const amount = parseFloat(document.getElementById('jAmount').value);
-            const startDate = document.getElementById('jStartDate').value;
-            const lastDay = parseInt(document.getElementById('jLastDay').value);
-            const payDay = parseInt(document.getElementById('jPayDay').value);
-            const notifyChannel = document.getElementById('jNotifyChannel').value;
-
-            const newJamiya = {
-                id: 'j-' + Date.now(),
-                name,
-                count,
-                amount,
-                startDate,
-                lastDay,
-                payDay,
-                notifyChannel,
-                creatorEmail: currentUser.email,
-                modificationRequest: null,
-                members: [
-                    { id: 'm-creator', name: currentUser.name || 'مشرف الجمعية', contact: currentUser.email, bank: currentUser.bank, iban: currentUser.iban, status: 'registered', order: 1, paid: false, proof: null }
-                ]
-            };
-
-            jamiyatList.push(newJamiya);
-            localStorage.setItem('jamiyah_all_list', JSON.stringify(jamiyatList));
-            showToast('تم إنشاء الجمعية بنجاح وتم إرسال الإشعارات عبر ' + notifyChannel, 'success');
-            openJamiya(newJamiya.id);
-        }
-
-        function openJamiya(jId) {
-            const j = jamiyatList.find(item => item.id === jId);
-            if (!j) return;
-            activeJamiyaId = jId;
-
-            document.getElementById('displayJName').innerText = j.name;
-            document.getElementById('displayJAmount').innerText = j.amount;
-            document.getElementById('displayJLastDay').innerText = j.lastDay;
-
-            // Render modification request banner if exists
-            const banner = document.getElementById('modificationRequestBanner');
-            if (j.modificationRequest && j.modificationRequest.status === 'pending') {
-                banner.classList.remove('hide');
-                document.getElementById('modRequestText').innerText = `طلب من (${j.modificationRequest.by}): ${j.modificationRequest.text}`;
-                const actionsEl = document.getElementById('modRequestActions');
-                if (j.creatorEmail.toLowerCase() === currentUser?.email.toLowerCase()) {
-                    actionsEl.innerHTML = `
-                        <button onclick="resolveModification('${j.id}', true)" class="px-3 py-1 bg-emerald-600 text-white rounded-lg font-bold">موافقة</button>
-                        <button onclick="resolveModification('${j.id}', false)" class="px-3 py-1 bg-rose-600 text-white rounded-lg font-bold">رفض</button>
-                    `;
-                } else {
-                    actionsEl.innerHTML = `<span class="text-xs text-indigo-600 font-semibold">بانتظار موافقة المشرف</span>`;
-                }
-            } else {
-                banner.classList.add('hide');
-            }
-
-            const recipient = j.members.find(m => m.order === 1) || j.members[0];
-            document.getElementById('currentRecipientName').innerText = recipient.name;
-            document.getElementById('currentRecipientBank').innerText = recipient.bank || 'مصرف الراجحي';
-            document.getElementById('currentRecipientIban').innerText = recipient.iban || 'SA12345678901234567890';
-
-            const paymentArea = document.getElementById('paymentActionArea');
-            const isUserRecipient = recipient.contact.toLowerCase() === currentUser?.email.toLowerCase() || recipient.name.includes(currentUser?.name || '');
-
-            if (isUserRecipient) {
-                paymentArea.innerHTML = `
-                    <span class="px-3 py-1 bg-yellow-400 text-slate-900 text-xs font-bold rounded-xl inline-block mb-2">أنت مستلم دفعة هذا الشهر</span>
-                    <p class="text-xs text-amber-100">قم بمراجعة الإيصالات الواردة وتأكيد استلام الدفعات من الأعضاء.</p>
-                `;
-            } else {
-                paymentArea.innerHTML = `
-                    <button onclick="openPaymentModal()" class="px-5 py-2.5 bg-white text-orange-600 font-bold rounded-xl shadow hover:bg-amber-50 transition text-xs flex items-center space-x-2 space-x-reverse">
-                        <i class="fa-solid fa-file-arrow-up"></i>
-                        <span>رفع إثبات سداد القسط</span>
-                    </button>
-                `;
-            }
-
-            renderMembersLists(j);
-            goToScreen('screen-browse-jamiya');
-        }
-
-        function renderMembersLists(j) {
-            const membersContainer = document.getElementById('membersListContainer');
-            const pendingContainer = document.getElementById('pendingMembersContainer');
-            membersContainer.innerHTML = '';
-            pendingContainer.innerHTML = '';
-
-            let collected = 0;
-            let registeredCount = 0;
-
-            j.members.forEach((m, index) => {
-                if (m.status === 'registered') {
-                    registeredCount++;
-                    if (m.paid) collected += j.amount;
-
-                    const isRecipient = index === 0;
-                    const isUserRecipient = (j.members.find(mem => mem.order === 1)?.contact.toLowerCase() === currentUser?.email.toLowerCase());
-
-                    membersContainer.innerHTML += `
-                        <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center text-xs">
-                            <div class="flex items-center space-x-3 space-x-reverse">
-                                <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center">${m.order}</span>
-                                <div>
-                                    <p class="font-bold text-slate-800">${m.name} ${isRecipient ? '<span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">مستلم الشهر</span>' : ''}</p>
-                                    <p class="text-[10px] text-slate-400">${m.contact}</p>
-                                </div>
-                            </div>
-                            <div class="flex items-center space-x-2 space-x-reverse">
-                                ${m.paid ? '<span class="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-lg font-bold">تم السداد</span>' : '<span class="px-2 py-1 bg-amber-100 text-amber-700 rounded-lg">بانتظار السداد</span>'}
-                                ${m.proof ? `<button onclick="showProof('${m.proof}')" class="text-indigo-600 hover:underline px-2 py-1 bg-indigo-50 rounded-lg"><i class="fa-solid fa-paperclip"></i> إيصال</button>` : ''}
-                                ${isUserRecipient && m.proof && !m.paidConfirmation ? `<button onclick="confirmMemberPayment('${j.id}', '${m.contact}')" class="px-2 py-1 bg-emerald-600 text-white rounded-lg font-bold">تأكيد الاستلام</button>` : ''}
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    pendingContainer.innerHTML += `
-                        <div class="p-3 bg-amber-50/60 border border-amber-200 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
-                            <div class="overflow-hidden">
-                                <p class="font-bold text-slate-900">${m.name}</p>
-                                <p class="text-[11px] text-slate-500 break-all">${m.contact}</p>
-                            </div>
-                            <div class="flex items-center space-x-1.5 space-x-reverse self-end sm:self-center shrink-0">
-                                <button onclick="resendInvitation('${j.id}', '${m.contact}')" class="px-2.5 py-1.5 bg-white border border-amber-300 text-amber-700 rounded-lg text-[10px] font-bold hover:bg-amber-100 transition shadow-sm">إعادة إرسال</button>
-                                <button onclick="cancelInvitation('${j.id}', '${m.contact}')" class="px-2.5 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-bold hover:bg-rose-100 transition shadow-sm">إلغاء</button>
-                            </div>
-                        </div>
-                    `;
-                }
-            });
-
-            document.getElementById('memberCountBadge').innerText = `${registeredCount} أعضاء`;
-            document.getElementById('statTargetAmount').innerText = `${j.count * j.amount} ريال`;
-            document.getElementById('statCollectedAmount').innerText = `${collected} ريال`;
-            
-            const percentage = (collected / (j.count * j.amount)) * 100;
-            document.getElementById('collectionProgressBar').style.width = `${Math.min(percentage, 100)}%`;
-        }
-
-        function openPaymentModal() {
-            document.getElementById('paymentModal').classList.remove('hide');
-        }
-        function closePaymentModal() {
-            document.getElementById('paymentModal').classList.add('hide');
-        }
-        function submitPaymentProof(event) {
-            event.preventDefault();
-            const amount = document.getElementById('payAmountInput').value;
-            const file = document.getElementById('payAttachmentInput').files[0];
-
-            const j = jamiyatList.find(item => item.id === activeJamiyaId);
-            if (j && currentUser) {
-                const member = j.members.find(m => m.contact.toLowerCase() === currentUser.email.toLowerCase() || m.contact === currentUser.phone) || j.members[0];
-                member.proof = file ? file.name : 'transfer_receipt.jpg';
-                localStorage.setItem('jamiyah_all_list', JSON.stringify(jamiyatList));
-                showToast('تم إرسال إثبات السداد بنجاح لمستلم الدفعة للمراجعة والتاكيد!', 'success');
-                closePaymentModal();
-                renderMembersLists(j);
-            }
-        }
-        function showProof(proofName) {
-            showToast(`عرض مرفق الإيصال المرفوع: ${proofName}`, 'info');
-        }
-
-        function confirmMemberPayment(jId, memberContact) {
-            const j = jamiyatList.find(item => item.id === jId);
-            if (j) {
-                const member = j.members.find(m => m.contact === memberContact);
-                if (member) {
-                    member.paid = true;
-                    member.paidConfirmation = true;
-                    localStorage.setItem('jamiyah_all_list', JSON.stringify(jamiyatList));
-                    showToast(`تم تأكيد استلام القسط من ${member.name} بنجاح!`, 'success');
-                    renderMembersLists(j);
-                }
-            }
-        }
-
-        function openInviteModal() {
-            document.getElementById('inviteModal').classList.remove('hide');
-        }
-        function closeInviteModal() {
-            document.getElementById('inviteModal').classList.add('hide');
-        }
-
-        function handleInviteMember(event) {
-            event.preventDefault();
-            const name = document.getElementById('invName').value.trim();
-            const contact = document.getElementById('invContact').value.trim().toLowerCase();
-
-            if (!isValidEmail(contact)) {
-                showToast('الرجاء إدخال بريد إلكتروني حقيقي وصحيح لدعوة العضو', 'error');
-                return;
-            }
-
-            const j = jamiyatList.find(item => item.id === activeJamiyaId);
-            if (j) {
-                if (j.members.some(m => m.contact.toLowerCase() === contact)) {
-                    showToast('هذا البريد مسجل مسبقاً في هذه الجمعية!', 'error');
-                    return;
-                }
-
-                j.members.push({
-                    id: 'm-' + Date.now(),
-                    name,
-                    contact,
-                    status: 'pending',
-                    order: j.members.length + 1,
-                    paid: false,
-                    proof: null
-                });
-                localStorage.setItem('jamiyah_all_list', JSON.stringify(jamiyatList));
-
-                addNotification(contact, `دعوة رسمية للانضمام للجمعية: ${j.name}`, `عزيزي ${name}، تمت دعوتك للانضمام إلى جمعية "${j.name}" برئاسة ${currentUser.name}. يرجى تسجيل الدخول وقبول الدعوة.`);
-                
-                showToast(`📧 تم تسجيل الدعوة وإضافتها للأعضاء بانتظار القبول!`, 'success');
-                closeInviteModal();
-                renderMembersLists(j);
-            }
-        }
-
-        function resendInvitation(jId, contact) {
-            const j = jamiyatList.find(item => item.id === jId);
-            if (j) {
-                addNotification(contact, `إعادة إرسال دعوة رسمية: ${j.name}`, `تذكير: تمت دعوتك للانضمام إلى جمعية "${j.name}".`);
-                showToast(`📧 تم إعادة إرسال الدعوة بنجاح إلى (${contact})`, 'success');
-            }
-        }
-
-        function cancelInvitation(jId, contact) {
-            const j = jamiyatList.find(item => item.id === jId);
-            if (j) {
-                j.members = j.members.filter(m => m.contact.toLowerCase() !== contact.toLowerCase());
-                localStorage.setItem('jamiyah_all_list', JSON.stringify(jamiyatList));
-                showToast('تم إلغاء وحذف طلب الانضمام بنجاح', 'info');
-                renderMembersLists(j);
-            }
-        }
-
-        function openEmailDispatcherModal() {
-            document.getElementById('emailDispatcherModal').classList.remove('hide');
-        }
-        function closeEmailDispatcherModal() {
-            document.getElementById('emailDispatcherModal').classList.add('hide');
-        }
-
-        function sendBroadcastEmail(event) {
-            event.preventDefault();
-            const target = document.getElementById('emailTargetSelect').value;
-            const subject = document.getElementById('emailSubjectInput').value.trim();
-            const body = document.getElementById('emailBodyInput').value.trim();
-
-            const j = jamiyatList.find(item => item.id === activeJamiyaId);
-            if (!j) return;
-
-            let recipientCount = 0;
-
-            j.members.forEach(m => {
-                if (target === 'all' || (target === 'pending' && m.status === 'pending')) {
-                    if (m.contact && m.contact.includes('@')) {
-                        // 1. إضافة للإشعارات داخل التطبيق
-                        addNotification(m.contact, subject, body);
-
-                        // 2. إرسال بريد حقيقي عبر EmailJS للمشترك مع معالجة الأخطاء بوضوح
-                        emailjs.send("service_5dxkih9", "template_mr4lkca", {
-                            to_email: m.contact,
-                            to_name: m.name,
-                            subject: subject,
-                            message: body
-                        }).then(function(response) {
-                            console.log('تم إرسال البريد بنجاح لـ:', m.contact);
-                        }, function(error) {
-                            console.error('فشل إرسال البريد:', error);
-                            showToast(`⚠️ فشل إرسال البريد إلى ${m.contact}: تحقق من Service ID أو Template ID`, 'error');
-                        });
-
-                        recipientCount++;
-                    }
-                }
-            });
-
-            showToast(`✅ جاري إرسال البريد الإلكتروني الفعلي إلى (${recipientCount}) من المشتركين!`, 'success');
-            closeEmailDispatcherModal();
-            document.getElementById('emailSubjectInput').value = '';
-            document.getElementById('emailBodyInput').value = '';
-        }
-
-        function openModificationModal() {
-            document.getElementById('modificationModal').classList.remove('hide');
-        }
-        function closeModificationModal() {
-            document.getElementById('modificationModal').classList.add('hide');
-        }
-        function submitModificationRequest(event) {
-            event.preventDefault();
-            const text = document.getElementById('modInputText').value.trim();
-            const j = jamiyatList.find(item => item.id === activeJamiyaId);
-            if (j && currentUser) {
-                j.modificationRequest = {
-                    text,
-                    by: currentUser.name || currentUser.email,
-                    status: 'pending'
-                };
-                localStorage.setItem('jamiyah_all_list', JSON.stringify(jamiyatList));
-                showToast('تم إرسال طلب تعديل الشروط بنجاح للمشرف والأعضاء للموافقة', 'success');
-                closeModificationModal();
-                openJamiya(j.id);
-            }
-        }
-        function resolveModification(jId, approved) {
-            const j = jamiyatList.find(item => item.id === jId);
-            if (j && j.modificationRequest) {
-                j.modificationRequest.status = approved ? 'approved' : 'rejected';
-                localStorage.setItem('jamiyah_all_list', JSON.stringify(jamiyatList));
-                showToast(approved ? 'تمت الموافقة على طلب التعديل بنجاح!' : 'تم رفض طلب التعديل', approved ? 'success' : 'error');
-                openJamiya(j.id);
-            }
-        }
-
-        function openProfileScreen() {
-            if (!currentUser) return;
-            document.getElementById('profileTitleName').innerText = currentUser.name || 'عضو عائلي';
-            document.getElementById('profileTitleEmail').innerText = currentUser.email || '';
-            document.getElementById('profileInitial').innerText = (currentUser.name || 'ع')[0];
-            
-            document.getElementById('pName').value = currentUser.name || '';
-            document.getElementById('pPhone').value = currentUser.phone || '';
-            document.getElementById('pBank').value = currentUser.bank || 'مصرف الراجحي';
-            document.getElementById('pIban').value = currentUser.iban || '';
-            document.getElementById('pAvatar').value = currentUser.avatar || '';
-
-            if (currentUser.avatar) {
-                document.getElementById('profileAvatarDisplay').innerHTML = `<img src="${currentUser.avatar}" class="w-full h-full object-cover">`;
-            }
-
-            const inboxEl = document.getElementById('userNotificationsInbox');
-            inboxEl.innerHTML = '';
-            let notifications = JSON.parse(localStorage.getItem('jamiyah_notifications') || '[]');
-            let userNotifs = notifications.filter(n => n.email.toLowerCase() === currentUser.email.toLowerCase());
-
-            if (userNotifs.length === 0) {
-                inboxEl.innerHTML = `<p class="text-xs text-slate-400">لا توجد إشعارات أو بريد وارد حالياً.</p>`;
-            } else {
-                userNotifs.reverse().forEach(n => {
-                    inboxEl.innerHTML += `
-                        <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1 text-xs">
-                            <div class="flex justify-between items-center">
-                                <span class="font-bold text-slate-900">${n.title}</span>
-                                <span class="text-[10px] text-slate-400">${n.date}</span>
-                            </div>
-                            <p class="text-slate-600">${n.body}</p>
-                        </div>
-                    `;
-                });
-            }
-
-            goToScreen('screen-profile');
-        }
-
-        function updateUserProfile(event) {
-            event.preventDefault();
-            if (!currentUser) return;
-
-            currentUser.name = document.getElementById('pName').value.trim();
-            currentUser.phone = document.getElementById('pPhone').value.trim();
-            currentUser.bank = document.getElementById('pBank').value;
-            currentUser.iban = document.getElementById('pIban').value.trim();
-            currentUser.avatar = document.getElementById('pAvatar').value.trim();
-
-            localStorage.setItem('jamiyah_current_user', JSON.stringify(currentUser));
-            
-            let index = registeredUsersList.findIndex(u => u.email.toLowerCase() === currentUser.email.toLowerCase());
-            if (index !== -1) {
-                registeredUsersList[index] = currentUser;
-                localStorage.setItem('jamiyah_all_users', JSON.stringify(registeredUsersList));
-            }
-
-            showToast('تم تحديث البيانات الشخصية بنجاح!', 'success');
-            openProfileScreen();
-            renderNavigation();
-        }
-
-        function openAiAdvisorModal() {
-            document.getElementById('aiModal').classList.remove('hide');
-        }
-        function closeAiAdvisorModal() {
-            document.getElementById('aiModal').classList.add('hide');
-        }
-        function sendAiQuery() {
-            const input = document.getElementById('aiQueryInput');
-            const box = document.getElementById('aiChatBox');
-            const query = input.value.trim();
-            if (!query) return;
-
-            box.innerHTML += `<div class="bg-indigo-50 p-3 rounded-xl text-indigo-900 text-right">${query}</div>`;
-            input.value = '';
-
-            setTimeout(() => {
-                let aiReply = "بناءً على المعطيات الحالية لجمعيتك العائلية، أنصح بالالتزام بموعد السداد في الخامس من كل شهر لضمان استلام المستحق في وقته المحدد بدون أي تأخير.";
-                if (query.includes('ترتيب') || query.includes('دور')) {
-                    aiReply = "تم ترتيب الأعضاء بناءً على أولوية التسجيل وموافقة الأفراد لتجنب أي تعارض عائلي.";
-                } else if (query.includes('رسالة') || query.includes('تذكير')) {
-                    aiReply = "صيغة التذكير المقترحة: 'السلام عليكم، تنبيه ودي بسداد قسط الجمعية العائلية لهذا الشهر وشكراً لالتزامكم.'";
-                }
-                box.innerHTML += `<div class="bg-white p-3 rounded-xl shadow-sm border border-slate-100 text-slate-800">${aiReply}</div>`;
-                box.scrollTop = box.scrollHeight;
-            }, 600);
-        }
-
-        function renderOwnerDashboard() {
-            document.getElementById('adminTotalJamiyat').innerText = jamiyatList.length;
-            document.getElementById('adminTotalUsers').innerText = registeredUsersList.length;
-
-            let totalMoney = 0;
-            let jamiyatHtml = '';
-            let usersHtml = '';
-
-            jamiyatList.forEach(j => {
-                totalMoney += j.count * j.amount;
-                jamiyatHtml += `
-                    <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-1">
-                        <div class="flex justify-between items-center">
-                            <h4 class="font-bold text-slate-900 text-sm">${j.name}</h4>
-                            <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded">نشطة</span>
-                        </div>
-                        <p class="text-slate-500">المشرف: ${j.creatorEmail} | القيمة: ${j.amount} ريال | الأعضاء: ${j.count}</p>
-                        <p class="text-[10px] text-slate-400">تاريخ البداية: ${j.startDate} | أقصى دفع: يوم ${j.lastDay} | القبض: يوم ${j.payDay}</p>
-                    </div>
-                `;
-            });
-
-            registeredUsersList.forEach(u => {
-                usersHtml += `
-                    <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-1">
-                        <div class="flex justify-between items-center">
-                            <h4 class="font-bold text-slate-900 text-sm">${u.name || 'بدون اسم'}</h4>
-                            <span class="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold">${u.email.toLowerCase() === OWNER_EMAIL.toLowerCase() ? 'المالك' : 'عضو'}</span>
-                        </div>
-                        <p class="text-slate-600">الإيميل: ${u.email} | الجوال: ${u.phone || 'غير مسجل'}</p>
-                        <p class="text-[10px] text-slate-400">البنك: ${u.bank || '-'} | الآيبان: ${u.iban || '-'}</p>
-                    </div>
-                `;
-            });
-
-            document.getElementById('adminTotalMoney').innerText = totalMoney + ' ريال';
-            document.getElementById('adminJamiyatList').innerHTML = jamiyatHtml || '<p class="text-xs text-slate-400">لا توجد جمعيات مسجلة.</p>';
-            document.getElementById('adminUsersList').innerHTML = usersHtml || '<p class="text-xs text-slate-400">لا يوجد أعضاء مسجلين.</p>';
-        }
-
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            const bgClass = type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-rose-600' : 'bg-slate-800';
-            toast.className = `${bgClass} text-white px-4 py-3 rounded-2xl shadow-xl text-xs font-bold animate-fade flex items-center space-x-2 space-x-reverse`;
-            toast.innerHTML = `<i class="fa-solid fa-circle-info"></i><span>${message}</span>`;
-            container.appendChild(toast);
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                setTimeout(() => toast.remove(), 300);
-            }, 3500);
-        }
-    </script>
+    <div class="flex items-center gap-2" id="nav"></div>
+  </div>
+</header>
+
+<main class="max-w-4xl mx-auto px-4 py-6" id="app"></main>
+<div id="modal"></div>
+<div id="toasts" class="fixed bottom-5 left-5 z-[60] space-y-2"></div>
+
+<script>
+/* ============ الإعدادات ============ */
+const firebaseConfig = {
+  apiKey: "AIzaSyBD_a9TrhsCL5ognnIxhv2OuyiWJmdr33o",
+  authDomain: "aljamiyahapp.firebaseapp.com",
+  projectId: "aljamiyahapp",
+  storageBucket: "aljamiyahapp.firebasestorage.app",
+  messagingSenderId: "508199870007",
+  appId: "1:508199870007:web:5aeee0d4bdbb4a4893e9b2"
+};
+const EMAILJS_PUBLIC_KEY = "o2fIFJJYtmnzK2XKg";
+const EMAILJS_SERVICE_ID = "service_5dxkih9";
+const EMAILJS_TEMPLATE_ID = "template_mr4lkca";
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth(), db = firebase.firestore(), storage = firebase.storage();
+const FV = firebase.firestore.FieldValue;
+emailjs.init(EMAILJS_PUBLIC_KEY);
+
+const BANKS = ["مصرف الراجحي","البنك الأهلي السعودي","بنك الإنماء","بنك الرياض","بنك البلاد","بنك الجزيرة","السعودي الفرنسي","البنك العربي الوطني","البنك السعودي الأول","بنك رقمي / أخرى","كاش (نقداً)"];
+
+/* ============ الحالة ============ */
+const state = {
+  user: null, profile: null, isAdmin: false, view: 'loading', authMode: 'login',
+  jamiyat: [], invites: [], activeId: null, j: null, members: {}, payments: [], jInvites: [],
+  admin: { jamiyat: [], users: [] }, unsubs: [], jUnsubs: []
+};
+
+/* ============ أدوات ============ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const lc = s => String(s || '').trim().toLowerCase();
+const money = n => Number(n || 0).toLocaleString('ar-SA') + ' ريال';
+const bankOpts = sel => BANKS.map(b => `<option ${b === sel ? 'selected' : ''}>${b}</option>`).join('');
+const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+const fixIban = s => String(s || '').replace(/\s+/g, '').toUpperCase();
+const validIban = s => /^SA\d{22}$/.test(fixIban(s));
+const validPhone = s => /^05\d{8}$/.test(String(s || '').trim());
+const fmtDate = d => d.toLocaleDateString('ar-SA-u-ca-gregory', { year: 'numeric', month: 'long', day: 'numeric' });
+const fmtMonth = d => d.toLocaleDateString('ar-SA-u-ca-gregory', { year: 'numeric', month: 'long' });
+
+function toast(msg, type = 'success') {
+  const t = document.createElement('div');
+  t.className = `${type === 'error' ? 'bg-rose-600' : type === 'info' ? 'bg-slate-800' : 'bg-emerald-600'} text-white px-4 py-3 rounded-2xl shadow-xl text-xs font-bold fade max-w-xs`;
+  t.textContent = msg;
+  $('toasts').appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 4000);
+}
+function authErr(e) {
+  const m = {
+    'auth/email-already-in-use': 'هذا البريد مسجل مسبقاً، جرّب تسجيل الدخول.',
+    'auth/invalid-email': 'صيغة البريد غير صحيحة.',
+    'auth/weak-password': 'كلمة المرور ضعيفة (6 أحرف على الأقل).',
+    'auth/invalid-credential': 'البريد أو كلمة المرور غير صحيحة.',
+    'auth/wrong-password': 'كلمة المرور غير صحيحة.',
+    'auth/user-not-found': 'لا يوجد حساب بهذا البريد.',
+    'auth/too-many-requests': 'محاولات كثيرة، حاول لاحقاً.',
+    'auth/popup-closed-by-user': 'تم إغلاق نافذة جوجل.',
+    'auth/unauthorized-domain': 'هذا الدومين غير مضاف في Authorized domains بإعدادات Firebase.',
+    'auth/network-request-failed': 'مشكلة في الاتصال بالإنترنت.'
+  };
+  return m[e.code] || e.message;
+}
+async function sendMail(to, name, subject, message) {
+  return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, { to_email: to, to_name: name, subject, message });
+}
+const appUrl = () => location.origin + location.pathname;
+
+/* ============ منطق الجمعية ============ */
+function monthIdx(j) {
+  const s = new Date(j.startDate + 'T00:00:00'), n = new Date();
+  return (n.getFullYear() - s.getFullYear()) * 12 + n.getMonth() - s.getMonth();
+}
+function dayIn(j, idx, day) {
+  const s = new Date(j.startDate + 'T00:00:00');
+  const first = new Date(s.getFullYear(), s.getMonth() + idx, 1);
+  const last = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  return new Date(first.getFullYear(), first.getMonth(), Math.min(day, last));
+}
+function ctx() {
+  const j = state.j; if (!j) return null;
+  const idx = monthIdx(j);
+  const cur = Math.min(Math.max(idx, 0), j.count - 1);
+  const turns = j.turns || [];
+  const recUid = turns[cur] || null;
+  const rec = recUid ? state.members[recUid] : null;
+  const pays = state.payments.filter(p => p.month === cur);
+  return { j, idx, cur, finished: idx >= j.count, started: idx >= 0, turns, recUid, rec, pays,
+           isCreator: j.creatorUid === state.user.uid, isRec: recUid === state.user.uid,
+           myPay: pays.find(p => p.uid === state.user.uid) };
+}
+function payStatus(c, uid) {
+  if (uid === c.recUid) return 'recipient';
+  const p = c.pays.find(x => x.uid === uid);
+  return p ? p.status : 'unpaid';
+}
+
+/* ============ المصادقة ============ */
+auth.onAuthStateChanged(async user => {
+  cleanup(state.unsubs); cleanup(state.jUnsubs);
+  state.user = user; state.profile = null; state.isAdmin = false;
+  state.jamiyat = []; state.invites = [];
+  if (!user) { state.view = 'auth'; return render(); }
+
+  const needsVerify = !user.emailVerified && user.providerData.every(p => p.providerId === 'password');
+  if (needsVerify) { state.view = 'verify'; return render(); }
+
+  try {
+    const snap = await db.collection('users').doc(user.uid).get();
+    state.profile = snap.exists ? snap.data() : null;
+    const adm = await db.collection('admins').doc(user.uid).get().catch(() => ({ exists: false }));
+    state.isAdmin = adm.exists;
+  } catch (e) { toast('تعذر تحميل الحساب: ' + e.message, 'error'); }
+
+  if (!state.profile) { state.view = 'complete'; return render(); }
+  startListeners();
+  state.view = 'home'; render();
+});
+
+function cleanup(arr) { arr.forEach(u => u()); arr.length = 0; }
+
+function startListeners() {
+  const uid = state.user.uid, email = lc(state.user.email);
+  state.unsubs.push(
+    db.collection('jamiyat').where('memberUids', 'array-contains', uid).onSnapshot(s => {
+      state.jamiyat = s.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (['home'].includes(state.view)) render();
+    }, e => toast('خطأ في تحميل الجمعيات: ' + e.message, 'error')),
+    db.collection('invites').where('email', '==', email).where('status', '==', 'pending').onSnapshot(s => {
+      state.invites = s.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (state.view === 'home') render();
+    }, e => toast('خطأ في تحميل الدعوات: ' + e.message, 'error'))
+  );
+}
+
+async function doRegister(f) {
+  const name = f.name.value.trim(), email = lc(f.email.value), pass = f.password.value;
+  const phone = f.phone.value.trim(), bank = f.bank.value, iban = fixIban(f.iban.value);
+  if (name.length < 3) return toast('اكتب الاسم الثلاثي', 'error');
+  if (!validEmail(email)) return toast('البريد غير صحيح', 'error');
+  if (pass.length < 6) return toast('كلمة المرور 6 أحرف على الأقل', 'error');
+  if (!validPhone(phone)) return toast('رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
+  if (!bank.startsWith('كاش') && !validIban(iban)) return toast('الآيبان يجب أن يكون SA متبوعاً بـ 22 رقماً', 'error');
+  if (!f.terms.checked) return toast('يجب الموافقة على الشروط', 'error');
+  try {
+    const cred = await auth.createUserWithEmailAndPassword(email, pass);
+    await cred.user.updateProfile({ displayName: name });
+    await db.collection('users').doc(cred.user.uid).set({ name, email, phone, bank, iban: bank.startsWith('كاش') ? '' : iban, avatar: '', createdAt: FV.serverTimestamp() });
+    await cred.user.sendEmailVerification({ url: appUrl() });
+    toast('تم إنشاء الحساب وإرسال رابط التحقق إلى بريدك');
+    await auth.signOut().catch(() => {});
+    state.authMode = 'login'; state.view = 'auth'; render();
+    toast('فعّل بريدك من الرسالة ثم سجّل الدخول', 'info');
+  } catch (e) { toast(authErr(e), 'error'); }
+}
+async function doLogin(f) {
+  try {
+    const cred = await auth.signInWithEmailAndPassword(lc(f.email.value), f.password.value);
+    if (!cred.user.emailVerified) {
+      await cred.user.sendEmailVerification({ url: appUrl() }).catch(() => {});
+    }
+  } catch (e) { toast(authErr(e), 'error'); }
+}
+async function doReset(f) {
+  try { await auth.sendPasswordResetEmail(lc(f.email.value), { url: appUrl() }); toast('أُرسل رابط إعادة تعيين كلمة المرور إلى بريدك'); state.authMode = 'login'; render(); }
+  catch (e) { toast(authErr(e), 'error'); }
+}
+async function doGoogle() {
+  try { await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
+  catch (e) { toast(authErr(e), 'error'); }
+}
+async function doCompleteProfile(f) {
+  const phone = f.phone.value.trim(), bank = f.bank.value, iban = fixIban(f.iban.value);
+  if (!validPhone(phone)) return toast('رقم الجوال غير صحيح', 'error');
+  if (!bank.startsWith('كاش') && !validIban(iban)) return toast('الآيبان غير صحيح', 'error');
+  const u = state.user;
+  const profile = { name: u.displayName || 'عضو', email: lc(u.email), phone, bank, iban: bank.startsWith('كاش') ? '' : iban, avatar: u.photoURL || '', createdAt: FV.serverTimestamp() };
+  try {
+    await db.collection('users').doc(u.uid).set(profile);
+    state.profile = profile; startListeners(); state.view = 'home'; render();
+  } catch (e) { toast(e.message, 'error'); }
+}
+async function recheckVerification() {
+  await auth.currentUser.reload();
+  if (auth.currentUser.emailVerified) { toast('تم التحقق من البريد'); location.reload(); }
+  else toast('لم يتم التحقق بعد، افتح الرابط المرسل لبريدك', 'error');
+}
+
+/* ============ الدعوات ============ */
+async function handleInvite(f) {
+  const c = ctx(); const name = f.name.value.trim(), email = lc(f.email.value);
+  if (!validEmail(email)) return toast('البريد غير صحيح', 'error');
+  if (Object.values(state.members).some(m => lc(m.email) === email)) return toast('هذا الشخص عضو بالفعل', 'error');
+  const pending = state.jInvites.filter(i => i.status === 'pending').length;
+  if (c.j.memberUids.length + pending >= c.j.count) return toast('اكتمل عدد الأعضاء المحدد للجمعية', 'error');
+  const id = `${c.j.id}__${email}`;
+  try {
+    await db.collection('invites').doc(id).set({
+      jamiyaId: c.j.id, jamiyaName: c.j.name, amount: c.j.amount, email, name,
+      invitedBy: state.user.uid, inviterName: state.profile.name, creatorUid: c.j.creatorUid,
+      status: 'pending', createdAt: FV.serverTimestamp()
+    });
+    closeModal(); toast('تم إنشاء الدعوة، وستظهر للمدعو فور دخوله بنفس البريد');
+    sendInviteMail({ email, name, jamiyaName: c.j.name, inviterName: state.profile.name, amount: c.j.amount });
+  } catch (e) { toast('تعذر إنشاء الدعوة: ' + e.message, 'error'); }
+}
+function sendInviteMail(i) {
+  return sendMail(i.email, i.name, `دعوة للانضمام إلى جمعية ${i.jamiyaName}`,
+    `السلام عليكم ${i.name}،\nدعاك ${i.inviterName} للانضمام إلى جمعية "${i.jamiyaName}" بقيمة اشتراك ${i.amount} ريال شهرياً.\n\nلقبول الدعوة افتح الرابط وسجّل الدخول بنفس هذا البريد (${i.email}):\n${appUrl()}`)
+    .then(() => toast('✉️ أُرسل بريد الدعوة إلى ' + i.email))
+    .catch(e => toast('تم حفظ الدعوة لكن فشل إرسال البريد (' + (e.text || e.message || 'خطأ EmailJS') + '). المدعو سيراها عند دخوله.', 'error'));
+}
+async function acceptInvite(inviteId) {
+  const inv = state.invites.find(i => i.id === inviteId); if (!inv) return;
+  const uid = state.user.uid, p = state.profile;
+  const batch = db.batch();
+  const jRef = db.collection('jamiyat').doc(inv.jamiyaId);
+  batch.update(jRef, { memberUids: FV.arrayUnion(uid), turns: FV.arrayUnion(uid) });
+  batch.update(db.collection('invites').doc(inviteId), { status: 'accepted' });
+  batch.set(jRef.collection('members').doc(uid), { uid, name: p.name, email: lc(state.user.email), phone: p.phone, bank: p.bank, iban: p.iban });
+  try { await batch.commit(); toast('تم الانضمام للجمعية'); } catch (e) { toast('تعذر الانضمام: ' + e.message, 'error'); }
+}
+async function declineInvite(inviteId) {
+  try { await db.collection('invites').doc(inviteId).update({ status: 'declined' }); toast('تم رفض الدعوة', 'info'); }
+  catch (e) { toast(e.message, 'error'); }
+}
+
+/* ============ إنشاء وفتح الجمعية ============ */
+async function handleCreate(f) {
+  const name = f.jname.value.trim(), count = parseInt(f.count.value), amount = parseFloat(f.amount.value);
+  const startDate = f.start.value, lastDay = parseInt(f.lastDay.value), payDay = parseInt(f.payDay.value);
+  if (!name || !startDate) return toast('أكمل الحقول المطلوبة', 'error');
+  if (!(count >= 2 && count <= 30)) return toast('عدد الأعضاء بين 2 و30', 'error');
+  if (!(amount >= 1)) return toast('قيمة الاشتراك غير صحيحة', 'error');
+  if (!(lastDay >= 1 && lastDay <= 31 && payDay >= 1 && payDay <= 31)) return toast('الأيام بين 1 و31', 'error');
+  const uid = state.user.uid, p = state.profile;
+  const ref = db.collection('jamiyat').doc();
+  const batch = db.batch();
+  batch.set(ref, { name, count, amount, startDate, lastDay, payDay, creatorUid: uid, creatorName: p.name, memberUids: [uid], turns: [uid], modRequest: null, createdAt: FV.serverTimestamp() });
+  batch.set(ref.collection('members').doc(uid), { uid, name: p.name, email: lc(state.user.email), phone: p.phone, bank: p.bank, iban: p.iban });
+  try { await batch.commit(); toast('تم إنشاء الجمعية'); openJamiya(ref.id); }
+  catch (e) { toast('تعذر الإنشاء: ' + e.message, 'error'); }
+}
+function openJamiya(id) {
+  cleanup(state.jUnsubs); state.jInviteSub = false;
+  state.activeId = id; state.j = null; state.members = {}; state.payments = []; state.jInvites = [];
+  state.view = 'jamiya'; render();
+  const ref = db.collection('jamiyat').doc(id);
+  state.jUnsubs.push(
+    ref.onSnapshot(s => { if (!s.exists) { toast('الجمعية غير متاحة', 'error'); state.view = 'home'; return render(); }
+      state.j = { id: s.id, ...s.data() };
+      if (state.j.creatorUid === state.user.uid && !state.jInviteSub) subscribeInvites(id);
+      render(); }, e => toast(e.message, 'error')),
+    ref.collection('members').onSnapshot(s => { state.members = {}; s.docs.forEach(d => state.members[d.id] = d.data()); if (state.view === 'jamiya') render(); }),
+    ref.collection('payments').onSnapshot(s => { state.payments = s.docs.map(d => ({ id: d.id, ...d.data() })); if (state.view === 'jamiya') render(); })
+  );
+}
+function subscribeInvites(id) {
+  state.jInviteSub = true;
+  state.jUnsubs.push(db.collection('invites').where('jamiyaId', '==', id).where('creatorUid', '==', state.user.uid).onSnapshot(s => {
+    state.jInvites = s.docs.map(d => ({ id: d.id, ...d.data() })); if (state.view === 'jamiya') render();
+  }, e => toast('خطأ في الدعوات: ' + e.message, 'error')));
+}
+
+/* ============ المدفوعات ============ */
+async function submitPayment(f) {
+  const c = ctx(); const amount = parseFloat(f.amount.value); const file = f.file.files[0];
+  if (!(amount > 0)) return toast('المبلغ غير صحيح', 'error');
+  if (!file) return toast('أرفق الإيصال', 'error');
+  if (file.size > 5 * 1024 * 1024) return toast('حجم الملف يجب ألا يتجاوز 5MB', 'error');
+  const btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'جارٍ الرفع...';
+  try {
+    const safe = file.name.replace(/[^\w.\-]/g, '_');
+    const path = `receipts/${c.j.id}/${state.user.uid}/${c.cur}_${Date.now()}_${safe}`;
+    const snap = await storage.ref(path).put(file);
+    const url = await snap.ref.getDownloadURL();
+    await db.collection('jamiyat').doc(c.j.id).collection('payments').doc(`${c.cur}_${state.user.uid}`).set({
+      month: c.cur, uid: state.user.uid, name: state.profile.name, amount, proofUrl: url, proofName: file.name,
+      status: 'pending', recipientUid: c.recUid, createdAt: FV.serverTimestamp()
+    });
+    closeModal(); toast('أُرسل الإيصال للمستلم للتأكيد');
+    if (c.rec && c.rec.email) sendMail(c.rec.email, c.rec.name, `إيصال سداد جديد - ${c.j.name}`, `رفع ${state.profile.name} إيصال سداد بقيمة ${amount} ريال لجمعية "${c.j.name}". افتح التطبيق للمراجعة والتأكيد:\n${appUrl()}`).catch(() => {});
+  } catch (e) { toast('تعذر الرفع: ' + e.message, 'error'); btn.disabled = false; btn.textContent = 'إرسال الإيصال'; }
+}
+async function confirmPayment(payId) {
+  try { await db.collection('jamiyat').doc(state.j.id).collection('payments').doc(payId).update({ status: 'confirmed' }); toast('تم تأكيد الاستلام'); }
+  catch (e) { toast(e.message, 'error'); }
+}
+async function remindUnpaid() {
+  const c = ctx(); let n = 0;
+  c.turns.forEach(uid => {
+    const m = state.members[uid]; if (!m || payStatus(c, uid) !== 'unpaid') return;
+    n++;
+    sendMail(m.email, m.name, `تذكير بسداد قسط ${c.j.name}`, `السلام عليكم ${m.name}،\nتذكير ودي بسداد قسط جمعية "${c.j.name}" (${c.j.amount} ريال) قبل ${fmtDate(dayIn(c.j, c.cur, c.j.lastDay))}.\n${appUrl()}`).catch(() => toast('فشل إرسال التذكير إلى ' + m.email, 'error'));
+  });
+  toast(n ? `جارٍ إرسال التذكير إلى ${n} عضو` : 'لا يوجد أعضاء متأخرون', n ? 'success' : 'info');
+}
+
+/* ============ ترتيب الأدوار وتعديل الشروط ============ */
+async function saveTurns(turns) { try { await db.collection('jamiyat').doc(state.j.id).update({ turns }); } catch (e) { toast(e.message, 'error'); } }
+function moveTurn(i, d) { const t = [...state.j.turns], k = i + d; if (k < 0 || k >= t.length) return; [t[i], t[k]] = [t[k], t[i]]; saveTurns(t); }
+function shuffleTurns() { const t = [...state.j.turns]; for (let i = t.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [t[i], t[k]] = [t[k], t[i]]; } saveTurns(t); toast('تم الترتيب عشوائياً'); }
+
+async function submitMod(f) {
+  const text = f.text.value.trim(); if (!text) return;
+  try { await db.collection('jamiyat').doc(state.j.id).update({ modRequest: { text, byUid: state.user.uid, byName: state.profile.name, approvals: [state.user.uid], rejections: [], status: 'pending' } });
+    closeModal(); toast('أُرسل الطلب للتصويت'); } catch (e) { toast(e.message, 'error'); }
+}
+async function voteMod(approve) {
+  const uid = state.user.uid, r = { ...state.j.modRequest };
+  r.approvals = (r.approvals || []).filter(x => x !== uid); r.rejections = (r.rejections || []).filter(x => x !== uid);
+  (approve ? r.approvals : r.rejections).push(uid);
+  const total = state.j.memberUids.length;
+  if (r.approvals.length > total / 2) r.status = 'approved'; else if (r.rejections.length >= total / 2) r.status = 'rejected';
+  try { await db.collection('jamiyat').doc(state.j.id).update({ modRequest: r }); } catch (e) { toast(e.message, 'error'); }
+}
+async function closeMod() { try { await db.collection('jamiyat').doc(state.j.id).update({ modRequest: null }); } catch (e) { toast(e.message, 'error'); } }
+async function submitEdit(f) {
+  const upd = { name: f.jname.value.trim(), amount: parseFloat(f.amount.value), lastDay: parseInt(f.lastDay.value), payDay: parseInt(f.payDay.value) };
+  if (!upd.name || !(upd.amount > 0) || !(upd.lastDay >= 1 && upd.lastDay <= 31) || !(upd.payDay >= 1 && upd.payDay <= 31)) return toast('قيم غير صحيحة', 'error');
+  try { await db.collection('jamiyat').doc(state.j.id).update(upd); closeModal(); toast('تم حفظ التعديلات'); } catch (e) { toast(e.message, 'error'); }
+}
+
+/* ============ الملف الشخصي ============ */
+async function saveProfile(f) {
+  const upd = { name: f.name.value.trim(), phone: f.phone.value.trim(), bank: f.bank.value, iban: fixIban(f.iban.value) };
+  if (upd.name.length < 3) return toast('الاسم قصير', 'error');
+  if (!validPhone(upd.phone)) return toast('رقم الجوال غير صحيح', 'error');
+  if (!upd.bank.startsWith('كاش') && !validIban(upd.iban)) return toast('الآيبان غير صحيح', 'error');
+  if (upd.bank.startsWith('كاش')) upd.iban = '';
+  try {
+    await db.collection('users').doc(state.user.uid).update(upd);
+    state.profile = { ...state.profile, ...upd };
+    await Promise.all(state.jamiyat.map(j => db.collection('jamiyat').doc(j.id).collection('members').doc(state.user.uid).set({ uid: state.user.uid, name: upd.name, email: lc(state.user.email), phone: upd.phone, bank: upd.bank, iban: upd.iban }).catch(() => {})));
+    toast('تم الحفظ'); render();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+/* ============ لوحة المشرف العام ============ */
+async function loadAdmin() {
+  try {
+    const [j, u] = await Promise.all([db.collection('jamiyat').get(), db.collection('users').get()]);
+    state.admin.jamiyat = j.docs.map(d => ({ id: d.id, ...d.data() })); state.admin.users = u.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) { toast('تعذر تحميل لوحة المشرف: ' + e.message, 'error'); }
+  render();
+}
+
+/* ============ الواجهات ============ */
+function render() {
+  renderNav();
+  const v = state.view, app = $('app');
+  const views = { loading: vLoading, auth: vAuth, verify: vVerify, complete: vComplete, home: vHome, create: vCreate, jamiya: vJamiya, profile: vProfile, admin: vAdmin };
+  app.innerHTML = `<div class="fade">${(views[v] || vLoading)()}</div>`;
+}
+function renderNav() {
+  const nav = $('nav'), sub = $('hdrSub');
+  if (!state.user || !state.profile) { nav.innerHTML = ''; sub.textContent = 'منصة التعاون العائلي'; return; }
+  sub.textContent = state.profile.name;
+  nav.innerHTML = `${state.isAdmin ? '<button class="btn b-sec" data-act="go-admin"><i class="fa-solid fa-shield-halved"></i> المشرف</button>' : ''}
+    <button class="btn b-sec" data-act="go-profile"><i class="fa-solid fa-user-gear"></i> حسابي</button>
+    <button class="btn b-red" data-act="logout"><i class="fa-solid fa-right-from-bracket"></i></button>`;
+}
+const vLoading = () => `<div class="text-center py-24 text-slate-400"><i class="fa-solid fa-spinner fa-spin text-3xl"></i></div>`;
+
+function bankFields(p = {}) {
+  return `<div><label class="text-xs font-semibold block mb-1">رقم الجوال (05xxxxxxxx)</label><input name="phone" class="inp" inputmode="numeric" value="${esc(p.phone)}" placeholder="05xxxxxxxx"></div>
+  <div><label class="text-xs font-semibold block mb-1">البنك</label><select name="bank" class="inp">${bankOpts(p.bank)}</select></div>
+  <div><label class="text-xs font-semibold block mb-1">الآيبان (SA + 22 رقماً) — اتركه فارغاً للكاش</label><input name="iban" class="inp" dir="ltr" value="${esc(p.iban)}" placeholder="SA0000000000000000000000"></div>`;
+}
+
+function vAuth() {
+  const m = state.authMode;
+  const title = { login: 'تسجيل الدخول', register: 'إنشاء حساب جديد', reset: 'استعادة كلمة المرور' }[m];
+  return `<div class="max-w-md mx-auto card p-8">
+    <div class="text-center mb-6"><div class="w-16 h-16 mx-auto mb-3 bg-gradient-to-tr from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center text-white text-3xl"><i class="fa-solid fa-people-roof"></i></div>
+    <h2 class="text-2xl font-black">${title}</h2><p class="text-xs text-slate-500 mt-1">جمعيات عائلية بتدوير شهري وتوثيق للسداد</p></div>
+    ${m !== 'reset' ? `<button data-act="google" class="w-full mb-4 py-3 border border-slate-200 rounded-xl font-semibold text-sm hover:bg-slate-50 flex items-center justify-center gap-3"><img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="">المتابعة بحساب جوجل</button>
+    <div class="flex items-center my-4"><div class="flex-grow border-t"></div><span class="px-3 text-xs text-slate-400">أو بالبريد</span><div class="flex-grow border-t"></div></div>` : ''}
+    <form id="${m === 'register' ? 'f-register' : m === 'reset' ? 'f-reset' : 'f-login'}" class="space-y-3">
+      ${m === 'register' ? '<div><label class="text-xs font-semibold block mb-1">الاسم الثلاثي</label><input name="name" class="inp" required></div>' : ''}
+      <div><label class="text-xs font-semibold block mb-1">البريد الإلكتروني</label><input name="email" type="email" dir="ltr" class="inp" required></div>
+      ${m !== 'reset' ? '<div><label class="text-xs font-semibold block mb-1">كلمة المرور</label><input name="password" type="password" class="inp" required minlength="6"></div>' : ''}
+      ${m === 'register' ? bankFields() + '<label class="flex items-center gap-2 text-xs"><input type="checkbox" name="terms"> أوافق على الشروط والأحكام وسياسة الخصوصية</label>' : ''}
+      <button class="btn b-pri w-full py-3 text-sm" type="submit">${m === 'login' ? 'دخول' : m === 'register' ? 'إنشاء الحساب' : 'إرسال رابط الاستعادة'}</button>
+    </form>
+    <div class="text-center mt-5 space-y-1">
+      ${m === 'login' ? '<button class="text-xs text-emerald-600 font-semibold" data-act="auth-register">ليس لديك حساب؟ سجّل الآن</button><br><button class="text-xs text-slate-500" data-act="auth-reset">نسيت كلمة المرور؟</button>'
+        : '<button class="text-xs text-emerald-600 font-semibold" data-act="auth-login">لديك حساب؟ سجّل الدخول</button>'}
+    </div></div>`;
+}
+function vVerify() {
+  return `<div class="max-w-md mx-auto card p-8 text-center space-y-4">
+    <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-2xl"><i class="fa-solid fa-envelope-circle-check"></i></div>
+    <h3 class="text-xl font-bold">فعّل بريدك الإلكتروني</h3>
+    <p class="text-xs text-slate-600 leading-relaxed">أرسلنا رابط التحقق إلى <b dir="ltr">${esc(state.user.email)}</b>. افتح الرابط ثم اضغط الزر أدناه. تحقق أيضاً من مجلد البريد المزعج.</p>
+    <button class="btn b-pri w-full py-3" data-act="recheck">تم التفعيل، تابع</button>
+    <button class="btn b-sec w-full" data-act="resend-verify">إعادة إرسال رابط التحقق</button>
+    <button class="text-xs text-slate-500" data-act="logout">تسجيل الخروج</button></div>`;
+}
+function vComplete() {
+  return `<div class="max-w-md mx-auto card p-8"><h3 class="text-xl font-bold text-center mb-1">أكمل بيانات حسابك</h3>
+    <p class="text-xs text-slate-500 text-center mb-5">مرحباً ${esc(state.user.displayName || '')}، نحتاج بيانات الجوال والتحويل البنكي لتستلم دورك.</p>
+    <form id="f-complete" class="space-y-3">${bankFields()}<button class="btn b-pri w-full py-3" type="submit">حفظ ومتابعة</button></form></div>`;
+}
+
+function vHome() {
+  const inv = state.invites.map(i => `<div class="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-wrap justify-between items-center gap-3 text-xs">
+      <div><p class="font-bold text-sm">${esc(i.jamiyaName)}</p><p class="text-slate-500">دعوة من ${esc(i.inviterName)} • الاشتراك ${money(i.amount)}</p></div>
+      <div class="flex gap-2"><button class="btn b-pri" data-act="accept" data-id="${esc(i.id)}">قبول</button><button class="btn b-red" data-act="decline" data-id="${esc(i.id)}">رفض</button></div></div>`).join('');
+  const js = state.jamiyat.map(j => `<div class="p-4 bg-white border border-slate-200 rounded-2xl flex justify-between items-center gap-3">
+      <div><h4 class="font-bold text-sm">${esc(j.name)}</h4><p class="text-xs text-slate-500 mt-0.5">${money(j.amount)} شهرياً • ${j.memberUids.length}/${j.count} أعضاء</p>
+      <span class="text-[10px] ${j.creatorUid === state.user.uid ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'} px-2 py-0.5 rounded-md font-bold inline-block mt-1">${j.creatorUid === state.user.uid ? 'مشرف الجمعية' : 'عضو'}</span></div>
+      <button class="btn b-pri" data-act="open" data-id="${j.id}">دخول</button></div>`).join('');
+  return `<div class="space-y-5">
+    <div class="card p-6 flex flex-wrap justify-between items-center gap-3"><div><h2 class="text-xl font-black">أهلاً ${esc(state.profile.name)}</h2><p class="text-xs text-slate-500 mt-1">جمعياتك ودعواتك في مكان واحد</p></div>
+      <button class="btn b-pri py-3" data-act="go-create"><i class="fa-solid fa-circle-plus"></i> إنشاء جمعية جديدة</button></div>
+    ${inv ? `<div class="space-y-2"><h3 class="font-bold text-sm"><i class="fa-solid fa-envelope-open-text text-amber-500"></i> دعوات بانتظارك</h3>${inv}</div>` : ''}
+    <div class="space-y-2"><h3 class="font-bold text-sm">جمعياتك</h3>${js || '<div class="card p-8 text-center text-xs text-slate-400">لا توجد جمعيات بعد. أنشئ جمعيتك الأولى أو انتظر دعوة.</div>'}</div></div>`;
+}
+
+function vCreate() {
+  return `<div class="max-w-xl mx-auto card p-8"><div class="flex justify-between items-center mb-5"><h3 class="text-xl font-bold">إنشاء جمعية جديدة</h3><button data-act="go-home" class="text-slate-400"><i class="fa-solid fa-xmark text-lg"></i></button></div>
+  <form id="f-create" class="space-y-4">
+    <div><label class="text-xs font-semibold block mb-1">اسم الجمعية</label><input name="jname" class="inp" required placeholder="جمعية عائلة ... 2026"></div>
+    <div class="grid md:grid-cols-2 gap-4"><div><label class="text-xs font-semibold block mb-1">عدد الأعضاء (يساوي عدد الأشهر)</label><input name="count" type="number" min="2" max="30" class="inp" required></div>
+    <div><label class="text-xs font-semibold block mb-1">الاشتراك الشهري (ريال)</label><input name="amount" type="number" min="1" class="inp" required></div></div>
+    <div class="grid md:grid-cols-3 gap-4"><div><label class="text-xs font-semibold block mb-1">تاريخ البداية</label><input name="start" type="date" class="inp" required></div>
+    <div><label class="text-xs font-semibold block mb-1">آخر يوم للسداد كل شهر</label><input name="lastDay" type="number" min="1" max="31" class="inp" required></div>
+    <div><label class="text-xs font-semibold block mb-1">يوم الصرف</label><input name="payDay" type="number" min="1" max="31" class="inp" required></div></div>
+    <button class="btn b-pri w-full py-3" type="submit">إنشاء الجمعية</button></form></div>`;
+}
+
+function vJamiya() {
+  const c = ctx(); if (!c) return vLoading();
+  const { j } = c, uid = state.user.uid;
+  const paidCount = c.turns.filter(u => ['confirmed', 'recipient'].includes(payStatus(c, u))).length;
+  const collected = paidCount * j.amount, target = j.count * j.amount;
+  const pct = Math.min(100, Math.round(collected / target * 100));
+  const due = dayIn(j, c.cur, j.lastDay), payout = dayIn(j, c.cur, j.payDay);
+  const badge = { recipient: ['المستلم', 'bg-amber-100 text-amber-800'], confirmed: ['تم السداد', 'bg-emerald-100 text-emerald-700'], pending: ['بانتظار التأكيد', 'bg-sky-100 text-sky-700'], unpaid: ['لم يسدد', 'bg-rose-100 text-rose-700'] };
+  const canReorder = c.isCreator && !c.started;
+
+  const recBox = c.finished ? `<div class="bg-slate-800 text-white p-6 rounded-3xl"><h3 class="text-lg font-black">اكتملت الجمعية 🎉</h3><p class="text-xs text-slate-300 mt-1">استلم جميع الأعضاء أدوارهم.</p></div>`
+    : `<div class="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-6 rounded-3xl shadow-lg"><div class="flex flex-wrap justify-between items-center gap-4">
+      <div><p class="text-xs font-bold text-yellow-100">${c.started ? 'مستلم دفعة ' + fmtMonth(dayIn(j, c.cur, 1)) : 'أول مستلم (لم تبدأ الجمعية بعد)'}</p>
+      <h3 class="text-xl font-black">${c.rec ? esc(c.rec.name) : 'لم يكتمل ترتيب الأعضاء'}</h3>
+      ${c.rec ? `<p class="text-xs text-amber-100 mt-1">${esc(c.rec.bank)} ${c.rec.iban ? '• <span dir="ltr">' + esc(c.rec.iban) + '</span>' : ''}</p>` : ''}
+      <p class="text-xs text-amber-100 mt-1">آخر موعد للسداد: ${fmtDate(due)} • الصرف: ${fmtDate(payout)}</p></div>
+      <div>${c.isRec ? '<span class="px-3 py-1 bg-yellow-300 text-slate-900 text-xs font-bold rounded-xl">أنت مستلم هذا الشهر</span>'
+        : !c.started ? ''
+        : c.myPay ? `<span class="px-3 py-1.5 bg-white/20 rounded-xl text-xs font-bold">${c.myPay.status === 'confirmed' ? 'تم تأكيد سدادك ✓' : 'إيصالك بانتظار تأكيد المستلم'}</span>`
+        : '<button class="btn bg-white text-orange-600" data-act="pay-modal"><i class="fa-solid fa-file-arrow-up"></i> رفع إثبات السداد</button>'}</div></div></div>`;
+
+  const rows = c.turns.map((u, i) => {
+    const m = state.members[u] || { name: '...', email: '' };
+    const st = payStatus(c, u), b = badge[st];
+    const pay = c.pays.find(p => p.uid === u);
+    const month = fmtMonth(dayIn(j, i, 1));
+    return `<div class="p-3 bg-slate-50 border border-slate-100 rounded-xl flex flex-wrap justify-between items-center gap-2 text-xs">
+      <div class="flex items-center gap-3"><span class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center">${i + 1}</span>
+      <div><p class="font-bold">${esc(m.name)} ${u === j.creatorUid ? '<span class="text-[10px] text-indigo-600">(مشرف)</span>' : ''}</p><p class="text-[10px] text-slate-400">دوره: ${month}</p></div></div>
+      <div class="flex items-center gap-2 flex-wrap">
+        ${c.finished ? '' : `<span class="px-2 py-1 rounded-lg font-bold ${b[1]}">${b[0]}</span>`}
+        ${pay ? `<a href="${esc(pay.proofUrl)}" target="_blank" rel="noopener" class="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg"><i class="fa-solid fa-paperclip"></i> إيصال</a>` : ''}
+        ${pay && pay.status === 'pending' && (c.isRec || c.isCreator) ? `<button class="btn bg-emerald-600 text-white" data-act="confirm-pay" data-id="${esc(pay.id)}">تأكيد الاستلام</button>` : ''}
+        ${canReorder ? `<button class="btn b-sec" data-act="up" data-i="${i}">▲</button><button class="btn b-sec" data-act="down" data-i="${i}">▼</button>` : ''}
+      </div></div>`;
+  }).join('');
+
+  const pend = state.jInvites.filter(i => i.status === 'pending').map(i => `<div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs">
+      <p class="font-bold">${esc(i.name)}</p><p class="text-slate-500 break-all" dir="ltr">${esc(i.email)}</p>
+      <div class="flex gap-1.5 mt-2"><button class="btn b-sec" data-act="resend" data-id="${esc(i.id)}">إعادة إرسال</button><button class="btn b-red" data-act="cancel-inv" data-id="${esc(i.id)}">إلغاء</button></div></div>`).join('');
+
+  const mr = j.modRequest;
+  const modBox = mr ? `<div class="bg-indigo-50 border border-indigo-200 p-4 rounded-2xl text-xs space-y-2">
+      <p class="font-bold text-indigo-900"><i class="fa-solid fa-circle-exclamation"></i> طلب تعديل من ${esc(mr.byName)}:</p><p class="text-indigo-800">${esc(mr.text)}</p>
+      <p class="text-indigo-700">موافقون ${mr.approvals.length} • رافضون ${mr.rejections.length} من ${j.memberUids.length} • الحالة: ${{ pending: 'قيد التصويت', approved: 'مقبول (يطبّقه المشرف)', rejected: 'مرفوض' }[mr.status]}</p>
+      <div class="flex gap-2 flex-wrap">${mr.status === 'pending' ? `<button class="btn bg-emerald-600 text-white" data-act="vote-yes">موافق</button><button class="btn bg-rose-600 text-white" data-act="vote-no">غير موافق</button>` : ''}
+      ${c.isCreator ? '<button class="btn b-sec" data-act="close-mod">إغلاق الطلب</button>' : ''}</div></div>` : '';
+
+  const sched = Array.from({ length: j.count }, (_, i) => {
+    const u = c.turns[i], m = u && state.members[u];
+    return `<div class="flex justify-between text-xs py-1.5 border-b border-slate-100 ${i === c.cur && c.started && !c.finished ? 'font-bold text-emerald-700' : ''}"><span>${i + 1}. ${fmtMonth(dayIn(j, i, 1))}</span><span>${m ? esc(m.name) : '— شاغر —'}</span></div>`;
+  }).join('');
+
+  return `<div class="space-y-5">
+    <div class="card p-6 flex flex-wrap justify-between items-center gap-4">
+      <div><button class="text-xs text-slate-400 mb-1" data-act="go-home">← رجوع</button><h2 class="text-2xl font-black">${esc(j.name)}</h2>
+      <p class="text-xs text-slate-500 mt-1">الاشتراك ${money(j.amount)} • السداد حتى يوم ${j.lastDay} • الصرف يوم ${j.payDay} • تبدأ ${fmtDate(new Date(j.startDate + 'T00:00:00'))}</p></div>
+      <div class="flex flex-wrap gap-2">
+        ${c.isCreator ? `<button class="btn b-pri" data-act="invite-modal"><i class="fa-solid fa-user-plus"></i> دعوة عضو</button><button class="btn b-sec" data-act="remind"><i class="fa-solid fa-bell"></i> تذكير المتأخرين</button><button class="btn b-sec" data-act="edit-modal"><i class="fa-solid fa-gear"></i> تعديل</button>` : ''}
+        <button class="btn b-sec" data-act="mod-modal"><i class="fa-solid fa-pen-to-square"></i> اقتراح تعديل</button></div></div>
+    ${modBox}${recBox}
+    <div class="grid md:grid-cols-3 gap-5">
+      <div class="card p-5 md:col-span-2"><div class="flex justify-between items-center mb-3"><h4 class="font-bold text-sm"><i class="fa-solid fa-users text-emerald-600"></i> الأعضاء وترتيب القبض</h4>
+        <span class="text-xs bg-slate-100 px-2 py-1 rounded-lg font-semibold">${c.turns.length}/${j.count}</span></div>
+        ${canReorder ? '<button class="btn b-sec mb-3" data-act="shuffle"><i class="fa-solid fa-shuffle"></i> ترتيب عشوائي</button>' : ''}
+        <div class="space-y-2">${rows}</div></div>
+      <div class="space-y-5">
+        <div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-chart-pie text-indigo-600"></i> تحصيل هذا الشهر</h4>
+          <div class="text-xs space-y-2"><div class="flex justify-between"><span>المستهدف</span><b>${money(target)}</b></div><div class="flex justify-between"><span>المؤكد</span><b class="text-emerald-600">${money(collected)}</b></div>
+          <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden"><div class="bg-emerald-500 h-full" style="width:${pct}%"></div></div></div></div>
+        ${c.isCreator ? `<div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-clock-rotate-left text-amber-500"></i> دعوات معلّقة</h4><div class="space-y-2">${pend || '<p class="text-xs text-slate-400">لا توجد دعوات معلّقة.</p>'}</div></div>` : ''}
+        <div class="card p-5"><h4 class="font-bold text-sm mb-2"><i class="fa-solid fa-calendar-days text-teal-600"></i> الجدول الزمني</h4>${sched}</div>
+      </div></div></div>`;
+}
+
+function vProfile() {
+  const p = state.profile;
+  return `<div class="max-w-xl mx-auto card p-8 space-y-5"><div class="flex justify-between items-center"><div><h3 class="font-bold text-lg">${esc(p.name)}</h3><p class="text-xs text-slate-500" dir="ltr">${esc(p.email)}</p></div><button class="btn b-sec" data-act="go-home">الرئيسية</button></div>
+    <form id="f-profile" class="space-y-3"><div><label class="text-xs font-semibold block mb-1">الاسم</label><input name="name" class="inp" value="${esc(p.name)}" required></div>${bankFields(p)}
+    <button class="btn b-pri w-full py-3" type="submit">حفظ التعديلات</button></form></div>`;
+}
+
+function vAdmin() {
+  const { jamiyat, users } = state.admin;
+  const total = jamiyat.reduce((s, j) => s + j.count * j.amount, 0);
+  return `<div class="space-y-5"><div class="card p-6 bg-slate-900 text-white !bg-slate-900"><h2 class="text-xl font-black">لوحة المشرف العام</h2></div>
+  <div class="grid grid-cols-3 gap-4"><div class="card p-4"><p class="text-xs text-slate-500">الجمعيات</p><h3 class="text-2xl font-black">${jamiyat.length}</h3></div>
+  <div class="card p-4"><p class="text-xs text-slate-500">المستخدمون</p><h3 class="text-2xl font-black">${users.length}</h3></div>
+  <div class="card p-4"><p class="text-xs text-slate-500">إجمالي الدورات</p><h3 class="text-lg font-black text-emerald-600">${money(total)}</h3></div></div>
+  <div class="grid md:grid-cols-2 gap-5"><div class="card p-5"><h3 class="font-bold text-sm mb-3">الجمعيات</h3><div class="space-y-2 max-h-96 overflow-y-auto">${jamiyat.map(j => `<div class="p-3 bg-slate-50 rounded-xl text-xs"><b>${esc(j.name)}</b><p class="text-slate-500">المشرف: ${esc(j.creatorName)} • ${j.memberUids.length}/${j.count} • ${money(j.amount)}</p></div>`).join('')}</div></div>
+  <div class="card p-5"><h3 class="font-bold text-sm mb-3">المستخدمون</h3><div class="space-y-2 max-h-96 overflow-y-auto">${users.map(u => `<div class="p-3 bg-slate-50 rounded-xl text-xs"><b>${esc(u.name)}</b><p class="text-slate-500" dir="ltr">${esc(u.email)}</p></div>`).join('')}</div></div></div></div>`;
+}
+
+/* ============ النوافذ المنبثقة ============ */
+function showModal(title, body) {
+  $('modal').innerHTML = `<div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 fade"><div class="bg-white max-w-md w-full p-6 rounded-3xl shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center"><h3 class="font-bold text-lg">${title}</h3><button data-act="close" class="text-slate-400"><i class="fa-solid fa-xmark text-lg"></i></button></div>${body}</div></div>`;
+}
+function closeModal() { $('modal').innerHTML = ''; }
+
+function openModal(kind) {
+  const c = ctx();
+  if (kind === 'invite') showModal('دعوة عضو للجمعية', `<form id="f-invite" class="space-y-3"><div><label class="text-xs font-semibold block mb-1">اسم العضو</label><input name="name" class="inp" required></div>
+    <div><label class="text-xs font-semibold block mb-1">بريده الإلكتروني (يجب أن يسجّل به)</label><input name="email" type="email" dir="ltr" class="inp" required></div>
+    <button class="btn b-pri w-full py-3" type="submit">إرسال الدعوة</button></form>`);
+  if (kind === 'pay') showModal('إثبات سداد القسط', `<form id="f-pay" class="space-y-3"><p class="text-xs text-slate-500">حوّل إلى: <b>${esc(c.rec?.name)}</b> — ${esc(c.rec?.bank)} <span dir="ltr">${esc(c.rec?.iban || '')}</span></p>
+    <div><label class="text-xs font-semibold block mb-1">المبلغ المحوّل (ريال)</label><input name="amount" type="number" class="inp" value="${c.j.amount}" required></div>
+    <div><label class="text-xs font-semibold block mb-1">صورة الإيصال (صورة أو PDF، حتى 5MB)</label><input name="file" type="file" accept="image/*,.pdf" class="inp" required></div>
+    <button class="btn b-pri w-full py-3" type="submit">إرسال الإيصال</button></form>`);
+  if (kind === 'mod') showModal('اقتراح تعديل على الشروط', `<form id="f-mod" class="space-y-3"><textarea name="text" rows="3" class="inp" required placeholder="اكتب التعديل المقترح بوضوح..."></textarea>
+    <p class="text-[11px] text-slate-500">يُقبل الطلب عند موافقة أكثر من نصف الأعضاء، ثم يطبّقه المشرف.</p><button class="btn b-pri w-full py-3" type="submit">إرسال للتصويت</button></form>`);
+  if (kind === 'edit') showModal('تعديل إعدادات الجمعية', `<form id="f-edit" class="space-y-3"><div><label class="text-xs font-semibold block mb-1">الاسم</label><input name="jname" class="inp" value="${esc(c.j.name)}" required></div>
+    <div><label class="text-xs font-semibold block mb-1">الاشتراك الشهري</label><input name="amount" type="number" class="inp" value="${c.j.amount}" required></div>
+    <div class="grid grid-cols-2 gap-3"><div><label class="text-xs font-semibold block mb-1">آخر يوم للسداد</label><input name="lastDay" type="number" class="inp" value="${c.j.lastDay}" required></div>
+    <div><label class="text-xs font-semibold block mb-1">يوم الصرف</label><input name="payDay" type="number" class="inp" value="${c.j.payDay}" required></div></div>
+    <button class="btn b-pri w-full py-3" type="submit">حفظ</button></form>`);
+}
+
+/* ============ التوجيه والأحداث ============ */
+const actions = {
+  'go-home': () => { cleanup(state.jUnsubs); state.view = state.user && state.profile ? 'home' : state.view; render(); },
+  'go-create': () => { state.view = 'create'; render(); },
+  'go-profile': () => { state.view = 'profile'; render(); },
+  'go-admin': () => { state.view = 'admin'; render(); loadAdmin(); },
+  'logout': () => auth.signOut(),
+  'google': doGoogle,
+  'auth-register': () => { state.authMode = 'register'; render(); },
+  'auth-login': () => { state.authMode = 'login'; render(); },
+  'auth-reset': () => { state.authMode = 'reset'; render(); },
+  'recheck': recheckVerification,
+  'resend-verify': () => auth.currentUser.sendEmailVerification({ url: appUrl() }).then(() => toast('أُعيد إرسال رابط التحقق')).catch(e => toast(authErr(e), 'error')),
+  'open': (el) => openJamiya(el.dataset.id),
+  'accept': (el) => acceptInvite(el.dataset.id),
+  'decline': (el) => declineInvite(el.dataset.id),
+  'invite-modal': () => openModal('invite'), 'pay-modal': () => openModal('pay'), 'mod-modal': () => openModal('mod'), 'edit-modal': () => openModal('edit'),
+  'close': closeModal,
+  'confirm-pay': (el) => confirmPayment(el.dataset.id),
+  'remind': remindUnpaid,
+  'resend': (el) => { const i = state.jInvites.find(x => x.id === el.dataset.id); if (i) sendInviteMail({ ...i, amount: state.j.amount }); },
+  'cancel-inv': (el) => db.collection('invites').doc(el.dataset.id).delete().then(() => toast('أُلغيت الدعوة', 'info')).catch(e => toast(e.message, 'error')),
+  'up': (el) => moveTurn(+el.dataset.i, -1), 'down': (el) => moveTurn(+el.dataset.i, 1), 'shuffle': shuffleTurns,
+  'vote-yes': () => voteMod(true), 'vote-no': () => voteMod(false), 'close-mod': closeMod
+};
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const fn = actions[el.dataset.act]; if (fn) fn(el);
+});
+const forms = { 'f-register': doRegister, 'f-login': doLogin, 'f-reset': doReset, 'f-complete': doCompleteProfile, 'f-create': handleCreate,
+  'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-edit': submitEdit, 'f-profile': saveProfile };
+document.addEventListener('submit', e => { const fn = forms[e.target.id]; if (fn) { e.preventDefault(); fn(e.target); } });
+
+render();
+</script>
 </body>
 </html>
