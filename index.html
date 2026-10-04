@@ -77,8 +77,9 @@ textarea.inp{min-height:96px}
 .bar{height:6px;border-radius:99px;background:#e2e8f0;overflow:hidden}.bar>i{display:block;height:100%;background:linear-gradient(90deg,#10b981,#14b8a6);border-radius:99px}
 
 /* شرائط الأزرار القابلة للتمرير في الجوال */
-.chips{display:flex;gap:.5rem;overflow-x:auto;scrollbar-width:none;padding:.15rem}
-.chips::-webkit-scrollbar{display:none}.chips .btn{flex:none}
+.chips{display:flex;flex-wrap:wrap;gap:.45rem}
+.chips .btn{flex:1 1 28%;min-width:0;min-height:38px;padding:.4rem .35rem;font-size:.72rem;gap:.3rem}
+@media(min-width:768px){.chips .btn{flex:none;min-height:42px;padding:.55rem 1rem;font-size:.8rem}}
 
 /* شريط التنقل السفلي (الجوال) */
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:45;display:flex;height:calc(var(--tab-h) + var(--sab));padding-bottom:var(--sab);background:rgba(255,255,255,.92);-webkit-backdrop-filter:saturate(180%) blur(18px);backdrop-filter:saturate(180%) blur(18px);border-top:1px solid #e2e8f0}
@@ -175,6 +176,12 @@ const bankOpts = sel => BANKS.map(b => `<option ${b === sel ? 'selected' : ''}>$
 const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 const fixIban = s => String(s || '').replace(/\s+/g, '').toUpperCase();
 const validIban = s => /^SA\d{22}$/.test(fixIban(s));
+const normPhone = s => {
+  let d = String(s || '').replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/[۰-۹]/g, c => '۰۱۲۳۴۵۶۷۸۹'.indexOf(c)).replace(/\D/g, '');
+  if (d.startsWith('00966')) d = d.slice(5); else if (d.startsWith('966')) d = d.slice(3);
+  if (/^5\d{8}$/.test(d)) d = '0' + d;
+  return d;
+};
 const validPhone = s => /^05\d{8}$/.test(String(s || '').trim());
 const fmtDate = d => d.toLocaleDateString('ar-SA-u-ca-gregory', { year: 'numeric', month: 'long', day: 'numeric' });
 const fmtMonth = d => d.toLocaleDateString('ar-SA-u-ca-gregory', { year: 'numeric', month: 'long' });
@@ -325,30 +332,54 @@ auth.onAuthStateChanged(async user => {
   } catch (e) { toast('تعذر تحميل الحساب: ' + e.message, 'error'); }
 
   if (!state.profile) { state.view = 'complete'; return render(); }
+  claimPhone(user.uid, state.profile.phone);
   startListeners();
   if (state.isAdmin) { state.view = 'admin'; render(); loadAdmin(); toast('مرحباً بك في لوحة المالك', 'info'); return; }
   state.view = launchAction() || 'home'; render();
 });
 
+/* حجز رقم الجوال: مستند في phones/{الرقم} يحمل uid صاحبه، فلا يمكن لحسابين استخدام نفس الرقم */
+async function saveProfileWithPhone(uid, data, mode, oldPhone) {
+  const phoneRef = db.collection('phones').doc(data.phone), userRef = db.collection('users').doc(uid);
+  await db.runTransaction(async t => {
+    const ps = await t.get(phoneRef);
+    if (ps.exists && ps.data().uid !== uid) throw new Error('PHONE_TAKEN');
+    if (oldPhone && oldPhone !== data.phone) t.delete(db.collection('phones').doc(oldPhone));
+    t.set(phoneRef, { uid });
+    if (mode === 'update') t.update(userRef, data); else t.set(userRef, data);
+  });
+}
+async function claimPhone(uid, phone) { // للحسابات القديمة: يحجز رقمها بصمت إن لم يكن محجوزاً
+  try { if (!validPhone(phone)) return; const r = db.collection('phones').doc(phone); const x = await r.get(); if (!x.exists) await r.set({ uid }); } catch (e) {}
+}
+const PHONE_TAKEN_MSG = 'رقم الجوال هذا مسجّل مسبقاً بحساب آخر';
+const phoneSaveErr = e => e && e.message === 'PHONE_TAKEN' ? PHONE_TAKEN_MSG : (e && e.code === 'permission-denied' ? 'تعذر حجز رقم الجوال: انشر قواعد Firestore الجديدة (مجموعة phones) ثم أعد المحاولة' : (e && e.message) || 'خطأ غير معروف');
+
 function cleanup(arr) { arr.forEach(u => u()); arr.length = 0; }
 
 function startListeners() {
-  const uid = state.user.uid, email = lc(state.user.email);
+  const uid = state.user.uid, email = lc(state.user.email), phone = normPhone(state.profile && state.profile.phone);
+  let invA = [], invB = [];
+  const merge = () => { const m = new Map(); [...invA, ...invB].forEach(i => m.set(i.id, i)); state.invites = [...m.values()]; if (state.view === 'home') render(); };
   state.unsubs.push(
     db.collection('jamiyat').where('memberUids', 'array-contains', uid).onSnapshot(s => {
       state.jamiyat = s.docs.map(d => ({ id: d.id, ...d.data() }));
       if (['home'].includes(state.view)) render();
     }, e => toast('خطأ في تحميل الجمعيات: ' + e.message, 'error')),
     db.collection('invites').where('email', '==', email).where('status', '==', 'pending').onSnapshot(s => {
-      state.invites = s.docs.map(d => ({ id: d.id, ...d.data() }));
-      if (state.view === 'home') render();
+      invA = s.docs.map(d => ({ id: d.id, ...d.data() })); merge();
     }, e => toast('خطأ في تحميل الدعوات: ' + e.message, 'error'))
+  );
+  if (validPhone(phone)) state.unsubs.push(
+    db.collection('invites').where('phone', '==', phone).where('status', '==', 'pending').onSnapshot(s => {
+      invB = s.docs.map(d => ({ id: d.id, ...d.data() })); merge();
+    }, e => toast('تعذر تحميل دعوات الجوال: تحقق من قواعد Firestore (' + e.code + ')', 'error'))
   );
 }
 
 async function doRegister(f) {
   const name = f.name.value.trim(), email = lc(f.email.value), pass = f.password.value;
-  const phone = f.phone.value.trim(), bank = resolveBank(f), iban = fixIban(f.iban.value);
+  const phone = normPhone(f.phone.value), bank = resolveBank(f), iban = fixIban(f.iban.value);
   if (bank === null) return;
   if (name.length < 3) return toast('اكتب الاسم الثلاثي', 'error');
   if (!validEmail(email)) return toast('البريد غير صحيح', 'error');
@@ -358,8 +389,13 @@ async function doRegister(f) {
   if (!f.terms.checked) return toast('يجب الموافقة على الشروط', 'error');
   try {
     const cred = await auth.createUserWithEmailAndPassword(email, pass);
-    await cred.user.updateProfile({ displayName: name });
-    await db.collection('users').doc(cred.user.uid).set({ name, email, phone, bank, iban: bank.startsWith('كاش') ? '' : iban, waOptIn: f.waOptIn.checked, avatar: '', createdAt: FV.serverTimestamp() });
+    try {
+      await cred.user.updateProfile({ displayName: name });
+      await saveProfileWithPhone(cred.user.uid, { name, email, phone, bank, iban: bank.startsWith('كاش') ? '' : iban, waOptIn: f.waOptIn.checked, avatar: '', createdAt: FV.serverTimestamp() }, 'set', null);
+    } catch (e) {
+      await cred.user.delete().catch(() => {}); // نتراجع عن إنشاء الحساب ليعيد المحاولة برقم آخر
+      return toast(phoneSaveErr(e), 'error');
+    }
     await cred.user.sendEmailVerification({ url: appUrl() });
     toast('تم إنشاء الحساب وإرسال رابط التحقق إلى بريدك');
     await auth.signOut().catch(() => {});
@@ -384,17 +420,17 @@ async function doGoogle() {
   catch (e) { toast(authErr(e), 'error'); }
 }
 async function doCompleteProfile(f) {
-  const phone = f.phone.value.trim(), bank = resolveBank(f), iban = fixIban(f.iban.value);
+  const phone = normPhone(f.phone.value), bank = resolveBank(f), iban = fixIban(f.iban.value);
   if (bank === null) return;
   if (!validPhone(phone)) return toast('رقم الجوال غير صحيح', 'error');
   if (!bank.startsWith('كاش') && !validIban(iban)) return toast('الآيبان غير صحيح', 'error');
   const u = state.user;
   const profile = { name: u.displayName || 'عضو', email: lc(u.email), phone, bank, iban: bank.startsWith('كاش') ? '' : iban, waOptIn: f.waOptIn.checked, avatar: u.photoURL || '', createdAt: FV.serverTimestamp() };
   try {
-    await db.collection('users').doc(u.uid).set(profile);
+    await saveProfileWithPhone(u.uid, profile, 'set', null);
     state.profile = profile; startListeners();
     if (state.isAdmin) { state.view = 'admin'; render(); loadAdmin(); } else { state.view = 'home'; render(); }
-  } catch (e) { toast(e.message, 'error'); }
+  } catch (e) { toast(phoneSaveErr(e), 'error'); }
 }
 async function recheckVerification() {
   await auth.currentUser.reload();
@@ -404,27 +440,40 @@ async function recheckVerification() {
 
 /* ============ الدعوات ============ */
 async function handleInvite(f) {
-  const c = ctx(); const name = f.name.value.trim(), email = lc(f.email.value);
-  if (!validEmail(email)) return toast('البريد غير صحيح', 'error');
-  if (Object.values(state.members).some(m => lc(m.email) === email)) return toast('هذا الشخص عضو بالفعل', 'error');
+  const c = ctx(); const name = f.name.value.trim(), phone = normPhone(f.phone.value), email = lc(f.email.value);
+  if (name.length < 2) return toast('اكتب اسم العضو', 'error');
+  if (!validPhone(phone)) return toast('رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
+  if (email && !validEmail(email)) return toast('البريد غير صحيح', 'error');
+  if (Object.values(state.members).some(m => normPhone(m.phone) === phone || (email && lc(m.email) === email))) return toast('هذا الشخص عضو بالفعل', 'error');
+  if (state.jInvites.some(i => i.status === 'pending' && (normPhone(i.phone) === phone || (email && lc(i.email) === email)))) return toast('توجد دعوة معلّقة لنفس الرقم أو البريد، أعد إرسالها من قائمة الدعوات', 'error');
   const pending = state.jInvites.filter(i => i.status === 'pending').length;
   if (c.j.memberUids.length + pending >= c.j.count) return toast('اكتمل عدد الأعضاء المحدد للجمعية', 'error');
-  const id = `${c.j.id}__${email}`;
+  const id = `${c.j.id}__p${phone}`;
+  const inv = { jamiyaId: c.j.id, jamiyaName: c.j.name, amount: c.j.amount, every: freqOf(c.j).every, email, phone, name,
+    invitedBy: state.user.uid, inviterName: state.profile.name, creatorUid: c.j.creatorUid, status: 'pending' };
   try {
-    await db.collection('invites').doc(id).set({
-      jamiyaId: c.j.id, jamiyaName: c.j.name, amount: c.j.amount, every: freqOf(c.j).every, email, name,
-      invitedBy: state.user.uid, inviterName: state.profile.name, creatorUid: c.j.creatorUid,
-      status: 'pending', createdAt: FV.serverTimestamp()
-    });
-    closeModal(); toast('تم إنشاء الدعوة، وستظهر للمدعو فور دخوله بنفس البريد');
-    sendInviteMail({ email, name, jamiyaName: c.j.name, inviterName: state.profile.name, amount: c.j.amount, every: freqOf(c.j).every });
+    await db.collection('invites').doc(id).set({ ...inv, createdAt: FV.serverTimestamp() });
+    closeModal(); showInviteShare({ ...inv, id }, true);
   } catch (e) { toast('تعذر إنشاء الدعوة: ' + e.message, 'error'); }
 }
 function inviteText(i, forEmail = false) {
-  return `السلام عليكم ${i.name}،\nدعاك ${i.inviterName} للانضمام إلى جمعية "${i.jamiyaName}" بقيمة اشتراك ${i.amount} ريال ${i.every || 'شهرياً'}.\n\nلقبول الدعوة افتح الرابط أدناه وسجّل الدخول بنفس هذا البريد (${i.email}):${forEmail ? mailLink() : '\n' + shareUrl()}`;
+  const who = i.phone ? `رقم جوالك (${i.phone})` : `هذا البريد (${i.email})`;
+  return `السلام عليكم ${i.name}،\nدعاك ${i.inviterName} للانضمام إلى جمعية "${i.jamiyaName}" بقيمة اشتراك ${i.amount} ريال ${i.every || 'شهرياً'}.\n\nلقبول الدعوة افتح الرابط أدناه، وأنشئ حساباً أو سجّل الدخول بنفس ${who}:${forEmail ? mailLink() : '\n' + shareUrl()}`;
+}
+// نافذة إرسال الدعوة: واتساب أولاً، ثم البريد (إن وُجد) أو النسخ
+function showInviteShare(i, fresh) {
+  state.lastInvite = i;
+  showModal(fresh ? 'تم إنشاء الدعوة' : 'إرسال الدعوة', `<div class="space-y-3 text-xs">
+    <p class="text-slate-600 leading-relaxed">${fresh ? 'الدعوة محفوظة. ' : ''}ستظهر لـ <b>${esc(i.name)}</b> تلقائياً عند التسجيل أو الدخول بنفس رقم الجوال <b dir="ltr">${esc(i.phone || '')}</b>${i.email ? ' أو بنفس البريد' : ''}. أرسل له الرابط الآن:</p>
+    <div class="p-3 bg-slate-50 rounded-xl text-slate-600 whitespace-pre-line leading-relaxed">${esc(inviteText(i))}</div>
+    <div class="flex flex-wrap gap-2">
+      ${i.phone ? `<a class="btn b-pri flex-1" target="_blank" rel="noopener" href="${waLink(i.phone, inviteText(i))}"><i class="fa-brands fa-whatsapp"></i> إرسال عبر واتساب</a>` : ''}
+      ${i.email ? '<button class="btn b-sec" data-act="mail-invite"><i class="fa-solid fa-envelope"></i> بالبريد</button>' : ''}
+      <button class="btn b-sec" data-act="copy-invite"><i class="fa-solid fa-copy"></i> نسخ</button></div></div>`);
 }
 async function sendInviteMail(i) {
   state.lastInvite = i;
+  if (!i.email) return toast('لا يوجد بريد لهذه الدعوة', 'error');
   try {
     await sendMail(i.email, i.name, `دعوة للانضمام إلى جمعية ${i.jamiyaName}`, inviteText(i, true));
     toast('✉️ أُرسل بريد الدعوة إلى ' + i.email);
@@ -432,11 +481,11 @@ async function sendInviteMail(i) {
     const { raw, hint } = mailErrHint(e);
     console.error('EmailJS error', e);
     showModal('تعذر إرسال بريد الدعوة', `<div class="space-y-3 text-xs">
-      <p class="text-slate-600">الدعوة محفوظة وستظهر لـ <b dir="ltr">${esc(i.email)}</b> داخل التطبيق عند دخوله بنفس البريد. لكن البريد لم يُرسل.</p>
+      <p class="text-slate-600">الدعوة محفوظة وستظهر للمدعو داخل التطبيق عند دخوله بنفس ${i.phone ? 'رقم الجوال' : 'البريد'}. لكن البريد لم يُرسل.</p>
       <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800" dir="ltr">${esc(raw)}</div>
       ${hint ? `<div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">${esc(hint)}</div>` : ''}
       <p class="font-bold">أرسل الدعوة بطريقة أخرى:</p>
-      <div class="flex gap-2 flex-wrap"><a class="btn b-pri" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(inviteText(i))}"><i class="fa-brands fa-whatsapp"></i> واتساب</a>
+      <div class="flex gap-2 flex-wrap"><a class="btn b-pri" target="_blank" rel="noopener" href="${waLink(i.phone || '', inviteText(i))}"><i class="fa-brands fa-whatsapp"></i> واتساب</a>
       <button class="btn b-sec" data-act="copy-invite"><i class="fa-solid fa-copy"></i> نسخ نص الدعوة</button></div></div>`);
   }
 }
@@ -686,22 +735,22 @@ async function submitDelete(f) {
 /* ============ الملف الشخصي ============ */
 async function saveProfile(f) {
   const bank = resolveBank(f); if (bank === null) return;
-  const upd = { name: f.name.value.trim(), phone: f.phone.value.trim(), bank, iban: fixIban(f.iban.value), waOptIn: f.waOptIn.checked };
+  const upd = { name: f.name.value.trim(), phone: normPhone(f.phone.value), bank, iban: fixIban(f.iban.value), waOptIn: f.waOptIn.checked };
   if (upd.name.length < 3) return toast('الاسم قصير', 'error');
   if (!validPhone(upd.phone)) return toast('رقم الجوال غير صحيح', 'error');
   if (!upd.bank.startsWith('كاش') && !validIban(upd.iban)) return toast('الآيبان غير صحيح', 'error');
   if (upd.bank.startsWith('كاش')) upd.iban = '';
   try {
-    await db.collection('users').doc(state.user.uid).update(upd);
+    await saveProfileWithPhone(state.user.uid, upd, 'update', normPhone(state.profile.phone) !== upd.phone ? state.profile.phone : null);
     state.profile = { ...state.profile, ...upd };
     await Promise.all(state.jamiyat.map(j => db.collection('jamiyat').doc(j.id).collection('members').doc(state.user.uid).set({ uid: state.user.uid, name: upd.name, email: lc(state.user.email), phone: upd.phone, bank: upd.bank, iban: upd.iban, waOptIn: upd.waOptIn }).catch(() => {})));
     toast('تم الحفظ'); render();
-  } catch (e) { toast(e.message, 'error'); }
+  } catch (e) { toast(phoneSaveErr(e), 'error'); }
 }
 
 /* ===== واتساب (روابط wa.me الجاهزة) وزر المشاركة ===== */
 function waNumber(phone) { const d = String(phone || '').replace(/\D/g, ''); return d.startsWith('05') ? '966' + d.slice(1) : d.startsWith('5') && d.length === 9 ? '966' + d : d; }
-function waLink(phone, text) { const n = waNumber(phone); return `https://wa.me/${n}?text=${encodeURIComponent(text)}`; }
+function waLink(phone, text) { const n = phone ? waNumber(phone) : ''; return `https://wa.me/${n}?text=${encodeURIComponent(text)}`; }
 function openWaReminders() {
   const c = ctx(); if (!c || !c.isCreator) return;
   const due = fmtDate(dayIn(c.j, c.cur, c.j.lastDay));
@@ -898,8 +947,8 @@ function vJamiya() {
   }).join('');
 
   const pend = state.jInvites.filter(i => i.status === 'pending').map(i => `<div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs">
-      <p class="font-bold">${esc(i.name)}</p><p class="text-slate-500 break-all" dir="ltr">${esc(i.email)}</p>
-      <div class="flex gap-1.5 mt-2 flex-wrap"><button class="btn b-sec" data-act="resend" data-id="${esc(i.id)}">إعادة إرسال</button><a class="btn bg-emerald-50 text-emerald-700" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(inviteText({ ...i, amount: j.amount }))}"><i class="fa-brands fa-whatsapp"></i></a><button class="btn b-red" data-act="cancel-inv" data-id="${esc(i.id)}">إلغاء</button></div></div>`).join('');
+      <p class="font-bold">${esc(i.name)}</p>${i.phone ? `<p class="text-slate-600" dir="ltr">${esc(i.phone)}</p>` : ''}${i.email ? `<p class="text-slate-500 break-all" dir="ltr">${esc(i.email)}</p>` : ''}
+      <div class="flex gap-1.5 mt-2 flex-wrap"><button class="btn b-pri" data-act="resend" data-id="${esc(i.id)}"><i class="fa-brands fa-whatsapp"></i> إرسال</button><button class="btn b-red" data-act="cancel-inv" data-id="${esc(i.id)}">إلغاء</button></div></div>`).join('');
 
   const mr = j.modRequest;
   const modBox = mr ? `<div class="bg-indigo-50 border border-indigo-200 p-4 rounded-2xl text-xs space-y-2">
@@ -972,8 +1021,10 @@ function closeModal() { $('modal').innerHTML = ''; }
 function openModal(kind) {
   const c = ctx();
   if (kind === 'invite') showModal('دعوة عضو للجمعية', `<form id="f-invite" class="space-y-3"><div><label class="text-xs font-semibold block mb-1">اسم العضو</label><input name="name" class="inp" required></div>
-    <div><label class="text-xs font-semibold block mb-1">بريده الإلكتروني (يجب أن يسجّل به)</label><input name="email" type="email" dir="ltr" class="inp" required></div>
-    <button class="btn b-pri w-full py-3" type="submit">إرسال الدعوة</button></form>`);
+    <div><label class="text-xs font-semibold block mb-1">رقم جواله (05xxxxxxxx)</label><input name="phone" type="tel" inputmode="tel" dir="ltr" class="inp" placeholder="05xxxxxxxx" required></div>
+    <div><label class="text-xs font-semibold block mb-1">بريده الإلكتروني (اختياري)</label><input name="email" type="email" dir="ltr" class="inp"></div>
+    <p class="text-[11px] text-slate-500 leading-relaxed">تظهر الدعوة للعضو تلقائياً عند تسجيله أو دخوله بنفس رقم الجوال. بعد الإنشاء ترسلها له عبر واتساب بضغطة واحدة.</p>
+    <button class="btn b-pri w-full py-3" type="submit"><i class="fa-brands fa-whatsapp"></i> إنشاء الدعوة</button></form>`);
   if (kind === 'pay') showModal('إثبات سداد القسط', `<form id="f-pay" class="space-y-3"><p class="text-xs text-slate-500">حوّل إلى: <b>${esc(c.rec?.name)}</b> — ${esc(c.rec?.bank)} <span dir="ltr">${esc(c.rec?.iban || '')}</span></p>
     <div class="p-2.5 bg-slate-50 rounded-xl text-[11px] text-slate-600">القسط ${fmtNum(c.j.amount)} ريال ${c.f.every} • المستحق عليك حتى الآن ${fmtNum(c.me?.owed || 0)} • المتبقي <b>${fmtNum(c.me?.remaining || 0)}</b> ريال</div>
     <div><label class="text-xs font-semibold block mb-1">المبلغ المحوّل (ريال) — يمكنك دفع جزء أو أكثر من قسط</label><input name="amount" type="number" step="0.01" min="1" class="inp" value="${c.me && c.me.remaining > 0 ? c.me.remaining : c.j.amount}" required></div>
@@ -1086,7 +1137,8 @@ const actions = {
   'member-pays': (el) => openMemberPays(el.dataset.uid),
   'confirm-edit': () => state.pendingEdit && saveEdit(state.pendingEdit),
   'remind': remindUnpaid,
-  'resend': (el) => { const i = state.jInvites.find(x => x.id === el.dataset.id); if (i) sendInviteMail({ ...i, amount: state.j.amount }); },
+  'resend': (el) => { const i = state.jInvites.find(x => x.id === el.dataset.id); if (i) showInviteShare({ ...i, amount: state.j.amount }); },
+  'mail-invite': () => sendInviteMail(state.lastInvite),
   'cancel-inv': (el) => db.collection('invites').doc(el.dataset.id).delete().then(() => toast('أُلغيت الدعوة', 'info')).catch(e => toast(e.message, 'error')),
   'order-modal': openOrderModal,
   'wa-remind': openWaReminders, 'share-app': shareApp,
