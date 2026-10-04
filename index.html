@@ -654,6 +654,35 @@ function showRepriceModal(c, upd) {
     <div class="flex gap-2"><button class="btn b-sec flex-1" data-act="close">إلغاء</button><button class="btn b-pri flex-1" data-act="confirm-edit">تأكيد وحفظ</button></div></div>`);
 }
 
+/* ============ حذف الجمعية (للمشرف فقط) ============ */
+function openDeleteModal() {
+  const c = ctx(); if (!c || !c.isCreator) return;
+  const hasPays = state.payments.length > 0;
+  showModal('حذف الجمعية', `<form id="f-delete" class="space-y-3">
+    <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 leading-relaxed"><b>تحذير:</b> سيتم حذف الجمعية نهائياً مع الأعضاء والمدفوعات والإيصالات والدعوات لجميع المشاركين، ولا يمكن التراجع.${hasPays ? `<br>يوجد ${state.payments.length} دفعة مسجّلة سيُحذف سجلها.` : ''}</div>
+    <div><label class="text-xs font-semibold block mb-1">للتأكيد اكتب اسم الجمعية: <b>${esc(c.j.name)}</b></label><input name="confirm" class="inp" autocomplete="off" required></div>
+    <div class="flex gap-2"><button type="button" class="btn b-sec flex-1" data-act="close">إلغاء</button><button class="btn flex-1 bg-rose-600 text-white" type="submit"><i class="fa-solid fa-trash"></i> حذف نهائياً</button></div></form>`);
+}
+async function submitDelete(f) {
+  const c = ctx(); if (!c || !c.isCreator) return toast('الحذف متاح لمشرف الجمعية فقط', 'error');
+  if (f.confirm.value.trim() !== c.j.name.trim()) return toast('اكتب اسم الجمعية كما هو تماماً للتأكيد', 'error');
+  const btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'جارٍ الحذف...';
+  const id = c.j.id, ref = db.collection('jamiyat').doc(id), uid = state.user.uid;
+  cleanup(state.jUnsubs); // نوقف الاستماع حتى لا تتأثر الشاشة أثناء الحذف
+  const wipe = async q => { const snap = await q.get(); for (let i = 0; i < snap.docs.length; i += 400) { const b = db.batch(); snap.docs.slice(i, i + 400).forEach(d => b.delete(d.ref)); await b.commit(); } };
+  try {
+    await wipe(ref.collection('payments'));
+    await wipe(ref.collection('proofs'));
+    await wipe(db.collection('invites').where('jamiyaId', '==', id).where('creatorUid', '==', uid));
+    await wipe(ref.collection('members'));
+    await ref.delete();
+    state.j = null; state.activeId = null; state.members = {}; state.payments = []; state.jInvites = []; state.jInviteSub = false;
+    closeModal(); state.view = 'home'; render(); toast('تم حذف الجمعية');
+  } catch (e) {
+    toast('تعذر الحذف: ' + e.message, 'error'); closeModal(); openJamiya(id);
+  }
+}
+
 /* ============ الملف الشخصي ============ */
 async function saveProfile(f) {
   const bank = resolveBank(f); if (bank === null) return;
@@ -889,7 +918,7 @@ function vJamiya() {
       <div><button class="text-xs text-slate-400 mb-1" data-act="go-home">← رجوع</button><h2 class="text-2xl font-black">${esc(j.name)}</h2>
       <p class="text-xs text-slate-500 mt-1">${freqOf(j).label} • القسط ${money(j.amount)} • السداد حتى يوم ${j.lastDay}${freqOf(j).days ? ' من الدورة' : ''} • الصرف يوم ${j.payDay}${freqOf(j).days ? ' من الدورة' : ''} • تبدأ ${fmtDate(new Date(j.startDate + 'T00:00:00'))}</p></div>
       <div class="chips w-full md:w-auto md:flex-wrap">
-        ${c.isCreator ? `<button class="btn b-pri" data-act="invite-modal"><i class="fa-solid fa-user-plus"></i> دعوة عضو</button><button class="btn b-sec" data-act="remind"><i class="fa-solid fa-bell"></i> تذكير بالبريد</button><button class="btn bg-emerald-50 text-emerald-700" data-act="wa-remind"><i class="fa-brands fa-whatsapp"></i> تذكير واتساب</button><button class="btn b-sec" data-act="edit-modal"><i class="fa-solid fa-gear"></i> تعديل</button>` : ''}
+        ${c.isCreator ? `<button class="btn b-pri" data-act="invite-modal"><i class="fa-solid fa-user-plus"></i> دعوة عضو</button><button class="btn b-sec" data-act="remind"><i class="fa-solid fa-bell"></i> تذكير بالبريد</button><button class="btn bg-emerald-50 text-emerald-700" data-act="wa-remind"><i class="fa-brands fa-whatsapp"></i> تذكير واتساب</button><button class="btn b-sec" data-act="edit-modal"><i class="fa-solid fa-gear"></i> تعديل</button><button class="btn b-red" data-act="delete-modal"><i class="fa-solid fa-trash"></i> حذف</button>` : ''}
         <button class="btn b-sec" data-act="mod-modal"><i class="fa-solid fa-pen-to-square"></i> اقتراح تعديل</button></div></div>
     ${modBox}${recBox}
     <div class="grid md:grid-cols-3 gap-5">
@@ -1051,7 +1080,7 @@ const actions = {
   'open': (el) => openJamiya(el.dataset.id),
   'accept': (el) => acceptInvite(el.dataset.id),
   'decline': (el) => declineInvite(el.dataset.id),
-  'invite-modal': () => openModal('invite'), 'pay-modal': () => openModal('pay'), 'mod-modal': () => openModal('mod'), 'edit-modal': () => openModal('edit'),
+  'delete-modal': openDeleteModal, 'invite-modal': () => openModal('invite'), 'pay-modal': () => openModal('pay'), 'mod-modal': () => openModal('mod'), 'edit-modal': () => openModal('edit'),
   'close': closeModal,
   'confirm-pay': (el) => confirmPayment(el.dataset.id),
   'member-pays': (el) => openMemberPays(el.dataset.uid),
@@ -1088,7 +1117,7 @@ document.addEventListener('change', e => {
   }
 });
 const forms = { 'f-register': doRegister, 'f-login': doLogin, 'f-reset': doReset, 'f-complete': doCompleteProfile, 'f-create': handleCreate,
-  'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-edit': submitEdit, 'f-profile': saveProfile };
+  'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete };
 document.addEventListener('submit', e => { const fn = forms[e.target.id]; if (fn) { e.preventDefault(); fn(e.target); } });
 
 render();
