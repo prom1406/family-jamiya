@@ -164,7 +164,7 @@ const BANKS = ["مصرف الراجحي","البنك الأهلي السعودي
 const state = {
   user: null, profile: null, isAdmin: false, view: 'loading', authMode: 'login',
   jamiyat: [], invites: [], activeId: null, j: null, members: {}, payments: [], jInvites: [],
-  admin: { jamiyat: [], users: [] }, unsubs: [], jUnsubs: []
+  admin: { jamiyat: [], users: [] }, unsubs: [], jUnsubs: [], pays: {}, payLs: {}, afterOpen: null
 };
 
 /* ============ أدوات ============ */
@@ -314,7 +314,7 @@ const needsPay = (c, u) => u !== c.recUid && c.acct[u] && ['unpaid', 'partial'].
 
 /* ============ المصادقة ============ */
 auth.onAuthStateChanged(async user => {
-  cleanup(state.unsubs); cleanup(state.jUnsubs);
+  cleanup(state.unsubs); cleanup(state.jUnsubs); stopPayListeners(); state.pays = {};
   state.user = user; state.profile = null; state.isAdmin = false;
   state.jamiyat = []; state.invites = [];
   if (!user) { state.view = 'auth'; return render(); }
@@ -364,6 +364,7 @@ function startListeners() {
   state.unsubs.push(
     db.collection('jamiyat').where('memberUids', 'array-contains', uid).onSnapshot(s => {
       state.jamiyat = s.docs.map(d => ({ id: d.id, ...d.data() }));
+      syncPayListeners();
       if (['home'].includes(state.view)) render();
     }, e => toast('خطأ في تحميل الجمعيات: ' + e.message, 'error')),
     db.collection('invites').where('email', '==', email).where('status', '==', 'pending').onSnapshot(s => {
@@ -521,8 +522,111 @@ async function handleCreate(f) {
   try { await batch.commit(); toast('تم إنشاء الجمعية'); openJamiya(ref.id); }
   catch (e) { toast('تعذر الإنشاء: ' + e.message, 'error'); }
 }
+/* ============ تنبيهات الصفحة الرئيسية + التقويم ============ */
+function stopPayListeners() { Object.values(state.payLs).forEach(u => u()); state.payLs = {}; }
+// مشرف الجمعية يقرأ كل دفعاتها، والعضو يقرأ دفعاته فقط (أقل استهلاكاً للحصة المجانية)
+function syncPayListeners() {
+  const uid = state.user.uid, ids = new Set(state.jamiyat.map(j => j.id));
+  Object.keys(state.payLs).forEach(id => { if (!ids.has(id)) { state.payLs[id](); delete state.payLs[id]; delete state.pays[id]; } });
+  state.jamiyat.forEach(j => {
+    if (state.payLs[j.id]) return;
+    const col = db.collection('jamiyat').doc(j.id).collection('payments');
+    const q = j.creatorUid === uid ? col : col.where('uid', '==', uid);
+    state.payLs[j.id] = q.onSnapshot(s => {
+      state.pays[j.id] = s.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (state.view === 'home') render();
+    }, () => {});
+  });
+}
+function runAfterOpen() {
+  const a = state.afterOpen;
+  if (!a || a.id !== state.activeId || !state.j || !state.gotM || !state.gotP) return;
+  state.afterOpen = null;
+  if (a.act === 'wa-remind') openWaReminders();
+}
+function homeAlerts() {
+  const uid = state.user.uid, out = [], today = new Date(); today.setHours(0, 0, 0, 0);
+  const diff = d => Math.round((d - today) / DAY_MS), SOON = 5;
+  const when = n => n < 0 ? `متأخر ${-n} ${-n === 1 ? 'يوم' : 'أيام'}` : n === 0 ? 'آخر موعد اليوم' : n === 1 ? 'آخر موعد غداً' : `آخر موعد بعد ${n} أيام`;
+  state.jamiyat.forEach(j => {
+    const pays = state.pays[j.id]; if (!pays || !j.startDate) return;
+    const idx = monthIdx(j); if (idx < 0 || idx >= j.count) return;
+    const cur = idx, turns = j.turns || [], recUid = turns[cur];
+    const due = dayIn(j, cur, j.lastDay), left = diff(due), payoutLeft = diff(dayIn(j, cur, j.payDay));
+    const owes = u => u !== recUid && ['unpaid', 'partial'].includes(accountFor(j, turns, cur, true, pays, u).status);
+    // 1) قسطي أنا
+    if (turns.includes(uid) && owes(uid)) {
+      const mine = accountFor(j, turns, cur, true, pays, uid);
+      const prev = cur > 0 ? accountFor(j, turns, cur - 1, true, pays, uid) : null;
+      const late = (prev && ['unpaid', 'partial'].includes(prev.status)) || left < 0;
+      if (late || left <= SOON) out.push({ lvl: late ? 0 : 1, id: j.id, title: `قسط جمعية «${j.name}»`,
+        text: `المتبقي عليك ${fmtNum(mine.remaining)} ريال — ${late ? 'متأخر، سدّد في أقرب وقت' : when(left)} (${fmtDate(due)})` });
+    }
+    // 2) المشرف: أعضاء لم يسددوا
+    if (j.creatorUid === uid && (left <= SOON)) {
+      const n = turns.filter(u => u !== uid && owes(u)).length;
+      if (n > 0) out.push({ lvl: left < 0 ? 0 : 1, id: j.id, remind: true, title: `جمعية «${j.name}»`,
+        text: `${n} ${n === 1 ? 'عضو لم يسدد' : 'أعضاء لم يسددوا'} بعد — ${when(left)} (${fmtDate(due)})` });
+    }
+    // 3) دوري في القبض قريباً
+    if (recUid === uid && payoutLeft >= 0 && payoutLeft <= 7)
+      out.push({ lvl: 2, id: j.id, title: `دورك في القبض 🎉`, text: `جمعية «${j.name}» — ${payoutLeft === 0 ? 'اليوم' : payoutLeft === 1 ? 'غداً' : `بعد ${payoutLeft} أيام`} (${fmtDate(dayIn(j, cur, j.payDay))})` });
+  });
+  return out.sort((a, b) => a.lvl - b.lvl);
+}
+function alertsHtml() {
+  const st = [['bg-rose-50 border-rose-200', 'fa-triangle-exclamation text-rose-500'], ['bg-amber-50 border-amber-200', 'fa-clock text-amber-500'], ['bg-indigo-50 border-indigo-200', 'fa-gift text-indigo-500']];
+  const items = homeAlerts().map(a => `<div class="p-4 ${st[a.lvl][0]} border rounded-2xl flex flex-wrap justify-between items-center gap-3 text-xs">
+      <div class="min-w-0"><p class="font-bold text-sm"><i class="fa-solid ${st[a.lvl][1]}"></i> ${esc(a.title)}</p><p class="text-slate-600 mt-0.5">${esc(a.text)}</p></div>
+      <div class="flex gap-2"><button class="btn b-sec" data-act="open" data-id="${esc(a.id)}">فتح</button>${a.remind ? `<button class="btn bg-emerald-50 text-emerald-700" data-act="alert-remind" data-id="${esc(a.id)}"><i class="fa-brands fa-whatsapp"></i> تذكير</button>` : ''}</div></div>`).join('');
+  return items ? `<div class="space-y-2"><h3 class="font-black text-sm"><i class="fa-solid fa-bell text-rose-500"></i> تنبيهات</h3>${items}</div>` : '';
+}
+
+// ملف تقويم (.ics): مواعيد السداد ويوم القبض لعضو محدد، مع تنبيه قبلها بيوم وصباح اليوم نفسه
+const icsEsc = t => String(t).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+const icsDate = d => d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+function icsFold(line) {
+  const enc = new TextEncoder(); let out = '', cur = '', bytes = 0, first = true;
+  for (const ch of line) {
+    const b = enc.encode(ch).length;
+    if (bytes + b > (first ? 74 : 73)) { out += cur + '\r\n '; cur = ''; bytes = 0; first = false; }
+    cur += ch; bytes += b;
+  }
+  return out + cur;
+}
+function buildIcs(j, uid) {
+  const turns = j.turns || [], my = turns.indexOf(uid); if (my < 0) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const ev = [];
+  const add = (k, kind, day, title, desc) => {
+    if (day < today) return;
+    const end = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+    const alarm = trig => ['BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsEsc(title)}`, `TRIGGER:${trig}`, 'END:VALARM'];
+    ev.push(...['BEGIN:VEVENT', `UID:${j.id}-${k}-${kind}@jamiya`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${icsDate(day)}`, `DTEND;VALUE=DATE:${icsDate(end)}`,
+      `SUMMARY:${icsEsc(title)}`, `DESCRIPTION:${icsEsc(desc)}`, 'TRANSP:TRANSPARENT', ...alarm('-PT15H'), ...alarm('PT8H'), 'END:VEVENT']);
+  };
+  for (let k = 0; k < j.count; k++) {
+    if (k === my) add(k, 'recv', dayIn(j, k, j.payDay), `يوم قبضك في جمعية «${j.name}»`, `دورك في القبض — ${periodLabel(j, k)}`);
+    else add(k, 'pay', dayIn(j, k, j.lastDay), `آخر موعد لسداد قسط «${j.name}»`, `القسط ${j.amount} ريال — ${periodLabel(j, k)}`);
+  }
+  if (!ev.length) return null;
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Jamiya//AR//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', `X-WR-CALNAME:${icsEsc('جمعية ' + j.name)}`, ...ev, 'END:VCALENDAR']
+    .map(icsFold).join('\r\n') + '\r\n';
+}
+function addToCalendar() {
+  const c = ctx(); if (!c) return;
+  const ics = buildIcs(c.j, state.user.uid);
+  if (!ics) return toast('لا توجد مواعيد قادمة لإضافتها', 'info');
+  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+  const a = document.createElement('a'); a.href = url; a.download = `jamiya-${c.j.id}.ics`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast('تم تجهيز ملف التقويم، افتحه لإضافة المواعيد. إن تغيّر ترتيب القبض أعد التصدير (لن تتكرر المواعيد)', 'info');
+}
+
 function openJamiya(id) {
-  cleanup(state.jUnsubs); state.jInviteSub = false;
+  cleanup(state.jUnsubs); state.jInviteSub = false; state.gotM = state.gotP = false;
+  if (state.afterOpen && state.afterOpen.id !== id) state.afterOpen = null;
   state.activeId = id; state.j = null; state.members = {}; state.payments = []; state.jInvites = [];
   state.view = 'jamiya'; render();
   const ref = db.collection('jamiyat').doc(id);
@@ -531,8 +635,8 @@ function openJamiya(id) {
       state.j = { id: s.id, ...s.data() };
       if (state.j.creatorUid === state.user.uid && !state.jInviteSub) subscribeInvites(id);
       render(); }, e => toast(e.message, 'error')),
-    ref.collection('members').onSnapshot(s => { state.members = {}; s.docs.forEach(d => state.members[d.id] = d.data()); if (state.view === 'jamiya') render(); }),
-    ref.collection('payments').onSnapshot(s => { state.payments = s.docs.map(d => ({ id: d.id, ...d.data() })); if (state.view === 'jamiya') render(); })
+    ref.collection('members').onSnapshot(s => { state.members = {}; s.docs.forEach(d => state.members[d.id] = d.data()); state.gotM = true; if (state.view === 'jamiya') render(); runAfterOpen(); }),
+    ref.collection('payments').onSnapshot(s => { state.payments = s.docs.map(d => ({ id: d.id, ...d.data() })); state.gotP = true; if (state.view === 'jamiya') render(); runAfterOpen(); })
   );
 }
 function subscribeInvites(id) {
@@ -886,6 +990,7 @@ function vHome() {
       <div class="flex flex-wrap items-center gap-3 mt-4"><div class="stat"><p class="text-[11px] text-emerald-50">جمعياتي</p><b class="text-lg">${state.jamiyat.length}</b></div>
       <div class="stat"><p class="text-[11px] text-emerald-50">دعوات</p><b class="text-lg">${state.invites.length}</b></div>
       <button class="btn b-white mr-auto" data-act="go-create"><i class="fa-solid fa-circle-plus"></i> جمعية جديدة</button></div></div>
+    ${alertsHtml()}
     ${inv ? `<div class="space-y-2"><h3 class="font-black text-sm"><i class="fa-solid fa-envelope-open-text text-amber-500"></i> دعوات بانتظارك</h3>${inv}</div>` : ''}
     <div class="space-y-2.5"><h3 class="font-black text-sm">جمعياتك</h3>${js || '<div class="card p-8 text-center text-xs text-slate-400"><i class="fa-regular fa-folder-open text-3xl mb-2 block"></i>لا توجد جمعيات بعد. أنشئ جمعيتك الأولى أو انتظر دعوة.</div>'}</div></div>`;
 }
@@ -968,6 +1073,7 @@ function vJamiya() {
       <p class="text-xs text-slate-500 mt-1">${freqOf(j).label} • القسط ${money(j.amount)} • السداد حتى يوم ${j.lastDay}${freqOf(j).days ? ' من الدورة' : ''} • الصرف يوم ${j.payDay}${freqOf(j).days ? ' من الدورة' : ''} • تبدأ ${fmtDate(new Date(j.startDate + 'T00:00:00'))}</p></div>
       <div class="chips w-full md:w-auto md:flex-wrap">
         ${c.isCreator ? `<button class="btn b-pri" data-act="invite-modal"><i class="fa-solid fa-user-plus"></i> دعوة عضو</button><button class="btn b-sec" data-act="remind"><i class="fa-solid fa-bell"></i> تذكير بالبريد</button><button class="btn bg-emerald-50 text-emerald-700" data-act="wa-remind"><i class="fa-brands fa-whatsapp"></i> تذكير واتساب</button><button class="btn b-sec" data-act="edit-modal"><i class="fa-solid fa-gear"></i> تعديل</button><button class="btn b-red" data-act="delete-modal"><i class="fa-solid fa-trash"></i> حذف</button>` : ''}
+        <button class="btn b-sec" data-act="add-cal"><i class="fa-solid fa-calendar-plus"></i> أضف للتقويم</button>
         <button class="btn b-sec" data-act="mod-modal"><i class="fa-solid fa-pen-to-square"></i> اقتراح تعديل</button></div></div>
     ${modBox}${recBox}
     <div class="grid md:grid-cols-3 gap-5">
@@ -1139,6 +1245,8 @@ const actions = {
   'remind': remindUnpaid,
   'resend': (el) => { const i = state.jInvites.find(x => x.id === el.dataset.id); if (i) showInviteShare({ ...i, amount: state.j.amount }); },
   'mail-invite': () => sendInviteMail(state.lastInvite),
+  'add-cal': addToCalendar,
+  'alert-remind': (el) => { state.afterOpen = { id: el.dataset.id, act: 'wa-remind' }; openJamiya(el.dataset.id); },
   'cancel-inv': (el) => db.collection('invites').doc(el.dataset.id).delete().then(() => toast('أُلغيت الدعوة', 'info')).catch(e => toast(e.message, 'error')),
   'order-modal': openOrderModal,
   'wa-remind': openWaReminders, 'share-app': shareApp,
