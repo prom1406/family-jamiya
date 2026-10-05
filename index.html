@@ -119,6 +119,40 @@ textarea.inp{min-height:96px}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 #print-root{display:none}
 @media print{body>*:not(#print-root){display:none!important}#print-root{display:block!important}@page{margin:12mm}}
+
+/* ===== ثيم عصري: ألوان هادئة وأزرار وبطاقات أنعم ===== */
+:root{--brand:#0f9d8f;--brand-2:#10b981;--accent:#6366f1;--tab-h:80px;--bg:#f4f8f8}
+body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,transparent 62%),radial-gradient(640px 340px at -8% 4%,rgba(165,180,252,.30) 0,transparent 58%),var(--bg);background-attachment:fixed}
+.app-header{background:rgba(255,255,255,.72);border-bottom:1px solid rgba(255,255,255,.6);box-shadow:0 8px 28px -20px rgba(15,23,42,.35)}
+.app-header .logo{border-radius:14px;box-shadow:0 6px 16px -6px rgba(15,157,143,.55)}
+.card{border:1px solid rgba(255,255,255,.8);border-radius:1.6rem;background:rgba(255,255,255,.86);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 1px 1px rgba(15,23,42,.03),0 14px 34px -18px rgba(15,60,70,.28)}
+.inp{border-radius:1.1rem;border:1.5px solid #e3ebee;background:rgba(248,251,251,.9)}
+.inp:focus{border-color:var(--brand);box-shadow:0 0 0 4px rgba(15,157,143,.16)}
+.btn{border-radius:999px;min-height:44px;padding:.55rem 1.15rem;letter-spacing:.1px}
+.b-pri{background:linear-gradient(135deg,#14b8a6 0%,#0f9d8f 45%,#10b981 100%);box-shadow:0 10px 22px -10px rgba(15,157,143,.75),inset 0 1px 0 rgba(255,255,255,.28)}
+.b-pri:hover{filter:brightness(1.05)}
+.b-sec{background:rgba(255,255,255,.85);color:#1e4e57;border:1px solid #dbe8ea;box-shadow:0 4px 12px -8px rgba(15,60,70,.3)}.b-sec:hover{background:#fff;border-color:#bcd6da}
+.b-red{background:#fff1f3;color:#e11d48;border:1px solid #ffd5dc}
+.b-white{box-shadow:0 10px 22px -12px rgba(0,0,0,.4)}
+.hero{border-radius:1.9rem;background:linear-gradient(135deg,#0f766e 0%,#0f9d8f 42%,#14b8c4 100%);box-shadow:0 22px 44px -22px rgba(15,157,143,.8)}
+.hero::before{background:rgba(255,255,255,.13)}.hero::after{background:rgba(129,140,248,.35)}
+.stat{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);border-radius:1.15rem;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.jcard{border:1px solid rgba(255,255,255,.85);border-radius:1.5rem;background:rgba(255,255,255,.9);box-shadow:0 14px 30px -20px rgba(15,60,70,.4);animation:fade .4s cubic-bezier(.2,.8,.2,1) both}
+.jcard:hover{transform:translateY(-2px);box-shadow:0 18px 36px -18px rgba(15,60,70,.45)}
+.jcard:nth-child(2){animation-delay:.05s}.jcard:nth-child(3){animation-delay:.1s}.jcard:nth-child(4){animation-delay:.15s}
+.jicon{border-radius:16px;box-shadow:0 8px 16px -8px rgba(15,157,143,.6)}
+.jcard:nth-child(4n+2) .jicon{background:linear-gradient(135deg,#818cf8,#6366f1);box-shadow:0 8px 16px -8px rgba(99,102,241,.6)}
+.jcard:nth-child(4n+3) .jicon{background:linear-gradient(135deg,#fbbf24,#f59e0b);box-shadow:0 8px 16px -8px rgba(245,158,11,.6)}
+.jcard:nth-child(4n+4) .jicon{background:linear-gradient(135deg,#fb7185,#e11d48);box-shadow:0 8px 16px -8px rgba(225,29,72,.55)}
+.bar{height:8px;background:#e4edf0}.bar>i{background:linear-gradient(90deg,#14b8a6,#10b981)}
+.tabbar{left:12px;right:12px;bottom:calc(var(--sab) + 10px);height:66px;padding-bottom:0;border-radius:26px;background:rgba(255,255,255,.88);border:1px solid rgba(255,255,255,.9);box-shadow:0 18px 40px -14px rgba(15,60,70,.45)}
+.tab{color:#7a8c92;z-index:0}
+.tab.on{color:var(--brand)}
+.tab.on::before{top:8px;width:54px;height:32px;border-radius:99px;background:rgba(15,157,143,.14);z-index:-1}
+.sheet{border-radius:1.9rem}
+@media(max-width:639px){.sheet{border-radius:1.9rem 1.9rem 0 0}.sheet::before{background:#d3dfe2}}
+.toast{border-radius:1.2rem}.toast.success{background:linear-gradient(135deg,#0f9d8f,#10b981)}.toast.info{background:#223641}
+.ibar{border-radius:1.5rem;background:linear-gradient(135deg,#0f2f3a,#16424a)}
 </style>
 </head>
 <body class="text-slate-800 antialiased">
@@ -134,7 +168,7 @@ textarea.inp{min-height:96px}
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.1</footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2</footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
