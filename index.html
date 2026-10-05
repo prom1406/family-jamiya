@@ -7,18 +7,18 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="الجمعية">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="application-name" content="الجمعية الصغيرة">
+<meta name="application-name" content="الجمعية الذكية">
 <meta name="format-detection" content="telephone=no">
-<title>الجمعية الصغيرة</title>
+<title>الجمعية الذكية</title>
 <meta name="theme-color" content="#0d9488">
-<meta name="description" content="الجمعية الصغيرة — منصة الجمعيات العائلية الذكية">
+<meta name="description" content="الجمعية الذكية — منصة الجمعيات العائلية">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="الجمعية الصغيرة">
-<meta property="og:title" content="الجمعية الصغيرة — منصة الجمعيات العائلية الذكية">
+<meta property="og:site_name" content="الجمعية الذكية">
+<meta property="og:title" content="الجمعية الذكية — منصة الجمعيات العائلية">
 <meta property="og:description" content="أدر جمعيتك العائلية: دعوات، ترتيب القبض، متابعة السداد والتنبيهات.">
 <meta property="og:image" content="https://prom1406.github.io/family-jamiya/icon-512.png">
 <meta property="og:url" content="https://prom1406.github.io/family-jamiya/">
@@ -117,6 +117,8 @@ textarea.inp{min-height:96px}
   body [class*="text-[10px]"]{font-size:.7rem}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+#print-root{display:none}
+@media print{body>*:not(#print-root){display:none!important}#print-root{display:block!important}@page{margin:12mm}}
 </style>
 </head>
 <body class="text-slate-800 antialiased">
@@ -124,15 +126,15 @@ textarea.inp{min-height:96px}
 <header class="app-header">
   <div class="max-w-4xl mx-auto px-4 h-14 flex justify-between items-center gap-2">
     <div class="flex items-center gap-2.5 cursor-pointer min-w-0" data-act="go-home">
-      <img src="icon-192.png" alt="شعار الجمعية الصغيرة" width="38" height="38" class="logo">
-      <div class="leading-tight min-w-0"><h1 class="font-black text-[15px] text-slate-900">الجمعية الصغيرة</h1><p class="text-[11px] text-slate-500 truncate max-w-[9.5rem] sm:max-w-xs" id="hdrSub">منصة التعاون العائلي</p></div>
+      <img src="icon-192.png" alt="شعار الجمعية الذكية" width="38" height="38" class="logo">
+      <div class="leading-tight min-w-0"><h1 class="font-black text-[15px] text-slate-900">الجمعية الذكية</h1><p class="text-[11px] text-slate-500 truncate max-w-[9.5rem] sm:max-w-xs" id="hdrSub">منصة التعاون العائلي</p></div>
     </div>
     <div class="flex items-center gap-1.5" id="nav"></div>
   </div>
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الصغيرة • الإصدار 1.0</footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.1</footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -154,6 +156,10 @@ const EMAILJS_TEMPLATE_ID = "template_mr4lkca";
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth(), db = firebase.firestore();
+// ذاكرة محلية: عند إعادة فتح التطبيق تُحتسب التغييرات فقط بدل إعادة قراءة كل المستندات.
+// ضعها false إن كان الجهاز مشتركاً بين عدة أشخاص.
+const OFFLINE_CACHE = true;
+if (OFFLINE_CACHE) db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
 const OWNER_EMAIL = "mamydady87@gmail.com"; // بريد المالك: لا توجد كلمة مرور هنا، الهوية تُتحقق من Firebase
 const FV = firebase.firestore.FieldValue;
 emailjs.init(EMAILJS_PUBLIC_KEY);
@@ -210,7 +216,7 @@ function authErr(e) {
   return m[e.code] || e.message;
 }
 async function sendMail(to, name, subject, message) {
-  return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, { to_email: to, to_name: name, subject, message, app_url: shareUrl(), app_name: 'الجمعية الصغيرة' });
+  return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, { to_email: to, to_name: name, subject, message, app_url: shareUrl(), app_name: 'الجمعية الذكية' });
 }
 function mailErrHint(e) {
   const raw = String((e && (e.text || e.message)) || e || 'خطأ غير معروف');
@@ -226,10 +232,10 @@ function mailErrHint(e) {
 }
 /* ===== رابط التطبيق في الرسائل =====
    APP_URL: الرابط الكامل (يُستخدم لروابط التحقق وإعادة تعيين كلمة المرور، ويجب أن يكون دومينه مصرّحاً في Firebase).
-   APP_SHORT_URL: ضع هنا رابطاً مختصراً (مثل https://tinyurl.com/jamiyah) ليظهر في الرسائل بدل الطويل، أو اتركه فارغاً.
+   APP_SHORT_URL: الرابط المختصر الذي يظهر في الرسائل بدل الطويل (اتركه فارغاً لاستخدام الرابط الكامل).
    EMAIL_LINK_IN_TEMPLATE: اجعله true بعد أن تضيف زر الرابط داخل قالب EmailJS (انظر README) فيُحذف الرابط الطويل من نص البريد. */
 const APP_URL = "https://prom1406.github.io/family-jamiya/";
-const APP_SHORT_URL = ""; // اتركه فارغاً: الرابط المباشر هو الذي يفتحه التطبيق المثبّت تلقائياً على أندرويد (الرابط المختصر يمر عبر موقع آخر فيفتح في المتصفح)
+const APP_SHORT_URL = "https://tinyurl.com/5ex2hs7w"; // الرابط المختصر المستخدم في رسائل الواتساب والبريد والمشاركة (روابط التحقق وإعادة التعيين تبقى بالرابط الكامل)
 const EMAIL_LINK_IN_TEMPLATE = false;
 const appUrl = () => APP_URL;
 const shareUrl = () => APP_SHORT_URL || APP_URL;
@@ -526,10 +532,16 @@ async function handleCreate(f) {
 function stopPayListeners() { Object.values(state.payLs).forEach(u => u()); state.payLs = {}; }
 // مشرف الجمعية يقرأ كل دفعاتها، والعضو يقرأ دفعاته فقط (أقل استهلاكاً للحصة المجانية)
 function syncPayListeners() {
-  const uid = state.user.uid, ids = new Set(state.jamiyat.map(j => j.id));
-  Object.keys(state.payLs).forEach(id => { if (!ids.has(id)) { state.payLs[id](); delete state.payLs[id]; delete state.pays[id]; } });
+  if (!state.user) return;
+  const uid = state.user.uid, want = new Set();
+  // فقط الجمعيات الجارية (بدأت ولم تنتهِ) وغير المفتوحة الآن (المفتوحة لها مستمع خاص بها)
   state.jamiyat.forEach(j => {
-    if (state.payLs[j.id]) return;
+    const idx = j.startDate ? monthIdx(j) : -1;
+    if (idx >= 0 && idx < j.count && !(state.view === 'jamiya' && state.activeId === j.id)) want.add(j.id);
+  });
+  Object.keys(state.payLs).forEach(id => { if (!want.has(id)) { state.payLs[id](); delete state.payLs[id]; } });
+  state.jamiyat.forEach(j => {
+    if (!want.has(j.id) || state.payLs[j.id]) return;
     const col = db.collection('jamiyat').doc(j.id).collection('payments');
     const q = j.creatorUid === uid ? col : col.where('uid', '==', uid);
     state.payLs[j.id] = q.onSnapshot(s => {
@@ -538,6 +550,7 @@ function syncPayListeners() {
     }, () => {});
   });
 }
+document.addEventListener('visibilitychange', () => { if (!document.hidden && state.view === 'home') render(); });
 function runAfterOpen() {
   const a = state.afterOpen;
   if (!a || a.id !== state.activeId || !state.j || !state.gotM || !state.gotP) return;
@@ -624,6 +637,67 @@ function addToCalendar() {
   toast('تم تجهيز ملف التقويم، افتحه لإضافة المواعيد. إن تغيّر ترتيب القبض أعد التصدير (لن تتكرر المواعيد)', 'info');
 }
 
+/* ============ تصدير كشف الجمعية (Excel / PDF) ============ */
+function statementData() {
+  const c = ctx(); if (!c) return null;
+  const j = c.j, st = { recipient: 'المستلم', confirmed: 'تم السداد', pending: 'بانتظار التأكيد', partial: 'سداد جزئي', unpaid: 'لم يسدد', wait: 'لم تبدأ' };
+  const nameOf = u => (state.members[u] && state.members[u].name) || '—';
+  const summary = c.turns.map((u, i) => { const a = c.acct[u] || {};
+    return { order: i + 1, name: nameOf(u), turn: periodLabel(j, i), owed: a.owed || 0, confirmed: a.confirmed || 0, pending: a.pending || 0, remaining: a.remaining || 0, credit: a.credit || 0, status: st[payStatus(c, u)] || '' }; });
+  const toD = p => { const t = p.createdAt && p.createdAt.toDate ? p.createdAt.toDate() : null; return t; };
+  const pays = [...state.payments].sort((a, b) => (a.month - b.month) || String(a.id).localeCompare(String(b.id)))
+    .map(p => ({ name: p.name || nameOf(p.uid), cycle: periodLabel(j, p.month), amount: Number(p.amount) || 0, status: p.status === 'confirmed' ? 'مؤكدة' : 'بانتظار التأكيد', ref: p.ref || '', date: toD(p) }));
+  const sum = k => r2(summary.reduce((t, r) => t + r[k], 0));
+  return { c, j, summary, pays, totals: { owed: sum('owed'), confirmed: sum('confirmed'), pending: sum('pending'), remaining: sum('remaining') },
+    cycle: c.finished ? 'اكتملت الجمعية' : !c.started ? 'لم تبدأ بعد' : `الدورة الحالية: ${periodLabel(j, c.cur)} — المستلم: ${c.rec ? c.rec.name : '—'}` };
+}
+const csvCell = v => { let t = String(v ?? ''); if (/^[=+\-@\t\r]/.test(t) && isNaN(Number(t))) t = "'" + t; return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+const isoDay = d => d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') : '';
+function buildStatementCsv(d) {
+  const j = d.j, rows = [
+    ['كشف جمعية', j.name], ['التكرار', freqOf(j).label], ['القسط (ريال)', j.amount], ['عدد الأعضاء', j.count], ['تاريخ الكشف', isoDay(new Date())], [d.cycle], [],
+    ['ملخص الأعضاء'], ['الترتيب', 'الاسم', 'دورة القبض', 'المستحق', 'المؤكد', 'بانتظار التأكيد', 'المتبقي', 'رصيد مقدّم', 'الحالة'],
+    ...d.summary.map(r => [r.order, r.name, r.turn, r.owed, r.confirmed, r.pending, r.remaining, r.credit, r.status]),
+    ['الإجمالي', '', '', d.totals.owed, d.totals.confirmed, d.totals.pending, d.totals.remaining, '', ''], [],
+    ['الدفعات'], ['العضو', 'الدورة', 'المبلغ', 'الحالة', 'المرجع', 'التاريخ'],
+    ...d.pays.map(p => [p.name, p.cycle, p.amount, p.status, p.ref, isoDay(p.date)])
+  ];
+  return '\ufeff' + rows.map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
+}
+function downloadFile(name, text, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+function exportCsv() {
+  const d = statementData(); if (!d) return;
+  downloadFile(`kashf-${d.j.id}.csv`, buildStatementCsv(d), 'text/csv;charset=utf-8');
+  closeModal(); toast('تم تجهيز ملف Excel (CSV)');
+}
+function exportPrint() {
+  const d = statementData(); if (!d) return;
+  const th = 'border:1px solid #cbd5e1;background:#f1f5f9;padding:6px;font-size:12px;text-align:right', td = 'border:1px solid #cbd5e1;padding:6px;font-size:12px;text-align:right';
+  const tbl = (head, rows) => `<table style="width:100%;border-collapse:collapse;margin:8px 0 16px"><thead><tr>${head.map(h => `<th style="${th}">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr style="page-break-inside:avoid">${r.map(x => `<td style="${td}">${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  document.getElementById('print-root').innerHTML = `<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;color:#0f172a;padding:8px">
+    <h1 style="font-size:22px;margin:0">كشف جمعية «${esc(d.j.name)}»</h1>
+    <p style="font-size:12px;color:#475569;margin:6px 0">${freqOf(d.j).label} • القسط ${fmtNum(d.j.amount)} ريال • ${d.j.count} أعضاء • تاريخ الكشف ${fmtDate(new Date())}</p>
+    <p style="font-size:13px;font-weight:bold;margin:4px 0 12px">${esc(d.cycle)}</p>
+    <h2 style="font-size:15px;margin:0">ملخص الأعضاء</h2>
+    ${tbl(['#', 'الاسم', 'دورة القبض', 'المستحق', 'المؤكد', 'بانتظار التأكيد', 'المتبقي', 'الحالة'],
+      [...d.summary.map(r => [r.order, r.name, r.turn, fmtNum(r.owed), fmtNum(r.confirmed), fmtNum(r.pending), fmtNum(r.remaining), r.status]),
+       ['', 'الإجمالي', '', fmtNum(d.totals.owed), fmtNum(d.totals.confirmed), fmtNum(d.totals.pending), fmtNum(d.totals.remaining), '']])}
+    <h2 style="font-size:15px;margin:0">الدفعات</h2>
+    ${d.pays.length ? tbl(['العضو', 'الدورة', 'المبلغ', 'الحالة', 'المرجع', 'التاريخ'], d.pays.map(p => [p.name, p.cycle, fmtNum(p.amount), p.status, p.ref, p.date ? fmtDate(p.date) : ''])) : '<p style="font-size:12px;color:#64748b">لا توجد دفعات مسجّلة.</p>'}
+    <p style="font-size:10px;color:#94a3b8;margin-top:16px">صدر من تطبيق الجمعية الذكية. لا يتضمن الكشف أرقام الحسابات أو الجوالات.</p></div>`;
+  closeModal(); setTimeout(() => window.print(), 200);
+}
+function openExportModal() {
+  showModal('تصدير كشف الجمعية', `<div class="space-y-2">
+    <button class="btn b-pri w-full py-3" data-act="export-csv"><i class="fa-solid fa-file-excel"></i> ملف Excel (CSV)</button>
+    <button class="btn b-sec w-full py-3" data-act="export-print"><i class="fa-solid fa-file-pdf"></i> PDF / طباعة</button>
+    <p class="text-[11px] text-slate-500 leading-relaxed">في نافذة الطباعة اختر «حفظ كـ PDF». الكشف يشمل الأعضاء والمستحقات والدفعات، ولا يتضمن أرقام الحسابات ولا الجوالات.</p></div>`);
+}
+
 function openJamiya(id) {
   cleanup(state.jUnsubs); state.jInviteSub = false; state.gotM = state.gotP = false;
   if (state.afterOpen && state.afterOpen.id !== id) state.afterOpen = null;
@@ -636,7 +710,7 @@ function openJamiya(id) {
       if (state.j.creatorUid === state.user.uid && !state.jInviteSub) subscribeInvites(id);
       render(); }, e => toast(e.message, 'error')),
     ref.collection('members').onSnapshot(s => { state.members = {}; s.docs.forEach(d => state.members[d.id] = d.data()); state.gotM = true; if (state.view === 'jamiya') render(); runAfterOpen(); }),
-    ref.collection('payments').onSnapshot(s => { state.payments = s.docs.map(d => ({ id: d.id, ...d.data() })); state.gotP = true; if (state.view === 'jamiya') render(); runAfterOpen(); })
+    ref.collection('payments').onSnapshot(s => { state.payments = s.docs.map(d => ({ id: d.id, ...d.data() })); state.gotP = true; state.pays[id] = state.payments; if (state.view === 'jamiya') render(); runAfterOpen(); })
   );
 }
 function subscribeInvites(id) {
@@ -679,9 +753,10 @@ function compressImage(file) {
         const cv = document.createElement('canvas');
         cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
         const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0, cv.width, cv.height);
-        for (const q of [0.75, 0.6, 0.45]) {
+        const limit = attempt < 2 ? 220000 : 600000; // الهدف إيصال أقل من ~220KB، ثم نتساهل إن لزم
+        for (const q of [0.72, 0.58, 0.45]) {
           const out = cv.toDataURL('image/jpeg', q);
-          if (out.length < 600000) return resolve(out);
+          if (out.length < limit) return resolve(out);
         }
         scale *= 0.75;
       }
@@ -868,9 +943,9 @@ function openWaReminders() {
     <p class="text-[11px] text-slate-500">يفتح الزر محادثة واتساب جاهزة بالرسالة، وتضغط إرسال بنفسك.</p>`);
 }
 async function shareApp() {
-  const text = 'الجمعية الصغيرة — منصة الجمعيات العائلية الذكية: أدر جمعيتك العائلية، تابع السداد وترتيب القبض بسهولة.';
+  const text = 'الجمعية الذكية — منصة الجمعيات العائلية: أدر جمعيتك العائلية، تابع السداد وترتيب القبض بسهولة.';
   if (navigator.share) {
-    try { await navigator.share({ title: 'الجمعية الصغيرة', text, url: shareUrl() }); return; }
+    try { await navigator.share({ title: 'الجمعية الذكية', text, url: shareUrl() }); return; }
     catch (e) { if (e && e.name === 'AbortError') return; }
   }
   state.shareText = `${text}\n${shareUrl()}`;
@@ -882,7 +957,7 @@ async function shareApp() {
 }
 
 async function testMail() {
-  try { await sendMail(state.user.email, state.profile.name, 'اختبار البريد - الجمعية الصغيرة', 'هذه رسالة اختبار. إذا وصلتك فإعدادات EmailJS سليمة.'); toast('✉️ أُرسلت رسالة الاختبار إلى بريدك، تحقق من الوارد والمزعج'); }
+  try { await sendMail(state.user.email, state.profile.name, 'اختبار البريد - الجمعية الذكية', 'هذه رسالة اختبار. إذا وصلتك فإعدادات EmailJS سليمة.'); toast('✉️ أُرسلت رسالة الاختبار إلى بريدك، تحقق من الوارد والمزعج'); }
   catch (e) { const { raw, hint } = mailErrHint(e); showModal('فشل إرسال رسالة الاختبار', `<div class="space-y-3 text-xs"><div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800" dir="ltr">${esc(raw)}</div>${hint ? `<div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">${esc(hint)}</div>` : ''}</div>`); }
 }
 
@@ -897,6 +972,7 @@ async function loadAdmin() {
 
 /* ============ الواجهات ============ */
 function render() {
+  syncPayListeners();
   renderNav();
   const v = state.view, app = $('app');
   const views = { loading: vLoading, auth: vAuth, verify: vVerify, complete: vComplete, home: vHome, create: vCreate, jamiya: vJamiya, profile: vProfile, admin: vAdmin };
@@ -908,7 +984,7 @@ function renderNav() {
   const canInst = !isStandalone() && (deferredPrompt || isIOS());
   const instBtn = canInst ? '<button class="btn b-pri" data-act="install-app" aria-label="تثبيت التطبيق"><i class="fa-solid fa-download"></i><span class="hidden sm:inline"> تثبيت</span></button>' : '';
   const shareBtn = '<button class="btn b-sec" data-act="share-app" aria-label="مشاركة التطبيق"><i class="fa-solid fa-share-nodes"></i><span class="hidden sm:inline"> مشاركة</span></button>';
-  if (!state.user || !state.profile) { nav.innerHTML = instBtn + shareBtn; sub.textContent = 'منصة الجمعيات العائلية الذكية'; tb.classList.add('hide'); return; }
+  if (!state.user || !state.profile) { nav.innerHTML = instBtn + shareBtn; sub.textContent = 'منصة الجمعيات العائلية'; tb.classList.add('hide'); return; }
   sub.textContent = state.profile.name;
   nav.innerHTML = `${instBtn}${shareBtn}<div class="dnav">${state.isAdmin ? '<button class="btn b-pri" data-act="go-admin"><i class="fa-solid fa-shield-halved"></i> لوحة المالك</button>' : ''}
     <button class="btn b-sec" data-act="go-home"><i class="fa-solid fa-house"></i> جمعياتي</button>
@@ -940,7 +1016,7 @@ function vAuth() {
   const m = state.authMode;
   const title = { login: 'تسجيل الدخول', register: 'إنشاء حساب جديد', reset: 'استعادة كلمة المرور' }[m];
   return `<div class="max-w-md mx-auto card p-8">
-    <div class="text-center mb-6"><img src="logo-full.jpg" alt="الجمعية الصغيرة - منصة الجمعيات العائلية الذكية" width="176" height="176" class="w-44 h-44 mx-auto -mt-2 mb-1 object-contain">
+    <div class="text-center mb-6"><img src="logo-full.jpg" alt="الجمعية الذكية - منصة الجمعيات العائلية" width="176" height="176" class="w-44 h-44 mx-auto -mt-2 mb-1 object-contain">
     <h2 class="text-xl font-black">${title}</h2></div>
     ${m !== 'reset' ? `<button data-act="google" class="w-full mb-4 py-3 border border-slate-200 rounded-xl font-semibold text-sm hover:bg-slate-50 flex items-center justify-center gap-3"><img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="">المتابعة بحساب جوجل</button>
     <div class="flex items-center my-4"><div class="flex-grow border-t"></div><span class="px-3 text-xs text-slate-400">أو بالبريد</span><div class="flex-grow border-t"></div></div>` : ''}
@@ -1073,6 +1149,7 @@ function vJamiya() {
       <p class="text-xs text-slate-500 mt-1">${freqOf(j).label} • القسط ${money(j.amount)} • السداد حتى يوم ${j.lastDay}${freqOf(j).days ? ' من الدورة' : ''} • الصرف يوم ${j.payDay}${freqOf(j).days ? ' من الدورة' : ''} • تبدأ ${fmtDate(new Date(j.startDate + 'T00:00:00'))}</p></div>
       <div class="chips w-full md:w-auto md:flex-wrap">
         ${c.isCreator ? `<button class="btn b-pri" data-act="invite-modal"><i class="fa-solid fa-user-plus"></i> دعوة عضو</button><button class="btn b-sec" data-act="remind"><i class="fa-solid fa-bell"></i> تذكير بالبريد</button><button class="btn bg-emerald-50 text-emerald-700" data-act="wa-remind"><i class="fa-brands fa-whatsapp"></i> تذكير واتساب</button><button class="btn b-sec" data-act="edit-modal"><i class="fa-solid fa-gear"></i> تعديل</button><button class="btn b-red" data-act="delete-modal"><i class="fa-solid fa-trash"></i> حذف</button>` : ''}
+        <button class="btn b-sec" data-act="export-modal"><i class="fa-solid fa-file-export"></i> تصدير الكشف</button>
         <button class="btn b-sec" data-act="add-cal"><i class="fa-solid fa-calendar-plus"></i> أضف للتقويم</button>
         <button class="btn b-sec" data-act="mod-modal"><i class="fa-solid fa-pen-to-square"></i> اقتراح تعديل</button></div></div>
     ${modBox}${recBox}
@@ -1096,7 +1173,7 @@ function vProfile() {
     <form id="f-profile" class="space-y-3"><div><label class="text-xs font-semibold block mb-1">الاسم</label><input name="name" class="inp" value="${esc(p.name)}" required></div>${bankFields(p)}
     <button class="btn b-pri w-full py-3" type="submit">حفظ التعديلات</button></form></div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-mobile-screen-button text-emerald-600"></i> التطبيق</h4>
-      <p class="text-xs text-slate-500 leading-relaxed">${inst ? 'أنت تستخدم التطبيق المثبّت على جهازك ✓' : 'ثبّت الجمعية الصغيرة على شاشتك الرئيسية لتعمل كتطبيق كامل وبسرعة أكبر.'}</p>
+      <p class="text-xs text-slate-500 leading-relaxed">${inst ? 'أنت تستخدم التطبيق المثبّت على جهازك ✓' : 'ثبّت الجمعية الذكية على شاشتك الرئيسية لتعمل كتطبيق كامل وبسرعة أكبر.'}</p>
       <div class="flex flex-wrap gap-2">${inst ? '' : '<button class="btn b-pri" data-act="install-app"><i class="fa-solid fa-download"></i> تثبيت التطبيق</button>'}<button class="btn b-sec" data-act="share-app"><i class="fa-solid fa-share-nodes"></i> مشاركة التطبيق</button></div></div>
     <button class="btn b-red w-full py-3 md:hidden" data-act="logout"><i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج</button></div>`;
 }
@@ -1246,6 +1323,9 @@ const actions = {
   'resend': (el) => { const i = state.jInvites.find(x => x.id === el.dataset.id); if (i) showInviteShare({ ...i, amount: state.j.amount }); },
   'mail-invite': () => sendInviteMail(state.lastInvite),
   'add-cal': addToCalendar,
+  'export-modal': openExportModal,
+  'export-csv': exportCsv,
+  'export-print': exportPrint,
   'alert-remind': (el) => { state.afterOpen = { id: el.dataset.id, act: 'wa-remind' }; openJamiya(el.dataset.id); },
   'cancel-inv': (el) => db.collection('invites').doc(el.dataset.id).delete().then(() => toast('أُلغيت الدعوة', 'info')).catch(e => toast(e.message, 'error')),
   'order-modal': openOrderModal,
@@ -1282,5 +1362,6 @@ document.addEventListener('submit', e => { const fn = forms[e.target.id]; if (fn
 
 render();
 </script>
+<div id="print-root"></div>
 </body>
 </html>
