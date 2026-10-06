@@ -155,6 +155,14 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 .ibar{border-radius:1.5rem;background:linear-gradient(135deg,#0f2f3a,#16424a)}
 .emo{width:40px;height:40px;border-radius:12px;background:#f1f5f9;font-size:1.2rem;border:1.5px solid transparent;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
 .emo.on{border-color:var(--brand);background:#ccfbf1}
+
+.atabs{display:flex;gap:.4rem;overflow-x:auto;padding:.2rem 0 .4rem;scrollbar-width:none}.atabs::-webkit-scrollbar{display:none}
+.achip{flex:none;padding:.5rem .95rem;border-radius:999px;font-size:.75rem;font-weight:800;background:rgba(255,255,255,.9);color:#1e4e57;border:1px solid #dbe8ea;cursor:pointer;font-family:inherit;display:inline-flex;gap:.4rem;align-items:center;white-space:nowrap}
+.achip.on{background:linear-gradient(135deg,#14b8a6,#0f9d8f);color:#fff;border-color:transparent}
+.bar{border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,#14b8a6,#0f9d8f);min-height:2px}.bar.z{background:#e2e8f0}
+.hbar{height:7px;border-radius:99px;background:#e2e8f0;overflow:hidden}.hbar>i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#14b8a6,#10b981)}
+.bdg{display:inline-flex;align-items:center;gap:.25rem;padding:.1rem .5rem;border-radius:99px;font-size:10px;font-weight:800}
+.dot-on{display:inline-block;width:9px;height:9px;border-radius:50%;background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.25)}
 </style>
 </head>
 <body class="text-slate-800 antialiased">
@@ -170,7 +178,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.0</footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 4.0</footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -380,7 +388,7 @@ const needsPay = (c, u) => u !== c.recUid && c.acct[u] && ['unpaid', 'partial'].
 
 /* ============ المصادقة ============ */
 auth.onAuthStateChanged(async user => {
-  cleanup(state.unsubs); cleanup(state.jUnsubs); stopPayListeners(); state.pays = {};
+  cleanup(state.unsubs); cleanup(state.jUnsubs); stopPayListeners(); state.pays = {}; stopBlockWatch(); stopHeartbeat(); state._tv = null;
   state.user = user; state.profile = null; state.isAdmin = false;
   state.jamiyat = []; state.invites = [];
   if (!user) { state.view = 'auth'; return render(); }
@@ -397,7 +405,9 @@ auth.onAuthStateChanged(async user => {
     state.isAdmin = adm.exists || (lc(user.email) === OWNER_EMAIL && user.emailVerified);
   } catch (e) { toast('تعذر تحميل الحساب: ' + e.message, 'error'); }
 
+  if (!state.isAdmin && await isBlockedNow()) return;
   if (!state.profile) { state.view = 'complete'; return render(); }
+  watchBlocked(); trackSession();
   claimPhone(user.uid, state.profile.phone);
   startListeners();
   if (state.isAdmin) { state.view = 'admin'; render(); loadAdmin(); toast('مرحباً بك في لوحة المالك', 'info'); return; }
@@ -445,6 +455,7 @@ function startListeners() {
 }
 
 async function doRegister(f) {
+  if (state.settings.regClosed) return toast(state.settings.regMsg || 'التسجيل الجديد متوقف مؤقتاً', 'error');
   const name = f.name.value.trim(), email = lc(f.email.value), pass = f.password.value;
   const phone = normPhone(f.phone.value), bank = resolveBank(f), iban = fixIban(f.iban.value);
   if (bank === null) return;
@@ -460,6 +471,7 @@ async function doRegister(f) {
     try {
       await cred.user.updateProfile({ displayName: name });
       await saveProfileWithPhone(cred.user.uid, { name, email, phone, bank, iban: bank.startsWith('كاش') ? '' : iban, waOptIn: f.waOptIn.checked, ...idn, avatar: '', createdAt: FV.serverTimestamp() }, 'set', null);
+      incStat({ regs: 1 }); logEvent('register', { name });
     } catch (e) {
       await cred.user.delete().catch(() => {}); // نتراجع عن إنشاء الحساب ليعيد المحاولة برقم آخر
       return toast(phoneSaveErr(e), 'error');
@@ -488,6 +500,7 @@ async function doGoogle() {
   catch (e) { toast(authErr(e), 'error'); }
 }
 async function doCompleteProfile(f) {
+  if (state.settings.regClosed && !state.isAdmin) return toast(state.settings.regMsg || 'التسجيل الجديد متوقف مؤقتاً', 'error');
   const phone = normPhone(f.phone.value), bank = resolveBank(f), iban = fixIban(f.iban.value);
   if (bank === null) return;
   const idn = readIdentity(f), ie = identityErr(idn); if (ie) return toast(ie, 'error');
@@ -497,6 +510,7 @@ async function doCompleteProfile(f) {
   const profile = { name: u.displayName || 'عضو', email: lc(u.email), phone, bank, iban: bank.startsWith('كاش') ? '' : iban, waOptIn: f.waOptIn.checked, ...idn, avatar: u.photoURL || '', createdAt: FV.serverTimestamp() };
   try {
     await saveProfileWithPhone(u.uid, profile, 'set', null);
+    if (!state.isAdmin) incStat({ regs: 1 }); logEvent('register', { name: profile.name });
     state.profile = profile; startListeners();
     if (state.isAdmin) { state.view = 'admin'; render(); loadAdmin(); } else { state.view = 'home'; render(); }
   } catch (e) { toast(phoneSaveErr(e), 'error'); }
@@ -1024,14 +1038,530 @@ async function testMail() {
   catch (e) { const { raw, hint } = mailErrHint(e); showModal('فشل إرسال رسالة الاختبار', `<div class="space-y-3 text-xs"><div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800" dir="ltr">${esc(raw)}</div>${hint ? `<div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">${esc(hint)}</div>` : ''}</div>`); }
 }
 
-/* ============ لوحة المشرف العام ============ */
-async function loadAdmin() {
-  try {
-    const [j, u] = await Promise.all([db.collection('jamiyat').get(), db.collection('users').get()]);
-    state.admin.jamiyat = j.docs.map(d => ({ id: d.id, ...d.data() })); state.admin.users = u.docs.map(d => ({ id: d.id, ...d.data() }));
-  } catch (e) { toast('تعذر تحميل لوحة المشرف: ' + e.message, 'error'); }
-  render();
+/* ============ لوحة المالك: التتبع والإدارة ============ */
+Object.assign(state.admin, { act: {}, blocked: {}, notes: {}, admins: {}, stats: {}, events: [], errors: [], tab: 'overview', q: '', uf: 'all', us: 'last', ulimit: 40, jq: '', range: 14, metric: 'visits', evf: 'all', loaded: false, loading: false });
+state.settings = {}; state._tv = null;
+
+/* --- أدوات --- */
+const dayKey = (t = Date.now()) => new Date(t + 3 * 3600000).toISOString().slice(0, 10); // بتوقيت الرياض
+const tsd = v => !v ? null : (v.toDate ? v.toDate() : new Date(v));
+const nf = n => Number(n || 0).toLocaleString('ar-SA');
+const fmtDT = d => d ? fmtDate(d) + ' ' + d.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : '—';
+const ssGet = k => { try { return sessionStorage.getItem(k); } catch (e) { return null; } };
+const ssSet = (k, v) => { try { sessionStorage.setItem(k, v); } catch (e) {} };
+const ssDel = k => { try { sessionStorage.removeItem(k); } catch (e) {} };
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const fkey = s => String(s).replace(/[.\/~*\[\]`\s]/g, '_').slice(0, 30) || '_';
+function ago(d) {
+  if (!d) return 'لم يُسجَّل';
+  const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
+  if (s < 90) return 'الآن';
+  if (s < 3600) return 'قبل ' + nf(Math.round(s / 60)) + ' دقيقة';
+  if (s < 86400) return 'قبل ' + nf(Math.round(s / 3600)) + ' ساعة';
+  if (s < 86400 * 30) return 'قبل ' + nf(Math.round(s / 86400)) + ' يوم';
+  return 'قبل ' + nf(Math.round(s / 86400 / 30)) + ' شهر';
 }
+const bdg = (t, c) => `<span class="bdg ${c}">${t}</span>`;
+const DEV_L = { mobile: 'جوال', tablet: 'لوحي', desktop: 'حاسوب' };
+const VIEW_L = { auth: 'تسجيل الدخول', verify: 'تفعيل البريد', complete: 'إكمال الملف', home: 'جمعياتي', create: 'إنشاء جمعية', jamiya: 'صفحة الجمعية', profile: 'حسابي' };
+const FLAGS = { '': ['بدون تصنيف', ''], vip: ['⭐ مميز', 'bg-amber-100 text-amber-800'], watch: ['👁 تحت المراقبة', 'bg-sky-100 text-sky-700'], problem: ['⚠️ مشكلة / متأخر', 'bg-rose-100 text-rose-700'], follow: ['📌 يحتاج متابعة', 'bg-violet-100 text-violet-700'] };
+const EV_L = { login: ['دخول', 'fa-right-to-bracket', 'text-emerald-600'], register: ['تسجيل جديد', 'fa-user-plus', 'text-sky-600'], blocked_try: ['محاولة دخول (حساب محظور)', 'fa-ban', 'text-rose-600'],
+  adm_block: ['حظر مستخدم', 'fa-user-slash', 'text-rose-600'], adm_unblock: ['رفع حظر', 'fa-user-check', 'text-emerald-600'], adm_note: ['ملاحظة إدارية', 'fa-note-sticky', 'text-amber-600'],
+  adm_mail: ['إرسال بريد', 'fa-envelope', 'text-sky-600'], adm_reset: ['رابط إعادة كلمة المرور', 'fa-key', 'text-slate-600'], adm_admin: ['تغيير صلاحية مشرف', 'fa-user-shield', 'text-violet-600'], adm_settings: ['تعديل إعدادات المنصة', 'fa-sliders', 'text-slate-600'] };
+
+/* --- التتبع (يعمل عند المستخدمين العاديين) --- */
+function devInfo() {
+  const ua = navigator.userAgent;
+  const os = /android/i.test(ua) ? 'Android' : isIOS() ? 'iOS' : /windows/i.test(ua) ? 'Windows' : /mac/i.test(ua) ? 'Mac' : /linux/i.test(ua) ? 'Linux' : 'أخرى';
+  const br = /edg/i.test(ua) ? 'Edge' : /samsungbrowser/i.test(ua) ? 'Samsung' : /opr|opera/i.test(ua) ? 'Opera' : /firefox|fxios/i.test(ua) ? 'Firefox' : /chrome|crios/i.test(ua) ? 'Chrome' : /safari/i.test(ua) ? 'Safari' : 'أخرى';
+  const dev = /ipad|tablet/i.test(ua) ? 'tablet' : /mobi|android|iphone|ipod/i.test(ua) ? 'mobile' : 'desktop';
+  return { os, br, dev, pwa: isStandalone() };
+}
+function trafficSource() {
+  try {
+    const q = new URLSearchParams(location.search), u = q.get('utm_source') || q.get('src') || q.get('ref');
+    if (u) return u.slice(0, 20);
+    if (document.referrer) { const h = new URL(document.referrer).hostname.replace(/^www\./, ''); if (h && h !== location.hostname) return h; }
+  } catch (e) {}
+  return 'مباشر';
+}
+function incStat(spec) {
+  const conv = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v && typeof v === 'object' ? conv(v) : FV.increment(v)]));
+  const d = dayKey();
+  return db.collection('stats').doc(d).set({ day: d, ...conv(spec) }, { merge: true }).catch(() => {});
+}
+function logEvent(type, extra = {}) {
+  const u = auth.currentUser; if (!u) return Promise.resolve();
+  return db.collection('events').add({ type, uid: u.uid, email: lc(u.email), name: (state.profile && state.profile.name) || u.displayName || '', ts: FV.serverTimestamp(), ...extra }).catch(() => {});
+}
+function trackVisit() { // زيارة واحدة لكل جلسة متصفح، حتى قبل تسجيل الدخول
+  if (ssGet('jm_visit')) return; ssSet('jm_visit', '1');
+  const d = devInfo();
+  incStat({ visits: 1, dev: { [d.dev]: 1 }, os: { [fkey(d.os)]: 1 }, br: { [fkey(d.br)]: 1 }, src: { [fkey(trafficSource())]: 1 }, hours: { [new Date().getHours()]: 1 }, ...(d.pwa ? { pwa: 1 } : {}) });
+}
+function trackView(v) {
+  if (!state.user || !state.profile || state.isAdmin || v === 'loading' || state._tv === v) return;
+  state._tv = v; incStat({ pv: 1, views: { [v]: 1 } });
+}
+let hbTimer = null;
+function stopHeartbeat() { if (hbTimer) clearInterval(hbTimer); hbTimer = null; }
+function startHeartbeat() {
+  stopHeartbeat();
+  hbTimer = setInterval(() => {
+    if (document.visibilityState === 'visible' && state.user) db.collection('activity').doc(state.user.uid).set({ lastSeen: FV.serverTimestamp() }, { merge: true }).catch(() => {});
+  }, 150000);
+}
+async function trackSession() { // يُحتسب "دخول" واحد لكل جلسة (لا تحتسب إعادة تحميل الصفحة)
+  const u = state.user, k = 'jm_sess_' + u.uid;
+  if (ssGet(k)) return startHeartbeat();
+  ssSet(k, '1');
+  const d = devInfo(), ref = db.collection('activity').doc(u.uid);
+  try {
+    const s = await ref.get();
+    const data = { uid: u.uid, name: state.profile.name, email: lc(u.email), loginCount: FV.increment(1), lastLogin: FV.serverTimestamp(), lastSeen: FV.serverTimestamp(),
+      os: d.os, browser: d.br, device: d.dev, pwa: d.pwa, lang: navigator.language || '', screen: screen.width + '×' + screen.height, provider: (u.providerData[0] || {}).providerId || '' };
+    if (!s.exists) data.firstLogin = FV.serverTimestamp();
+    await ref.set(data, { merge: true });
+  } catch (e) {}
+  logEvent('login', { info: d.os + ' • ' + d.br + (d.pwa ? ' • تطبيق' : '') });
+  if (!state.isAdmin) {
+    const o = { logins: 1 }, dk = 'jm_dau_' + u.uid;
+    if (lsGet(dk) !== dayKey()) { o.dau = 1; lsSet(dk, dayKey()); }
+    incStat(o);
+  }
+  startHeartbeat();
+}
+/* --- الحظر والإعدادات العامة --- */
+let blkUnsub = null, setKey = '0|0|0';
+function stopBlockWatch() { if (blkUnsub) blkUnsub(); blkUnsub = null; }
+function watchBlocked() {
+  stopBlockWatch();
+  if (!state.user || state.isAdmin) return;
+  blkUnsub = db.collection('blocked').doc(state.user.uid).onSnapshot(s => { if (s.exists) kickBlocked(s.data()); }, () => {});
+}
+function kickBlocked(b) {
+  stopBlockWatch(); stopHeartbeat();
+  logEvent('blocked_try');
+  if (state.user) ssDel('jm_sess_' + state.user.uid);
+  toast('تم إيقاف حسابك' + (b && b.reason ? ': ' + b.reason : '') + '. تواصل مع إدارة المنصة.', 'error');
+  setTimeout(() => auth.signOut(), 400);
+}
+async function isBlockedNow() {
+  try { const s = await db.collection('blocked').doc(state.user.uid).get(); if (s.exists) { kickBlocked(s.data()); return true; } } catch (e) {}
+  return false;
+}
+function watchSettings() {
+  db.collection('settings').doc('app').onSnapshot(s => {
+    state.settings = s.exists ? s.data() : {};
+    const st = state.settings, key = [st.maintenance ? 1 : 0, st.regClosed ? 1 : 0, st.annActive ? st.annVer : 0].join('|');
+    if (key !== setKey) { setKey = key; render(); }
+  }, () => {});
+}
+const maintOn = () => !!(state.settings.maintenance && state.user && state.profile && !state.isAdmin);
+function vMaint() {
+  const m = state.settings.maintMsg || 'المنصة تحت الصيانة حالياً، نعود قريباً بإذن الله.';
+  return `<div class="card p-8 text-center space-y-3 max-w-md mx-auto mt-10"><div class="jicon mx-auto !w-16 !h-16 !text-2xl"><i class="fa-solid fa-screwdriver-wrench"></i></div><h2 class="text-lg font-black">صيانة مؤقتة</h2>
+    <p class="text-sm text-slate-600 leading-relaxed">${esc(m)}</p><button class="btn b-red" data-act="logout"><i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج</button></div>`;
+}
+function annHtml() {
+  const s = state.settings || {}, v = state.view;
+  if (v === 'auth' && s.regClosed) return `<div class="p-3 mb-4 border rounded-2xl text-xs flex gap-2 bg-amber-50 border-amber-200 text-amber-900"><i class="fa-solid fa-circle-info mt-0.5"></i><div>${esc(s.regMsg || 'التسجيل الجديد متوقف مؤقتاً، ويمكن للمسجلين الدخول.')}</div></div>`;
+  if (!s.annActive || !s.annText || !state.user || !state.profile || v === 'admin') return '';
+  if (ssGet('jm_ann') === String(s.annVer)) return '';
+  const c = { info: 'bg-sky-50 border-sky-200 text-sky-900', warn: 'bg-amber-50 border-amber-200 text-amber-900', ok: 'bg-emerald-50 border-emerald-200 text-emerald-900' }[s.annType] || 'bg-sky-50 border-sky-200 text-sky-900';
+  return `<div class="p-3 mb-4 border rounded-2xl text-xs flex items-start gap-2 ${c}"><i class="fa-solid fa-bullhorn mt-0.5"></i><div class="flex-1 leading-relaxed">${esc(s.annText)}</div><button data-act="ann-x" aria-label="إخفاء"><i class="fa-solid fa-xmark"></i></button></div>`;
+}
+
+/* --- تحميل بيانات لوحة المالك --- */
+async function loadAdmin() {
+  if (!state.isAdmin) return;
+  const A = state.admin; A.loading = true; A.errors = []; if (state.view === 'admin') render();
+  const g = (name, q) => q.get().catch(e => { A.errors.push(name + ' (' + (e.code || e.message) + ')'); return null; });
+  const [j, u, ac, bl, nt, ad, st, ev] = await Promise.all([
+    g('jamiyat', db.collection('jamiyat')), g('users', db.collection('users')), g('activity', db.collection('activity')), g('blocked', db.collection('blocked')),
+    g('admin_notes', db.collection('admin_notes')), g('admins', db.collection('admins')),
+    g('stats', db.collection('stats').orderBy('day', 'desc').limit(70)), g('events', db.collection('events').orderBy('ts', 'desc').limit(200))]);
+  const map = (s, f) => { const o = {}; if (s) s.docs.forEach(d => { o[d.id] = f ? f(d) : d.data(); }); return o; };
+  if (j) A.jamiyat = j.docs.map(d => ({ id: d.id, ...d.data() }));
+  if (u) A.users = u.docs.map(d => ({ id: d.id, ...d.data() }));
+  A.act = map(ac); A.blocked = map(bl); A.notes = map(nt); A.admins = map(ad); A.stats = map(st);
+  A.events = ev ? ev.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+  A.loaded = true; A.loading = false;
+  if (state.view === 'admin') render();
+}
+function userInfo(u) {
+  const A = state.admin, a = A.act[u.id] || {}, n = A.notes[u.id] || {}, ll = tsd(a.lastLogin), ls = tsd(a.lastSeen);
+  return { u, id: u.id, a, logins: a.loginCount || 0, ll, ls, fl: tsd(a.firstLogin), created: tsd(u.createdAt), lastAct: ls || ll,
+    online: !!(ls && Date.now() - ls.getTime() < 5 * 60000), blocked: !!A.blocked[u.id], flag: n.flag || '', nNotes: (n.items || []).length, notes: n.items || [],
+    jc: A.jamiyat.filter(j => (j.memberUids || []).includes(u.id)).length, isAdm: !!A.admins[u.id] || lc(u.email) === OWNER_EMAIL };
+}
+const lastTime = x => (x.lastAct ? x.lastAct.getTime() : 0);
+
+/* --- مكونات العرض --- */
+function kpi(label, value, icon, tone = 'text-slate-900', sub = '') {
+  return `<div class="card p-4"><div class="flex justify-between items-start"><p class="text-xs text-slate-500">${label}</p><i class="fa-solid ${icon} text-slate-300"></i></div><h3 class="text-2xl font-black mt-1 ${tone}">${value}</h3>${sub ? `<p class="text-[11px] mt-0.5">${sub}</p>` : ''}</div>`;
+}
+const delta = (cur, prev) => !prev ? '' : (() => { const p = Math.round((cur - prev) / prev * 100); return `<span class="${p >= 0 ? 'text-emerald-600' : 'text-rose-600'} font-bold">${p >= 0 ? '▲' : '▼'} ${nf(Math.abs(p))}٪ عن الفترة السابقة</span>`; })();
+function barChart(labels, vals, every = 1, tips) {
+  const mx = Math.max(1, ...vals), showV = vals.length <= 16;
+  return `<div class="flex items-end gap-[3px]" dir="ltr" style="height:150px">${vals.map((v, i) => `<div class="flex-1 min-w-0 h-full flex flex-col justify-end items-center" title="${esc(tips ? tips[i] : labels[i])}: ${nf(v)}">${showV ? `<span class="text-[9px] text-slate-500 mb-0.5">${v ? nf(v) : ''}</span>` : ''}<div class="bar ${v ? '' : 'z'} w-full" style="height:${v ? Math.max(Math.round(v / mx * 100), 3) : 2}%"></div></div>`).join('')}</div>
+  <div class="flex gap-[3px] mt-1" dir="ltr">${labels.map((l, i) => `<span class="flex-1 min-w-0 text-center text-[9px] text-slate-400 ${i % every ? 'invisible' : ''}">${l}</span>`).join('')}</div>`;
+}
+function breakdown(title, icon, map, label = k => k) {
+  const rows = Object.entries(map).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 8), tot = rows.reduce((s, [, v]) => s + v, 0);
+  return `<div class="card p-5"><h4 class="font-black text-sm mb-3"><i class="fa-solid ${icon} text-teal-600"></i> ${title}</h4><div class="space-y-2.5">${rows.map(([k, v]) => `<div><div class="flex justify-between text-[11px] mb-1"><span class="font-bold">${esc(label(k))}</span><span class="text-slate-500">${nf(v)} • ${nf(Math.round(v / tot * 100))}٪</span></div><div class="hbar"><i style="width:${Math.round(v / tot * 100)}%"></i></div></div>`).join('') || '<p class="text-xs text-slate-400">لا توجد بيانات بعد.</p>'}</div></div>`;
+}
+function dayKeys(n, off = 0) { const a = []; for (let i = n - 1 + off; i >= off; i--) a.push(dayKey(Date.now() - i * 86400000)); return a; }
+const sumF = (keys, f) => keys.reduce((s, k) => s + ((state.admin.stats[k] || {})[f] || 0), 0);
+function sumMap(keys, f) { const o = {}; keys.forEach(k => { const m = (state.admin.stats[k] || {})[f] || {}; Object.entries(m).forEach(([a, v]) => { o[a] = (o[a] || 0) + v; }); }); return o; }
+const dayLbl = k => nf(+k.slice(8));
+function miniUser(x, extra) {
+  return `<button class="w-full text-right p-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl text-xs flex justify-between items-center gap-2" data-act="adm-user" data-id="${x.id}"><span class="min-w-0"><b class="block truncate">${esc(x.u.name || '—')}</b><span class="text-slate-500">${esc(extra)}</span></span>${x.online ? '<i class="dot-on flex-none"></i>' : ''}</button>`;
+}
+
+/* --- الواجهة الرئيسية --- */
+function vAdmin() {
+  const A = state.admin, t = A.tab;
+  const tabs = [['overview', 'fa-gauge-high', 'نظرة عامة'], ['users', 'fa-users', 'المستخدمون'], ['jam', 'fa-people-roof', 'الجمعيات'], ['traffic', 'fa-chart-line', 'الترافيك'], ['log', 'fa-clock-rotate-left', 'السجل'], ['settings', 'fa-sliders', 'التحكم']];
+  const body = !A.loaded ? '<div class="card p-10 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>' : ({ overview: tabOverview, users: tabUsers, jam: tabJam, traffic: tabTraffic, log: tabLog, settings: tabSettings }[t] || tabOverview)();
+  return `<div class="space-y-4"><div class="card p-5 !bg-slate-900 text-white flex flex-wrap justify-between items-center gap-3">
+    <div><span class="px-3 py-1 bg-indigo-500/30 text-indigo-200 text-xs font-bold rounded-full inline-block mb-2"><i class="fa-solid fa-shield-halved"></i> لوحة المالك</span><h2 class="text-xl font-black">إدارة المنصة</h2>
+    <p class="text-xs text-slate-300 mt-1" dir="ltr">${esc(state.user.email)}</p></div>
+    <button class="btn b-sec" data-act="refresh-admin"><i class="fa-solid fa-rotate ${A.loading ? 'fa-spin' : ''}"></i> تحديث البيانات</button></div>
+  <div class="atabs">${tabs.map(([k, i, l]) => `<button class="achip ${t === k ? 'on' : ''}" data-act="adm-tab" data-v="${k}"><i class="fa-solid ${i}"></i>${l}</button>`).join('')}</div>${body}</div>`;
+}
+
+function tabOverview() {
+  const A = state.admin, U = A.users.map(userInfo), now = Date.now(), d7 = now - 7 * 864e5;
+  const online = U.filter(x => x.online).length, new7 = U.filter(x => x.created && x.created.getTime() > d7).length, act7 = U.filter(x => lastTime(x) > d7).length;
+  const totalLogins = U.reduce((s, x) => s + x.logins, 0), blocked = U.filter(x => x.blocked).length, never = U.filter(x => !x.logins).length;
+  const jam = A.jamiyat, total = jam.reduce((s, j) => s + (j.count || 0) * (j.amount || 0), 0), members = jam.reduce((s, j) => s + (j.memberUids || []).length, 0);
+  const k14 = dayKeys(14), td = A.stats[dayKey()] || {};
+  const evL = A.events.slice(0, 8).map(e => { const m = EV_L[e.type] || [e.type, 'fa-circle', 'text-slate-500'], d = tsd(e.ts); return `<div class="flex gap-2 items-start text-xs p-2 bg-slate-50 rounded-xl"><i class="fa-solid ${m[1]} ${m[2]} mt-0.5"></i><div class="min-w-0"><b>${m[0]}</b> — ${esc(e.targetName || e.name || e.email || '')}<p class="text-[11px] text-slate-400">${ago(d)}</p></div></div>`; }).join('') || '<p class="text-xs text-slate-400">لا توجد أحداث بعد.</p>';
+  return `${A.errors.length ? `<div class="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-900 leading-relaxed"><b><i class="fa-solid fa-triangle-exclamation"></i> بعض البيانات لم تُحمَّل بسبب صلاحيات Firestore:</b> <span dir="ltr">${esc(A.errors.join(' • '))}</span><br>افتح تبويب «التحكم» وانسخ القواعد المطلوبة، ثم انشرها في Firebase Console ← Firestore ← Rules.</div>` : ''}
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    ${kpi('المستخدمون', nf(U.length), 'fa-users', 'text-slate-900', `<span class="text-emerald-600 font-bold">+${nf(new7)}</span> <span class="text-slate-400">آخر ٧ أيام</span>`)}
+    ${kpi('متصلون الآن', nf(online), 'fa-signal', 'text-emerald-600', `<span class="text-slate-400">نشطون ٧ أيام: ${nf(act7)}</span>`)}
+    ${kpi('إجمالي مرات الدخول', nf(totalLogins), 'fa-right-to-bracket', 'text-teal-700', `<span class="text-slate-400">اليوم: ${nf(td.logins || 0)}</span>`)}
+    ${kpi('زيارات اليوم', nf(td.visits || 0), 'fa-eye', 'text-sky-700', `<span class="text-slate-400">مستخدمون فريدون: ${nf(td.dau || 0)}</span>`)}
+    ${kpi('الجمعيات', nf(jam.length), 'fa-people-roof')}
+    ${kpi('عضويات الجمعيات', nf(members), 'fa-user-group')}
+    ${kpi('إجمالي الدورات', money(total), 'fa-sack-dollar', 'text-emerald-600')}
+    ${kpi('محظورون / لم يدخلوا', nf(blocked) + ' / ' + nf(never), 'fa-user-slash', blocked ? 'text-rose-600' : 'text-slate-900')}
+  </div>
+  <div class="grid md:grid-cols-2 gap-4"><div class="card p-5"><h4 class="font-black text-sm mb-3"><i class="fa-solid fa-eye text-sky-600"></i> الزيارات — آخر ١٤ يوماً</h4>${barChart(k14.map(dayLbl), k14.map(k => (A.stats[k] || {}).visits || 0), 2, k14)}</div>
+  <div class="card p-5"><h4 class="font-black text-sm mb-3"><i class="fa-solid fa-right-to-bracket text-teal-600"></i> مرات الدخول — آخر ١٤ يوماً</h4>${barChart(k14.map(dayLbl), k14.map(k => (A.stats[k] || {}).logins || 0), 2, k14)}</div></div>
+  <div class="grid md:grid-cols-2 gap-4">
+   <div class="card p-5"><h4 class="font-black text-sm mb-3"><i class="fa-solid fa-trophy text-amber-500"></i> الأكثر دخولاً</h4><div class="space-y-1.5">${[...U].sort((a, b) => b.logins - a.logins).filter(x => x.logins).slice(0, 5).map(x => miniUser(x, nf(x.logins) + ' مرة • ' + ago(x.lastAct))).join('') || '<p class="text-xs text-slate-400">لا توجد بيانات دخول بعد.</p>'}</div></div>
+   <div class="card p-5"><h4 class="font-black text-sm mb-3"><i class="fa-solid fa-bolt text-emerald-500"></i> آخر المستخدمين نشاطاً</h4><div class="space-y-1.5">${[...U].filter(x => x.lastAct).sort((a, b) => lastTime(b) - lastTime(a)).slice(0, 5).map(x => miniUser(x, ago(x.lastAct))).join('') || '<p class="text-xs text-slate-400">لا توجد بيانات.</p>'}</div></div>
+   <div class="card p-5"><h4 class="font-black text-sm mb-3"><i class="fa-solid fa-user-plus text-sky-500"></i> أحدث المسجلين</h4><div class="space-y-1.5">${[...U].filter(x => x.created).sort((a, b) => b.created - a.created).slice(0, 5).map(x => miniUser(x, ago(x.created))).join('') || '<p class="text-xs text-slate-400">لا توجد بيانات.</p>'}</div></div>
+   <div class="card p-5"><h4 class="font-black text-sm mb-3"><i class="fa-solid fa-clock-rotate-left text-slate-500"></i> آخر الأحداث</h4><div class="space-y-1.5">${evL}</div></div></div>`;
+}
+
+/* المستخدمون */
+const UF = [['all', 'الكل'], ['online', 'متصل الآن'], ['active7', 'نشط ٧ أيام'], ['idle', 'خامل +٣٠ يوماً'], ['never', 'لم يدخل بعد'], ['blocked', 'محظور'], ['noted', 'عليه ملاحظات']];
+function filteredUsers() {
+  const A = state.admin, q = lc(A.q), qd = normPhone(A.q), now = Date.now();
+  let L = A.users.map(userInfo).filter(x => {
+    if (q && !(lc(x.u.name).includes(q) || lc(x.u.email).includes(q) || lc(x.u.nick).includes(q) || (qd && String(x.u.phone || '').includes(qd)) || x.notes.some(n => lc(n.text).includes(q)))) return false;
+    switch (A.uf) {
+      case 'online': return x.online; case 'active7': return lastTime(x) > now - 7 * 864e5; case 'idle': return x.lastAct && lastTime(x) < now - 30 * 864e5;
+      case 'never': return !x.logins; case 'blocked': return x.blocked; case 'noted': return x.nNotes > 0 || !!x.flag;
+    } return true;
+  });
+  const s = A.us;
+  L.sort((a, b) => s === 'logins' ? b.logins - a.logins : s === 'new' ? (b.created || 0) - (a.created || 0) : s === 'name' ? String(a.u.name).localeCompare(String(b.u.name), 'ar') : lastTime(b) - lastTime(a));
+  return L;
+}
+function userListHtml() {
+  const A = state.admin, L = filteredUsers();
+  return `<p class="text-[11px] text-slate-500 mb-2">${nf(L.length)} مستخدم</p><div class="space-y-2">${L.slice(0, A.ulimit).map(x => {
+    const fl = FLAGS[x.flag];
+    return `<button class="w-full text-right p-3 bg-slate-50 hover:bg-slate-100 rounded-2xl flex items-center gap-3" data-act="adm-user" data-id="${x.id}">
+      <span class="jicon !w-10 !h-10 !text-sm relative">${esc(String(x.u.name || '؟').trim().charAt(0))}${x.online ? '<i class="dot-on absolute -top-0.5 -right-0.5"></i>' : ''}</span>
+      <span class="flex-1 min-w-0"><span class="flex items-center gap-1.5 flex-wrap"><b class="text-sm">${esc(x.u.name || '—')}</b>${x.blocked ? bdg('محظور', 'bg-rose-100 text-rose-700') : ''}${x.isAdm ? bdg('مشرف', 'bg-violet-100 text-violet-700') : ''}${fl && x.flag ? bdg(fl[0], fl[1]) : ''}${x.nNotes ? bdg('<i class="fa-solid fa-note-sticky"></i> ' + nf(x.nNotes), 'bg-amber-50 text-amber-700') : ''}</span>
+      <span class="block text-[11px] text-slate-500 truncate" dir="ltr" style="text-align:right">${esc(x.u.email || '')} • ${esc(x.u.phone || '')}</span>
+      <span class="block text-[11px] text-slate-400">${x.logins ? 'دخل ' + nf(x.logins) + ' مرة • آخر ظهور ' + ago(x.lastAct) : 'لم يُسجَّل له دخول'} • ${nf(x.jc)} جمعيات</span></span>
+      <i class="fa-solid fa-chevron-left text-slate-300 flex-none"></i></button>`;
+  }).join('') || '<p class="text-xs text-slate-400 p-3">لا توجد نتائج.</p>'}</div>${L.length > A.ulimit ? '<button class="btn b-sec w-full mt-3" data-act="adm-more">عرض المزيد</button>' : ''}`;
+}
+function tabUsers() {
+  const A = state.admin;
+  return `<div class="card p-5 space-y-3"><div class="flex flex-wrap gap-2"><input class="inp flex-1 min-w-[180px]" data-adm-q="q" value="${esc(A.q)}" placeholder="بحث بالاسم أو البريد أو الجوال أو نص الملاحظات…">
+    <select class="inp !w-auto" data-adm-sort><option value="last" ${A.us === 'last' ? 'selected' : ''}>الأحدث نشاطاً</option><option value="logins" ${A.us === 'logins' ? 'selected' : ''}>الأكثر دخولاً</option><option value="new" ${A.us === 'new' ? 'selected' : ''}>الأحدث تسجيلاً</option><option value="name" ${A.us === 'name' ? 'selected' : ''}>الاسم</option></select>
+    <button class="btn b-sec" data-act="adm-export"><i class="fa-solid fa-file-csv"></i> تصدير CSV</button></div>
+    <div class="atabs">${UF.map(([k, l]) => `<button class="achip ${A.uf === k ? 'on' : ''}" data-act="adm-uf" data-v="${k}">${l}</button>`).join('')}</div>
+    <div id="adm-ulist">${userListHtml()}</div></div>`;
+}
+
+/* الجمعيات */
+function jamListHtml() {
+  const A = state.admin, q = lc(A.jq);
+  const L = A.jamiyat.filter(j => !q || lc(j.name).includes(q) || lc(j.creatorName).includes(q)).sort((a, b) => (tsd(b.createdAt) || 0) - (tsd(a.createdAt) || 0));
+  return `<p class="text-[11px] text-slate-500 mb-2">${nf(L.length)} جمعية</p><div class="space-y-2">${L.map(j => {
+    const n = A.notes['j_' + j.id] || {}, fl = FLAGS[n.flag || ''], mem = (j.memberUids || []).length, full = mem >= j.count;
+    return `<div class="p-3 bg-slate-50 rounded-2xl flex items-center gap-3"><span class="jicon !w-10 !h-10 !text-lg">${iconHtml(j)}</span>
+      <div class="flex-1 min-w-0"><div class="flex items-center gap-1.5 flex-wrap"><b class="text-sm">${esc(j.name)}</b>${full ? bdg('مكتملة', 'bg-emerald-100 text-emerald-700') : bdg('تنتظر أعضاء', 'bg-slate-200 text-slate-600')}${n.flag ? bdg(fl[0], fl[1]) : ''}${(n.items || []).length ? bdg('<i class="fa-solid fa-note-sticky"></i> ' + nf(n.items.length), 'bg-amber-50 text-amber-700') : ''}</div>
+      <p class="text-[11px] text-slate-500">المشرف: ${esc(j.creatorName || '—')} • ${nf(mem)}/${nf(j.count)} عضو • ${money(j.amount)} • ${ago(tsd(j.createdAt))}</p></div>
+      <button class="btn b-sec" data-act="adm-jam" data-id="${j.id}">تفاصيل</button></div>`;
+  }).join('') || '<p class="text-xs text-slate-400 p-3">لا توجد جمعيات.</p>'}</div>`;
+}
+function tabJam() {
+  const A = state.admin, J = A.jamiyat, full = J.filter(j => (j.memberUids || []).length >= j.count).length;
+  return `<div class="grid grid-cols-2 md:grid-cols-4 gap-3">${kpi('إجمالي الجمعيات', nf(J.length), 'fa-people-roof')}${kpi('مكتملة الأعضاء', nf(full), 'fa-circle-check', 'text-emerald-600')}${kpi('تنتظر أعضاء', nf(J.length - full), 'fa-hourglass-half', 'text-amber-600')}
+    ${kpi('متوسط الأعضاء', J.length ? nf(Math.round(J.reduce((s, j) => s + (j.memberUids || []).length, 0) / J.length * 10) / 10) : '٠', 'fa-user-group')}</div>
+    <div class="card p-5 space-y-3"><input class="inp" data-adm-q="jq" value="${esc(A.jq)}" placeholder="بحث باسم الجمعية أو المشرف…"><div id="adm-jlist">${jamListHtml()}</div></div>`;
+}
+
+/* الترافيك */
+function tabTraffic() {
+  const A = state.admin, R = A.range, keys = dayKeys(R), prev = dayKeys(R, R);
+  const M = { visits: 'الزيارات', pv: 'مشاهدات الصفحات', logins: 'مرات الدخول', dau: 'مستخدمون فريدون يومياً', regs: 'تسجيلات جديدة' };
+  const tot = f => sumF(keys, f), ptot = f => sumF(prev, f);
+  const dev = sumMap(keys, 'dev'), devT = Object.values(dev).reduce((s, v) => s + v, 0);
+  const hours = sumMap(keys, 'hours'), hv = Array.from({ length: 24 }, (_, h) => hours[h] || 0), pk = hv.indexOf(Math.max(...hv));
+  const best = keys.reduce((b, k) => (((A.stats[k] || {}).visits || 0) > b[1] ? [k, (A.stats[k] || {}).visits || 0] : b), ['', 0]);
+  return `<div class="flex flex-wrap gap-2 items-center"><div class="atabs">${[7, 14, 30].map(n => `<button class="achip ${R === n ? 'on' : ''}" data-act="adm-range" data-v="${n}">${nf(n)} يوماً</button>`).join('')}</div></div>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    ${kpi('الزيارات', nf(tot('visits')), 'fa-eye', 'text-sky-700', delta(tot('visits'), ptot('visits')))}
+    ${kpi('مشاهدات الصفحات', nf(tot('pv')), 'fa-file-lines', 'text-slate-900', delta(tot('pv'), ptot('pv')))}
+    ${kpi('مرات الدخول', nf(tot('logins')), 'fa-right-to-bracket', 'text-teal-700', delta(tot('logins'), ptot('logins')))}
+    ${kpi('تسجيلات جديدة', nf(tot('regs')), 'fa-user-plus', 'text-emerald-600', delta(tot('regs'), ptot('regs')))}
+    ${kpi('متوسط الزيارات اليومي', nf(Math.round(tot('visits') / R * 10) / 10), 'fa-gauge')}
+    ${kpi('أفضل يوم', best[1] ? dayLbl(best[0]) + ' (' + nf(best[1]) + ')' : '—', 'fa-calendar-day')}
+    ${kpi('ذروة الساعات', hv[pk] ? nf(pk) + ':٠٠' : '—', 'fa-clock')}
+    ${kpi('من التطبيق المثبّت', nf(tot('pwa')), 'fa-mobile-screen-button', 'text-violet-700')}
+  </div>
+  <div class="card p-5"><div class="flex flex-wrap justify-between gap-2 mb-3"><h4 class="font-black text-sm"><i class="fa-solid fa-chart-column text-teal-600"></i> ${M[A.metric]}</h4>
+    <div class="atabs">${Object.entries(M).map(([k, l]) => `<button class="achip ${A.metric === k ? 'on' : ''}" data-act="adm-metric" data-v="${k}">${l}</button>`).join('')}</div></div>
+    ${barChart(keys.map(dayLbl), keys.map(k => (A.stats[k] || {})[A.metric] || 0), R > 14 ? 3 : 1, keys)}</div>
+  <div class="grid md:grid-cols-2 gap-4">
+    ${breakdown('الأجهزة', 'fa-mobile-screen', dev, k => DEV_L[k] || k)}
+    ${breakdown('أنظمة التشغيل', 'fa-microchip', sumMap(keys, 'os'))}
+    ${breakdown('المتصفحات', 'fa-globe', sumMap(keys, 'br'))}
+    ${breakdown('مصادر الزيارات', 'fa-link', sumMap(keys, 'src'))}
+    ${breakdown('الصفحات الأكثر مشاهدة', 'fa-table-columns', sumMap(keys, 'views'), k => VIEW_L[k] || k)}
+    <div class="card p-5"><h4 class="font-black text-sm mb-3"><i class="fa-solid fa-clock text-teal-600"></i> الزيارات حسب ساعة اليوم (بتوقيت جهاز الزائر)</h4>${barChart(hv.map((_, h) => nf(h)), hv, 3, hv.map((_, h) => nf(h) + ':٠٠'))}</div>
+  </div>
+  <p class="text-[11px] text-slate-400 leading-relaxed">الزيارة تُحتسب مرة لكل جلسة متصفح. الدخول يُحتسب مرة لكل جلسة لكل مستخدم (إعادة تحميل الصفحة لا تزيده). نشاط المالك والمشرفين لا يدخل في إحصاءات الصفحات. تبدأ الإحصاءات من لحظة نشر هذه النسخة${devT ? '' : ' — ولا توجد بيانات بعد'}.</p>`;
+}
+
+/* السجل */
+function tabLog() {
+  const A = state.admin, f = A.evf;
+  const L = A.events.filter(e => f === 'all' || (f === 'adm' ? e.type.startsWith('adm_') : e.type === f));
+  const chips = [['all', 'الكل'], ['login', 'الدخول'], ['register', 'التسجيل'], ['blocked_try', 'محظورون'], ['adm', 'إجراءات الإدارة']];
+  return `<div class="card p-5 space-y-3"><div class="atabs">${chips.map(([k, l]) => `<button class="achip ${f === k ? 'on' : ''}" data-act="adm-evf" data-v="${k}">${l}</button>`).join('')}</div>
+    <div class="space-y-1.5">${L.map(e => { const m = EV_L[e.type] || [e.type, 'fa-circle', 'text-slate-500'], d = tsd(e.ts);
+      return `<div class="flex gap-3 items-start p-2.5 bg-slate-50 rounded-xl text-xs"><i class="fa-solid ${m[1]} ${m[2]} mt-1"></i><div class="flex-1 min-w-0"><b>${m[0]}</b> — ${esc(e.name || e.email || '')}${e.targetName ? ' ← ' + esc(e.targetName) : ''}${e.info ? `<p class="text-slate-500 break-words">${esc(e.info)}</p>` : ''}</div><span class="text-[11px] text-slate-400 flex-none text-left">${d ? fmtDT(d) : ''}</span></div>`; }).join('') || '<p class="text-xs text-slate-400">لا توجد أحداث.</p>'}</div>
+    <p class="text-[11px] text-slate-400">يعرض آخر ٢٠٠ حدث.</p></div>`;
+}
+
+/* التحكم */
+const ADMIN_RULES = `// أضِف هذه القواعد داخل: match /databases/{database}/documents { ... }
+function signedIn() { return request.auth != null; }
+function isOwner() { return signedIn() && request.auth.token.email == "${OWNER_EMAIL}" && request.auth.token.email_verified == true; }
+function isAdm() { return isOwner() || (signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))); }
+
+match /activity/{uid} {
+  allow read: if isAdm() || (signedIn() && request.auth.uid == uid);
+  allow write: if signedIn() && request.auth.uid == uid;
+}
+match /events/{id} {
+  allow read: if isAdm();
+  allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+}
+match /stats/{day} {
+  allow read: if isAdm();
+  allow create: if request.resource.data.keys().hasOnly(['day','visits','pv','logins','dau','regs','pwa','dev','os','br','src','hours','views']);
+  allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['day','visits','pv','logins','dau','regs','pwa','dev','os','br','src','hours','views']);
+}
+match /blocked/{uid} {
+  allow read: if isAdm() || (signedIn() && request.auth.uid == uid);
+  allow write: if isAdm();
+}
+match /admin_notes/{id} { allow read, write: if isAdm(); }
+match /settings/{id} { allow read: if true; allow write: if isAdm(); }
+match /admins/{uid} {
+  allow read: if signedIn() && (request.auth.uid == uid || isAdm());
+  allow write: if isOwner();
+}
+// ملاحظة: يجب أن تسمح قواعد users و jamiyat الحالية للمشرف بقراءة كل المستندات (كما تعمل اللوحة اليوم).`;
+function tabSettings() {
+  const A = state.admin, s = state.settings || {}, owner = lc(state.user.email) === OWNER_EMAIL;
+  const adm = Object.keys(A.admins).map(id => { const u = A.users.find(x => x.id === id) || {}; return { id, name: u.name || A.admins[id].name || id, email: u.email || A.admins[id].email || '' }; });
+  const sw = (n, on, label) => `<label class="flex items-center gap-2 text-xs font-semibold"><input type="checkbox" name="${n}" class="w-4 h-4 accent-teal-600" ${on ? 'checked' : ''}> ${label}</label>`;
+  return `<form id="f-adm-settings" class="card p-5 space-y-4"><h4 class="font-black text-sm"><i class="fa-solid fa-bullhorn text-teal-600"></i> إعلان لكل المستخدمين</h4>
+    <textarea name="annText" rows="2" class="inp" maxlength="300" placeholder="نص الإعلان (يظهر أعلى الصفحة لكل مستخدم مسجّل)">${esc(s.annText || '')}</textarea>
+    <div class="flex flex-wrap gap-3 items-center"><select name="annType" class="inp !w-auto"><option value="info" ${s.annType === 'info' ? 'selected' : ''}>معلومة</option><option value="warn" ${s.annType === 'warn' ? 'selected' : ''}>تنبيه</option><option value="ok" ${s.annType === 'ok' ? 'selected' : ''}>خبر سار</option></select>${sw('annActive', s.annActive, 'تفعيل الإعلان')}</div>
+    <hr class="border-slate-100"><h4 class="font-black text-sm"><i class="fa-solid fa-screwdriver-wrench text-amber-600"></i> وضع الصيانة</h4>
+    ${sw('maintenance', s.maintenance, 'إيقاف المنصة مؤقتاً لكل المستخدمين (المشرفون لا يتأثرون)')}
+    <input name="maintMsg" class="inp" maxlength="200" value="${esc(s.maintMsg || '')}" placeholder="رسالة الصيانة (اختياري)">
+    <hr class="border-slate-100"><h4 class="font-black text-sm"><i class="fa-solid fa-user-lock text-rose-600"></i> التسجيل الجديد</h4>
+    ${sw('regClosed', s.regClosed, 'إيقاف تسجيل الحسابات الجديدة')}
+    <input name="regMsg" class="inp" maxlength="200" value="${esc(s.regMsg || '')}" placeholder="رسالة تظهر لمن يحاول التسجيل (اختياري)">
+    <button class="btn b-pri w-full py-3" type="submit"><i class="fa-solid fa-floppy-disk"></i> حفظ الإعدادات</button></form>
+  <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-user-shield text-violet-600"></i> المشرفون</h4>
+    <div class="space-y-1.5">${adm.map(a => `<div class="p-2.5 bg-slate-50 rounded-xl text-xs flex justify-between items-center gap-2"><span><b>${esc(a.name)}</b> <span class="text-slate-500" dir="ltr">${esc(a.email)}</span></span>${owner ? `<button class="btn b-red" data-act="adm-admin-del" data-id="${esc(a.id)}">إزالة</button>` : ''}</div>`).join('') || '<p class="text-xs text-slate-400">لا يوجد مشرفون إضافيون (المالك يملك الصلاحية دائماً).</p>'}</div>
+    ${owner ? `<form id="f-adm-addadmin" class="flex gap-2"><input name="email" type="email" dir="ltr" class="inp flex-1" placeholder="بريد مستخدم مسجّل لمنحه صلاحية المشرف" required><button class="btn b-pri" type="submit">إضافة</button></form>` : '<p class="text-[11px] text-slate-400">إدارة المشرفين للمالك فقط.</p>'}</div>
+  <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-toolbox text-slate-600"></i> أدوات</h4>
+    <div class="flex flex-wrap gap-2"><button class="btn b-pri" data-act="test-mail"><i class="fa-solid fa-envelope"></i> اختبار البريد</button><button class="btn b-sec" data-act="adm-export"><i class="fa-solid fa-file-csv"></i> تصدير المستخدمين CSV</button></div></div>
+  <details class="card p-5"><summary class="font-black text-sm cursor-pointer"><i class="fa-solid fa-shield-halved text-teal-600"></i> قواعد Firestore المطلوبة لهذه اللوحة</summary>
+    <p class="text-[11px] text-slate-500 my-3 leading-relaxed">بدون هذه القواعد لن تُحفظ الإحصاءات ولن تعمل الملاحظات والحظر. انسخها وأضِفها لقواعدك الحالية ثم اضغط Publish.</p>
+    <pre class="text-[11px] bg-slate-900 text-emerald-200 rounded-xl p-3 overflow-x-auto leading-relaxed" dir="ltr" style="text-align:left">${esc(ADMIN_RULES)}</pre><button class="btn b-sec mt-3" data-act="adm-copy-rules"><i class="fa-solid fa-copy"></i> نسخ القواعد</button></details>`;
+}
+
+/* --- نوافذ المستخدم والجمعية --- */
+const admWa = p => { const d = normPhone(p); return validPhone(d) ? 'https://wa.me/966' + d.slice(1) : ''; };
+const cell = (l, v) => `<div class="p-2.5 bg-slate-50 rounded-xl"><p class="text-[10px] text-slate-400">${l}</p><p class="font-bold text-[12px] break-words">${v}</p></div>`;
+function notesBlock(t) {
+  const n = state.admin.notes[t] || { items: [], flag: '' };
+  return `<div class="space-y-2"><h4 class="font-black text-sm"><i class="fa-solid fa-note-sticky text-amber-500"></i> ملاحظات الإدارة <span class="text-[10px] text-slate-400 font-normal">(لا يراها المستخدم)</span></h4>
+    <select class="inp" data-adm-flag data-t="${esc(t)}">${Object.entries(FLAGS).map(([k, v]) => `<option value="${k}" ${k === (n.flag || '') ? 'selected' : ''}>${v[0]}</option>`).join('')}</select>
+    <div class="space-y-1.5">${[...(n.items || [])].reverse().map(i => `<div class="p-2.5 bg-amber-50 border border-amber-100 rounded-xl text-[12px] flex justify-between gap-2"><div class="min-w-0"><p class="whitespace-pre-wrap break-words">${esc(i.text)}</p><p class="text-[10px] text-slate-400 mt-1">${fmtDT(new Date(i.ts))}</p></div><button class="text-rose-500 flex-none" data-act="adm-note-del" data-t="${esc(t)}" data-id="${esc(i.id)}" aria-label="حذف"><i class="fa-solid fa-trash-can"></i></button></div>`).join('') || '<p class="text-[11px] text-slate-400">لا توجد ملاحظات.</p>'}</div>
+    <form id="f-adm-note" data-t="${esc(t)}" class="flex gap-2"><textarea name="text" rows="2" class="inp" maxlength="600" placeholder="أضف ملاحظة…" required></textarea><button class="btn b-pri flex-none" type="submit">إضافة</button></form></div>`;
+}
+function openAdminUser(uid) {
+  const A = state.admin, u = A.users.find(x => x.id === uid); if (!u) return;
+  const x = userInfo(u), b = A.blocked[uid], a = x.a, owner = lc(state.user.email) === OWNER_EMAIL, self = uid === state.user.uid, isOwnerAcc = lc(u.email) === OWNER_EMAIL;
+  const js = A.jamiyat.filter(j => (j.memberUids || []).includes(uid)), wa = admWa(u.phone);
+  showModal(esc(u.name || 'مستخدم'), `<div class="space-y-4 text-xs">
+    <div class="flex flex-wrap gap-1.5">${x.online ? bdg('<i class="dot-on"></i> متصل الآن', 'bg-emerald-100 text-emerald-700') : ''}${x.blocked ? bdg('محظور', 'bg-rose-100 text-rose-700') : ''}${x.isAdm ? bdg('مشرف', 'bg-violet-100 text-violet-700') : ''}${x.flag ? bdg(FLAGS[x.flag][0], FLAGS[x.flag][1]) : ''}</div>
+    <div class="grid grid-cols-2 gap-2">${cell('عدد مرات الدخول', nf(x.logins))}${cell('آخر دخول', x.ll ? fmtDT(x.ll) + '<br><span class="text-slate-400 font-normal">' + ago(x.ll) + '</span>' : '—')}
+      ${cell('أول دخول مسجّل', x.fl ? fmtDT(x.fl) : '—')}${cell('آخر ظهور', x.ls ? ago(x.ls) : '—')}${cell('تاريخ التسجيل', x.created ? fmtDT(x.created) : '—')}${cell('الجمعيات', nf(x.jc))}
+      ${cell('الجوال', `<span dir="ltr">${esc(u.phone || '—')}</span>`)}${cell('البريد', `<span dir="ltr">${esc(u.email || '—')}</span>`)}${cell('البنك', esc(u.bank || '—'))}
+      ${cell('الجهاز', a.os ? esc(a.os + ' • ' + a.browser + ' • ' + (DEV_L[a.device] || a.device || '')) : '—')}${cell('التطبيق المثبّت', a.pwa ? 'نعم' : a.os ? 'لا' : '—')}${cell('الدخول بواسطة', a.provider === 'google.com' ? 'جوجل' : a.provider ? 'بريد وكلمة مرور' : '—')}</div>
+    ${b ? `<div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-900"><b>الحساب محظور</b>${b.reason ? ': ' + esc(b.reason) : ''}<p class="text-[10px] mt-1">${b.at ? fmtDT(tsd(b.at)) : ''}</p></div>` : ''}
+    <div class="flex flex-wrap gap-2">${wa ? `<a class="btn b-sec" href="${wa}" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp text-emerald-600"></i> واتساب</a>` : ''}
+      <button class="btn b-sec" data-act="adm-mail-modal" data-id="${uid}"><i class="fa-solid fa-envelope"></i> بريد</button>
+      <button class="btn b-sec" data-act="adm-reset" data-id="${uid}"><i class="fa-solid fa-key"></i> إعادة كلمة المرور</button>
+      ${!self && !isOwnerAcc ? (b ? `<button class="btn bg-emerald-600 text-white" data-act="adm-unblock" data-id="${uid}"><i class="fa-solid fa-user-check"></i> رفع الحظر</button>` : `<button class="btn b-red" data-act="adm-block-modal" data-id="${uid}"><i class="fa-solid fa-user-slash"></i> حظر</button>`) : ''}
+      ${owner && !self && !isOwnerAcc ? `<button class="btn b-sec" data-act="adm-admin-toggle" data-id="${uid}"><i class="fa-solid fa-user-shield"></i> ${A.admins[uid] ? 'سحب الإشراف' : 'منح الإشراف'}</button>` : ''}</div>
+    <div><h4 class="font-black text-sm mb-2"><i class="fa-solid fa-people-roof text-teal-600"></i> جمعياته</h4><div class="space-y-1.5">${js.map(j => `<div class="p-2.5 bg-slate-50 rounded-xl flex justify-between items-center gap-2"><span><b>${esc(j.name)}</b> ${j.creatorUid === uid ? bdg('مشرف الجمعية', 'bg-teal-100 text-teal-700') : ''}<span class="block text-[10px] text-slate-400">${money(j.amount)} • ${nf((j.memberUids || []).length)}/${nf(j.count)}</span></span><button class="btn b-sec" data-act="adm-jam" data-id="${j.id}">تفاصيل</button></div>`).join('') || '<p class="text-[11px] text-slate-400">لا ينتمي لأي جمعية.</p>'}</div></div>
+    ${notesBlock(uid)}</div>`);
+}
+function openAdminJam(id) {
+  const A = state.admin, j = A.jamiyat.find(x => x.id === id); if (!j) return;
+  const mem = (j.memberUids || []).map(uid => A.users.find(u => u.id === uid)).filter(Boolean), fr = (FREQS[j.frequency] || {}).label || j.frequency || '—';
+  showModal(esc(j.name), `<div class="space-y-4 text-xs"><div class="grid grid-cols-2 gap-2">${cell('المشرف', esc(j.creatorName || '—'))}${cell('النوع', esc(fr))}${cell('القسط', money(j.amount))}${cell('عدد الدورات', nf(j.count))}${cell('إجمالي الدورة', money((j.count || 0) * (j.amount || 0)))}${cell('تاريخ الإنشاء', j.createdAt ? fmtDT(tsd(j.createdAt)) : '—')}</div>
+    <div><h4 class="font-black text-sm mb-2">الأعضاء (${nf(mem.length)}/${nf(j.count)})</h4><div class="space-y-1.5">${mem.map(u => `<button class="w-full text-right p-2.5 bg-slate-50 rounded-xl flex justify-between" data-act="adm-user" data-id="${u.id}"><b>${esc(u.name)}</b><span class="text-slate-400" dir="ltr">${esc(u.phone || '')}</span></button>`).join('') || '<p class="text-[11px] text-slate-400">لا أعضاء.</p>'}</div></div>
+    <button class="btn b-pri w-full" data-act="open" data-id="${j.id}" onclick="closeModal()"><i class="fa-solid fa-arrow-up-right-from-square"></i> فتح الجمعية</button>
+    ${notesBlock('j_' + id)}</div>`);
+}
+function reopenTarget(t) { render(); if (String(t).startsWith('j_')) openAdminJam(t.slice(2)); else openAdminUser(t); }
+
+/* --- العمليات --- */
+async function saveNotes(t, n) {
+  const cur = state.admin.notes[t] || { items: [], flag: '' }, nn = { items: n.items || cur.items || [], flag: n.flag !== undefined ? n.flag : (cur.flag || '') };
+  await db.collection('admin_notes').doc(t).set({ ...nn, updatedAt: FV.serverTimestamp() });
+  state.admin.notes[t] = nn;
+}
+const targetName = t => { const A = state.admin; if (String(t).startsWith('j_')) { const j = A.jamiyat.find(x => x.id === t.slice(2)); return j ? j.name : t; } const u = A.users.find(x => x.id === t); return u ? u.name : t; };
+async function addNote(f) {
+  const t = f.dataset.t, text = f.text.value.trim(); if (!text) return;
+  const cur = state.admin.notes[t] || { items: [], flag: '' };
+  try {
+    await saveNotes(t, { items: [...(cur.items || []), { id: Date.now().toString(36), text, ts: Date.now(), by: lc(state.user.email) }] });
+    logEvent('adm_note', { target: t, targetName: targetName(t), info: text.slice(0, 120) }); toast('أُضيفت الملاحظة'); reopenTarget(t);
+  } catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
+}
+async function delNote(t, id) {
+  const cur = state.admin.notes[t]; if (!cur) return;
+  try { await saveNotes(t, { items: cur.items.filter(i => i.id !== id) }); reopenTarget(t); } catch (e) { toast('تعذر الحذف: ' + e.message, 'error'); }
+}
+async function setFlag(t, flag) {
+  try { await saveNotes(t, { flag }); toast('تم تحديث التصنيف', 'info'); render(); } catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
+}
+function openBlockModal(uid) {
+  const u = state.admin.users.find(x => x.id === uid); if (!u) return;
+  showModal('حظر ' + esc(u.name), `<form id="f-adm-block" data-id="${uid}" class="space-y-3"><p class="text-xs text-slate-600 leading-relaxed">سيتم تسجيل خروج المستخدم فوراً ومنعه من الدخول حتى ترفع الحظر.</p>
+    <input name="reason" class="inp" maxlength="120" placeholder="سبب الحظر (يظهر للمستخدم)"><button class="btn b-red w-full py-3" type="submit">تأكيد الحظر</button></form>`);
+}
+async function doBlock(f) {
+  const uid = f.dataset.id, u = state.admin.users.find(x => x.id === uid), reason = f.reason.value.trim();
+  try {
+    await db.collection('blocked').doc(uid).set({ reason, at: FV.serverTimestamp(), by: lc(state.user.email), name: u.name || '', email: u.email || '' });
+    state.admin.blocked[uid] = { reason, at: new Date(), by: lc(state.user.email) };
+    logEvent('adm_block', { target: uid, targetName: u.name, info: reason }); toast('تم حظر المستخدم'); reopenTarget(uid);
+  } catch (e) { toast('تعذر الحظر: ' + e.message, 'error'); }
+}
+async function doUnblock(uid) {
+  if (!confirm('رفع الحظر عن هذا المستخدم؟')) return;
+  try { await db.collection('blocked').doc(uid).delete(); delete state.admin.blocked[uid]; logEvent('adm_unblock', { target: uid, targetName: targetName(uid) }); toast('رُفع الحظر'); reopenTarget(uid); }
+  catch (e) { toast('تعذر رفع الحظر: ' + e.message, 'error'); }
+}
+async function adminReset(uid) {
+  const u = state.admin.users.find(x => x.id === uid); if (!u || !confirm('إرسال رابط إعادة تعيين كلمة المرور إلى ' + u.email + '؟')) return;
+  try { await auth.sendPasswordResetEmail(lc(u.email), { url: appUrl() }); logEvent('adm_reset', { target: uid, targetName: u.name }); toast('أُرسل رابط إعادة التعيين'); } catch (e) { toast(authErr(e), 'error'); }
+}
+function openMailModal(uid) {
+  const u = state.admin.users.find(x => x.id === uid); if (!u) return;
+  showModal('بريد إلى ' + esc(u.name), `<form id="f-adm-mail" data-id="${uid}" class="space-y-3"><input name="subject" class="inp" maxlength="100" placeholder="الموضوع" required><textarea name="message" rows="5" class="inp" maxlength="1500" placeholder="نص الرسالة…" required></textarea>
+    <button class="btn b-pri w-full py-3" type="submit"><i class="fa-solid fa-paper-plane"></i> إرسال</button></form>`);
+}
+async function sendAdminMail(f) {
+  const uid = f.dataset.id, u = state.admin.users.find(x => x.id === uid); if (!u) return;
+  try { await sendMail(u.email, u.name, f.subject.value.trim(), f.message.value.trim()); logEvent('adm_mail', { target: uid, targetName: u.name, info: f.subject.value.trim() }); toast('✉️ أُرسلت الرسالة'); reopenTarget(uid); }
+  catch (e) { const { raw } = mailErrHint(e); toast('فشل الإرسال: ' + raw, 'error'); }
+}
+async function toggleAdmin(uid) {
+  const A = state.admin, u = A.users.find(x => x.id === uid); if (!u) return;
+  const on = !A.admins[uid]; if (!confirm((on ? 'منح' : 'سحب') + ' صلاحية المشرف ' + (on ? 'إلى ' : 'من ') + u.name + '؟')) return;
+  try {
+    if (on) { await db.collection('admins').doc(uid).set({ email: lc(u.email), name: u.name, at: FV.serverTimestamp() }); A.admins[uid] = { email: u.email, name: u.name }; } else { await db.collection('admins').doc(uid).delete(); delete A.admins[uid]; }
+    logEvent('adm_admin', { target: uid, targetName: u.name, info: on ? 'منح' : 'سحب' }); toast('تم التحديث'); reopenTarget(uid);
+  } catch (e) { toast('تعذر التنفيذ: ' + e.message, 'error'); }
+}
+async function addAdminByEmail(f) {
+  const email = lc(f.email.value), u = state.admin.users.find(x => lc(x.email) === email);
+  if (!u) return toast('لا يوجد مستخدم مسجّل بهذا البريد', 'error');
+  await toggleAdmin(u.id); f.reset(); render();
+}
+async function saveSettings(f) {
+  const s = state.settings || {}, annText = f.annText.value.trim(), annActive = f.annActive.checked;
+  const data = { annText, annType: f.annType.value, annActive, maintenance: f.maintenance.checked, maintMsg: f.maintMsg.value.trim(), regClosed: f.regClosed.checked, regMsg: f.regMsg.value.trim(), annVer: (annText !== s.annText || (annActive && !s.annActive)) ? Date.now() : (s.annVer || 0) };
+  try { await db.collection('settings').doc('app').set(data, { merge: true }); state.settings = { ...s, ...data }; logEvent('adm_settings', { info: [data.maintenance ? 'صيانة' : '', data.regClosed ? 'تسجيل مغلق' : '', annActive ? 'إعلان' : ''].filter(Boolean).join(' • ') || 'حفظ' }); toast('تم حفظ الإعدادات'); render(); }
+  catch (e) { toast('تعذر الحفظ: ' + e.message + ' — تأكد من نشر القواعد', 'error'); }
+}
+function exportUsersCsv() {
+  const rows = [['الاسم', 'البريد', 'الجوال', 'البنك', 'تاريخ التسجيل', 'عدد مرات الدخول', 'آخر دخول', 'أول دخول', 'عدد الجمعيات', 'الحالة', 'التصنيف', 'الملاحظات']];
+  state.admin.users.map(userInfo).forEach(x => rows.push([x.u.name, x.u.email, x.u.phone, x.u.bank, x.created ? x.created.toISOString().slice(0, 10) : '', x.logins, x.ll ? x.ll.toISOString() : '', x.fl ? x.fl.toISOString() : '', x.jc, x.blocked ? 'محظور' : 'نشط', FLAGS[x.flag] ? FLAGS[x.flag][0] : '', x.notes.map(n => n.text).join(' | ')]));
+  const csv = '﻿' + rows.map(r => r.map(csvCell).join(',')).join('\r\n'), a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = 'users-' + dayKey() + '.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+const ADMIN_ACTIONS = {
+  'adm-tab': el => { state.admin.tab = el.dataset.v; render(); window.scrollTo(0, 0); },
+  'adm-uf': el => { state.admin.uf = el.dataset.v; state.admin.ulimit = 40; render(); },
+  'adm-more': () => { state.admin.ulimit += 40; const b = $('adm-ulist'); if (b) b.innerHTML = userListHtml(); },
+  'adm-range': el => { state.admin.range = +el.dataset.v; render(); },
+  'adm-metric': el => { state.admin.metric = el.dataset.v; render(); },
+  'adm-evf': el => { state.admin.evf = el.dataset.v; render(); },
+  'adm-user': el => openAdminUser(el.dataset.id), 'adm-jam': el => openAdminJam(el.dataset.id),
+  'adm-note-del': el => delNote(el.dataset.t, el.dataset.id),
+  'adm-block-modal': el => openBlockModal(el.dataset.id), 'adm-unblock': el => doUnblock(el.dataset.id),
+  'adm-mail-modal': el => openMailModal(el.dataset.id), 'adm-reset': el => adminReset(el.dataset.id),
+  'adm-admin-toggle': el => toggleAdmin(el.dataset.id), 'adm-admin-del': el => toggleAdmin(el.dataset.id),
+  'adm-export': exportUsersCsv,
+  'adm-copy-rules': () => navigator.clipboard.writeText(ADMIN_RULES).then(() => toast('تم نسخ القواعد')).catch(() => toast('تعذر النسخ', 'error')),
+  'ann-x': () => { ssSet('jm_ann', String(state.settings.annVer)); render(); }
+};
+const ADMIN_FORMS = { 'f-adm-note': addNote, 'f-adm-block': doBlock, 'f-adm-mail': sendAdminMail, 'f-adm-settings': saveSettings, 'f-adm-addadmin': addAdminByEmail };
+document.addEventListener('input', e => {
+  const t = e.target; if (!t.matches || !t.matches('[data-adm-q]')) return;
+  const k = t.dataset.admQ; state.admin[k] = t.value; if (k === 'q') state.admin.ulimit = 40;
+  const box = $(k === 'jq' ? 'adm-jlist' : 'adm-ulist'); if (box) box.innerHTML = k === 'jq' ? jamListHtml() : userListHtml();
+});
+document.addEventListener('change', e => {
+  const t = e.target; if (!t.matches) return;
+  if (t.matches('[data-adm-sort]')) { state.admin.us = t.value; const b = $('adm-ulist'); if (b) b.innerHTML = userListHtml(); }
+  if (t.matches('[data-adm-flag]')) setFlag(t.dataset.t, t.value);
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && state.user && state.profile && ssGet('jm_sess_' + state.user.uid)) db.collection('activity').doc(state.user.uid).set({ lastSeen: FV.serverTimestamp() }, { merge: true }).catch(() => {});
+});
+
 
 /* ============ الواجهات ============ */
 function render() {
@@ -1039,7 +1569,9 @@ function render() {
   renderNav();
   const v = state.view, app = $('app');
   const views = { loading: vLoading, auth: vAuth, verify: vVerify, complete: vComplete, home: vHome, create: vCreate, jamiya: vJamiya, profile: vProfile, admin: vAdmin };
-  app.innerHTML = `<div class="fade">${(views[v] || vLoading)()}</div>`;
+  if (maintOn()) { $('tabbar').classList.add('hide'); app.innerHTML = vMaint(); return; }
+  app.innerHTML = `<div class="fade">${annHtml()}${(views[v] || vLoading)()}</div>`;
+  trackView(v);
   app.querySelectorAll('form').forEach(fm => { if (fm.querySelector('[data-identity]')) updPreview(fm); });
   if (state._lv !== v) { state._lv = v; window.scrollTo(0, 0); }
 }
@@ -1258,22 +1790,6 @@ function vProfile() {
     <button class="btn b-red w-full py-3 md:hidden" data-act="logout"><i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج</button></div>`;
 }
 
-function vAdmin() {
-  const { jamiyat, users } = state.admin;
-  const total = jamiyat.reduce((s, j) => s + j.count * j.amount, 0);
-  const totalMembers = jamiyat.reduce((s, j) => s + (j.memberUids || []).length, 0);
-  return `<div class="space-y-5"><div class="card p-6 !bg-slate-900 text-white flex flex-wrap justify-between items-center gap-3">
-    <div><span class="px-3 py-1 bg-indigo-500/30 text-indigo-200 text-xs font-bold rounded-full inline-block mb-2"><i class="fa-solid fa-shield-halved"></i> لوحة المالك</span><h2 class="text-xl font-black">إدارة المنصة</h2>
-    <p class="text-xs text-slate-300 mt-1" dir="ltr">${esc(state.user.email)}</p></div>
-    <div class="flex gap-2 flex-wrap"><button class="btn b-sec" data-act="refresh-admin"><i class="fa-solid fa-rotate"></i> تحديث</button><button class="btn b-pri" data-act="test-mail"><i class="fa-solid fa-envelope"></i> اختبار البريد</button></div></div>
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4"><div class="card p-4"><p class="text-xs text-slate-500">الجمعيات</p><h3 class="text-2xl font-black">${jamiyat.length}</h3></div>
-  <div class="card p-4"><p class="text-xs text-slate-500">المستخدمون</p><h3 class="text-2xl font-black">${users.length}</h3></div>
-  <div class="card p-4"><p class="text-xs text-slate-500">عضويات الجمعيات</p><h3 class="text-2xl font-black">${totalMembers}</h3></div>
-  <div class="card p-4"><p class="text-xs text-slate-500">إجمالي الدورات</p><h3 class="text-lg font-black text-emerald-600">${money(total)}</h3></div></div>
-  <div class="grid md:grid-cols-2 gap-5"><div class="card p-5"><h3 class="font-bold text-sm mb-3">الجمعيات</h3><div class="space-y-2 max-h-96 overflow-y-auto">${jamiyat.map(j => `<div class="p-3 bg-slate-50 rounded-xl text-xs flex justify-between items-center gap-2"><div><b>${esc(j.name)}</b><p class="text-slate-500">المشرف: ${esc(j.creatorName)} • ${(j.memberUids || []).length}/${j.count} • ${money(j.amount)}</p></div><button class="btn b-sec" data-act="open" data-id="${j.id}">فتح</button></div>`).join('') || '<p class="text-xs text-slate-400">لا توجد جمعيات.</p>'}</div></div>
-  <div class="card p-5"><h3 class="font-bold text-sm mb-3">المستخدمون</h3><div class="space-y-2 max-h-96 overflow-y-auto">${users.map(u => `<div class="p-3 bg-slate-50 rounded-xl text-xs"><b>${esc(u.name)}</b><p class="text-slate-500" dir="ltr">${esc(u.email)} • ${esc(u.phone || '')}</p></div>`).join('') || '<p class="text-xs text-slate-400">لا يوجد مستخدمون.</p>'}</div></div></div></div>`;
-}
-
 /* ============ النوافذ المنبثقة ============ */
 function showModal(title, body) {
   $('modal').innerHTML = `<div class="sheet-wrap fade" data-bg><div class="sheet space-y-4" role="dialog" aria-modal="true">
@@ -1385,7 +1901,7 @@ const actions = {
   'go-create': () => { state.view = 'create'; render(); },
   'go-profile': () => { state.view = 'profile'; render(); },
   'go-admin': () => { state.view = 'admin'; render(); loadAdmin(); },
-  'logout': () => auth.signOut(),
+  'logout': () => { if (state.user) ssDel('jm_sess_' + state.user.uid); stopHeartbeat(); auth.signOut(); },
   'google': doGoogle,
   'auth-register': () => { state.authMode = 'register'; render(); },
   'auth-login': () => { state.authMode = 'login'; render(); },
@@ -1415,7 +1931,7 @@ const actions = {
   'od-up': (el) => orderMove(+el.dataset.i, -1), 'od-down': (el) => orderMove(+el.dataset.i, 1),
   'od-shuffle': orderShuffle, 'od-save': orderSave,
   'view-proof': (el) => viewProof(el.dataset.id),
-  'refresh-admin': loadAdmin, 'test-mail': testMail,
+  'refresh-admin': loadAdmin, 'test-mail': testMail, ...ADMIN_ACTIONS,
   'copy-invite': () => navigator.clipboard.writeText(inviteText(state.lastInvite)).then(() => toast('تم نسخ نص الدعوة')).catch(() => toast('تعذر النسخ', 'error')),
   'install-app': installApp, 'reload-app': () => location.reload(),
   'dismiss-ib': () => { try { localStorage.setItem(ibKey, Date.now()); } catch (e) {} state.updateReady = false; renderBanner(); },
@@ -1445,8 +1961,10 @@ document.addEventListener('input', e => {
 });
 const forms = { 'f-register': doRegister, 'f-login': doLogin, 'f-reset': doReset, 'f-complete': doCompleteProfile, 'f-create': handleCreate,
   'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete };
+Object.assign(forms, ADMIN_FORMS);
 document.addEventListener('submit', e => { const fn = forms[e.target.id]; if (fn) { e.preventDefault(); fn(e.target); } });
 
+watchSettings(); trackVisit();
 render();
 </script>
 <div id="print-root"></div>
