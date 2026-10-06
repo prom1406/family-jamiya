@@ -1,6 +1,6 @@
 /* الجمعية الصغيرة — Service Worker
    يجعل التطبيق قابلاً للتثبيت ويعمل واجهته دون اتصال. غيّر رقم الإصدار عند كل تحديث للملفات. */
-const VERSION = 'jamiya-v4.1';
+const VERSION = 'jamiya-v4.3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png', './favicon-32.png', './logo-full.jpg'];
 // مصادر ثابتة من CDN نخزنها للتشغيل السريع ودون اتصال
 const CDN_HOSTS = ['cdn.tailwindcss.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com', 'www.gstatic.com', 'cdn.jsdelivr.net', 'www.svgrepo.com'];
@@ -48,4 +48,11 @@ self.addEventListener('notificationclick', e => {
     if (c) { c.focus(); if (jid) c.postMessage({ type: 'open-jamiya', jid }); return; }
     return self.clients.openWindow('./');
   }));
+});
+
+// إشعارات الدفع من الخادم (FCM) تصل حتى والتطبيق مغلق
+self.addEventListener('push', e => {
+  let d = {}; try { d = e.data.json(); } catch (_) { d = { data: { body: e.data ? e.data.text() : '' } }; }
+  const n = d.notification || {}, x = d.data || {};
+  e.waitUntil(self.registration.showNotification(n.title || x.title || 'الجمعية الذكية', { body: n.body || x.body || '', icon: 'icon-192.png', badge: 'icon-192.png', lang: 'ar', dir: 'rtl', tag: x.tag || undefined, data: { jid: x.jid || '' } }));
 });
