@@ -178,7 +178,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 4.0</footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.1</footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -407,7 +407,7 @@ auth.onAuthStateChanged(async user => {
 
   if (!state.isAdmin && await isBlockedNow()) return;
   if (!state.profile) { state.view = 'complete'; return render(); }
-  watchBlocked(); trackSession();
+  watchBlocked(); trackSession(); renderBanner();
   claimPhone(user.uid, state.profile.phone);
   startListeners();
   if (state.isAdmin) { state.view = 'admin'; render(); loadAdmin(); toast('مرحباً بك في لوحة المالك', 'info'); return; }
@@ -436,7 +436,8 @@ function cleanup(arr) { arr.forEach(u => u()); arr.length = 0; }
 function startListeners() {
   const uid = state.user.uid, email = lc(state.user.email), phone = normPhone(state.profile && state.profile.phone);
   let invA = [], invB = [];
-  const merge = () => { const m = new Map(); [...invA, ...invB].forEach(i => m.set(i.id, i)); state.invites = [...m.values()]; if (state.view === 'home') render(); };
+  const merge = () => { const m = new Map(); [...invA, ...invB].forEach(i => m.set(i.id, i)); state.invites = [...m.values()];
+    state.invites.forEach(i => pushLocal('دعوة جديدة للانضمام', `دعاك ${i.inviterName || ''} إلى جمعية «${i.jamiyaName || ''}»`, 'inv_' + i.id)); if (state.view === 'home') render(); };
   state.unsubs.push(
     db.collection('jamiyat').where('memberUids', 'array-contains', uid).onSnapshot(s => {
       state.jamiyat = s.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -530,7 +531,8 @@ async function handleInvite(f) {
   if (Object.values(state.members).some(m => normPhone(m.phone) === phone || (email && lc(m.email) === email))) return toast('هذا الشخص عضو بالفعل', 'error');
   if (state.jInvites.some(i => i.status === 'pending' && (normPhone(i.phone) === phone || (email && lc(i.email) === email)))) return toast('توجد دعوة معلّقة لنفس الرقم أو البريد، أعد إرسالها من قائمة الدعوات', 'error');
   const pending = state.jInvites.filter(i => i.status === 'pending').length;
-  if (c.j.memberUids.length + pending >= c.j.count) return toast('اكتمل عدد الأعضاء المحدد للجمعية', 'error');
+  if (c.j.memberUids.length >= c.j.count) return toast('اكتمل عدد الأعضاء. احذف أحد الأعضاء أولاً لتتمكن من إضافة عضو جديد', 'error');
+  if (c.j.memberUids.length + pending >= c.j.count) return toast('عدد الأعضاء والدعوات المعلّقة وصل للحد. ألغِ دعوة معلّقة أو احذف عضواً', 'error');
   const id = `${c.j.id}__p${phone}`;
   const inv = { jamiyaId: c.j.id, jamiyaName: c.j.name, amount: c.j.amount, every: freqOf(c.j).every, email, phone, name,
     invitedBy: state.user.uid, inviterName: dispName(state.profile), creatorUid: c.j.creatorUid, status: 'pending' };
@@ -580,7 +582,18 @@ async function acceptInvite(inviteId) {
   batch.update(jRef, { memberUids: FV.arrayUnion(uid), turns: FV.arrayUnion(uid) });
   batch.update(db.collection('invites').doc(inviteId), { status: 'accepted' });
   batch.set(jRef.collection('members').doc(uid), memberDoc(uid, p));
-  try { await batch.commit(); toast('تم الانضمام للجمعية'); } catch (e) { toast('تعذر الانضمام: ' + e.message, 'error'); }
+  try { await batch.commit(); toast('تم الانضمام للجمعية'); } catch (e) { toast(e.code === 'permission-denied' ? 'تعذر الانضمام: ربما اكتمل عدد أعضاء الجمعية أو أُلغيت الدعوة' : 'تعذر الانضمام: ' + e.message, 'error'); }
+}
+async function removeMember(uid) {
+  const c = ctx(); if (!c || !c.isCreator || uid === c.j.creatorUid) return;
+  const ac = c.acct[uid], i = c.turns.indexOf(uid), m = state.members[uid] || {};
+  if (ac && ac.mine.length) return toast('لا يمكن حذف عضو لديه مدفوعات مسجّلة', 'error');
+  if (c.started && i <= c.cur) return toast('لا يمكن حذف عضو حلّ دوره في القبض', 'error');
+  if (!confirm('حذف ' + dispName(m) + ' من الجمعية؟ سيصبح مكانه شاغراً ويمكنك دعوة عضو بديل.')) return;
+  const ref = db.collection('jamiyat').doc(c.j.id), batch = db.batch();
+  batch.update(ref, { memberUids: FV.arrayRemove(uid), turns: FV.arrayRemove(uid) });
+  batch.delete(ref.collection('members').doc(uid));
+  try { await batch.commit(); toast('تم حذف العضو'); } catch (e) { toast('تعذر الحذف: ' + e.message, 'error'); }
 }
 async function declineInvite(inviteId) {
   try { await db.collection('invites').doc(inviteId).update({ status: 'declined' }); toast('تم رفض الدعوة', 'info'); }
@@ -621,7 +634,7 @@ function syncPayListeners() {
     const col = db.collection('jamiyat').doc(j.id).collection('payments');
     const q = j.creatorUid === uid ? col : col.where('uid', '==', uid);
     state.payLs[j.id] = q.onSnapshot(s => {
-      state.pays[j.id] = s.docs.map(d => ({ id: d.id, ...d.data() }));
+      state.pays[j.id] = s.docs.map(d => ({ id: d.id, ...d.data() })); notifyPays(j, state.pays[j.id]);
       if (state.view === 'home') render();
     }, () => {});
   });
@@ -923,11 +936,24 @@ async function voteMod(approve) {
   try { await db.collection('jamiyat').doc(state.j.id).update({ modRequest: r }); } catch (e) { toast(e.message, 'error'); }
 }
 async function closeMod() { try { await db.collection('jamiyat').doc(state.j.id).update({ modRequest: null }); } catch (e) { toast(e.message, 'error'); } }
-function editLocked(c) { return c.started || state.payments.length > 0; } // تغيير الدورية يُقفل بعد البدء أو أول دفعة
+const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+// عند تغيير المدة بعد البدء: تبدأ الدورة الحالية من اليوم بالمدة الجديدة، وتبقى أرقام الدورات والمدفوعات كما هي
+function reanchorStart(freq, idx) {
+  const f = FREQS[freq], n = new Date(), t = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  return ymd(f.days ? new Date(t.getFullYear(), t.getMonth(), t.getDate() - idx * f.days) : new Date(t.getFullYear(), t.getMonth() - idx, 1));
+}
 async function submitEdit(f) {
   const c = ctx(), minCount = Math.max(2, c.j.memberUids.length, c.started ? c.cur + 1 : 2);
   const upd = { name: f.jname.value.trim(), icon: cleanIcon(f.icon.value), count: parseInt(f.count.value), amount: parseFloat(f.amount.value), lastDay: parseInt(f.lastDay.value), payDay: parseInt(f.payDay.value) };
-  if (!editLocked(c) && FREQS[f.frequency.value]) upd.frequency = f.frequency.value;
+  const newFreq = FREQS[f.frequency.value] ? f.frequency.value : (c.j.frequency || 'monthly');
+  if (newFreq !== (c.j.frequency || 'monthly')) {
+    upd.frequency = newFreq;
+    if (c.started) {
+      if (!confirm('تغيير مدة الدورة بعد بدء الجمعية: ستبدأ الدورة الحالية (رقم ' + (c.cur + 1) + ') من اليوم بالمدة الجديدة، ويبقى ترتيب القبض والمدفوعات كما هي. هل تريد المتابعة؟')) return;
+      upd.startDate = reanchorStart(newFreq, c.idx);
+    }
+  }
+  if (f.start && f.start.value && !c.started && state.payments.length === 0 && !upd.startDate) upd.startDate = f.start.value;
   const maxDay = maxDayOf({ frequency: upd.frequency || c.j.frequency });
   if (!(upd.count >= minCount && upd.count <= 30)) return toast(`عدد الأعضاء يجب أن يكون بين ${minCount} و30 (لا يقل عن الأعضاء الحاليين أو الدورات المنقضية)`, 'error');
   if (!upd.name || !(upd.amount > 0) || !(upd.lastDay >= 1 && upd.lastDay <= maxDay) || !(upd.payDay >= 1 && upd.payDay <= maxDay)) return toast(`قيم غير صحيحة (الأيام بين 1 و${maxDay})`, 'error');
@@ -1068,7 +1094,7 @@ const VIEW_L = { auth: 'تسجيل الدخول', verify: 'تفعيل البري
 const FLAGS = { '': ['بدون تصنيف', ''], vip: ['⭐ مميز', 'bg-amber-100 text-amber-800'], watch: ['👁 تحت المراقبة', 'bg-sky-100 text-sky-700'], problem: ['⚠️ مشكلة / متأخر', 'bg-rose-100 text-rose-700'], follow: ['📌 يحتاج متابعة', 'bg-violet-100 text-violet-700'] };
 const EV_L = { login: ['دخول', 'fa-right-to-bracket', 'text-emerald-600'], register: ['تسجيل جديد', 'fa-user-plus', 'text-sky-600'], blocked_try: ['محاولة دخول (حساب محظور)', 'fa-ban', 'text-rose-600'],
   adm_block: ['حظر مستخدم', 'fa-user-slash', 'text-rose-600'], adm_unblock: ['رفع حظر', 'fa-user-check', 'text-emerald-600'], adm_note: ['ملاحظة إدارية', 'fa-note-sticky', 'text-amber-600'],
-  adm_mail: ['إرسال بريد', 'fa-envelope', 'text-sky-600'], adm_reset: ['رابط إعادة كلمة المرور', 'fa-key', 'text-slate-600'], adm_admin: ['تغيير صلاحية مشرف', 'fa-user-shield', 'text-violet-600'], adm_settings: ['تعديل إعدادات المنصة', 'fa-sliders', 'text-slate-600'] };
+  adm_mail: ['إرسال بريد', 'fa-envelope', 'text-sky-600'], adm_reset: ['رابط إعادة كلمة المرور', 'fa-key', 'text-slate-600'], adm_admin: ['تغيير صلاحية مشرف', 'fa-user-shield', 'text-violet-600'], adm_settings: ['تعديل إعدادات المنصة', 'fa-sliders', 'text-slate-600'], adm_jam_del: ['حذف جمعية', 'fa-trash', 'text-rose-600'] };
 
 /* --- التتبع (يعمل عند المستخدمين العاديين) --- */
 function devInfo() {
@@ -1154,6 +1180,7 @@ async function isBlockedNow() {
 function watchSettings() {
   db.collection('settings').doc('app').onSnapshot(s => {
     state.settings = s.exists ? s.data() : {};
+    if (state.settings.annActive && state.settings.annText && state.user && !state.isAdmin) pushLocal('إعلان من الجمعية الذكية', state.settings.annText, 'ann_' + state.settings.annVer);
     const st = state.settings, key = [st.maintenance ? 1 : 0, st.regClosed ? 1 : 0, st.annActive ? st.annVer : 0].join('|');
     if (key !== setKey) { setKey = key; render(); }
   }, () => {});
@@ -1447,7 +1474,9 @@ function openAdminJam(id) {
   showModal(esc(j.name), `<div class="space-y-4 text-xs"><div class="grid grid-cols-2 gap-2">${cell('المشرف', esc(j.creatorName || '—'))}${cell('النوع', esc(fr))}${cell('القسط', money(j.amount))}${cell('عدد الدورات', nf(j.count))}${cell('إجمالي الدورة', money((j.count || 0) * (j.amount || 0)))}${cell('تاريخ الإنشاء', j.createdAt ? fmtDT(tsd(j.createdAt)) : '—')}</div>
     <div><h4 class="font-black text-sm mb-2">الأعضاء (${nf(mem.length)}/${nf(j.count)})</h4><div class="space-y-1.5">${mem.map(u => `<button class="w-full text-right p-2.5 bg-slate-50 rounded-xl flex justify-between" data-act="adm-user" data-id="${u.id}"><b>${esc(u.name)}</b><span class="text-slate-400" dir="ltr">${esc(u.phone || '')}</span></button>`).join('') || '<p class="text-[11px] text-slate-400">لا أعضاء.</p>'}</div></div>
     <button class="btn b-pri w-full" data-act="open" data-id="${j.id}" onclick="closeModal()"><i class="fa-solid fa-arrow-up-right-from-square"></i> فتح الجمعية</button>
-    ${notesBlock('j_' + id)}</div>`);
+    ${notesBlock('j_' + id)}
+    ${lc(state.user.email) === OWNER_EMAIL ? `<div class="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-2"><p class="text-rose-800 leading-relaxed"><b>حذف نهائي (للمالك فقط):</b> يُحذف كل شيء: الأعضاء والمدفوعات والإيصالات والدعوات، ولا يمكن التراجع.</p>
+      <button class="btn b-red w-full" data-act="adm-jam-del" data-id="${id}"><i class="fa-solid fa-trash"></i> حذف الجمعية</button></div>` : ''}</div>`);
 }
 function reopenTarget(t) { render(); if (String(t).startsWith('j_')) openAdminJam(t.slice(2)); else openAdminUser(t); }
 
@@ -1531,7 +1560,24 @@ function exportUsersCsv() {
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = 'users-' + dayKey() + '.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
+async function adminDeleteJam(id) {
+  const A = state.admin, j = A.jamiyat.find(x => x.id === id);
+  if (!j || lc(state.user.email) !== OWNER_EMAIL) return toast('الحذف للمالك فقط', 'error');
+  const typed = prompt('للتأكيد اكتب اسم الجمعية تماماً:\n' + j.name);
+  if (typed === null) return;
+  if (typed.trim() !== String(j.name).trim()) return toast('الاسم غير مطابق، لم يتم الحذف', 'error');
+  const ref = db.collection('jamiyat').doc(id), wipe = async q => { const snap = await q.get(); for (let i = 0; i < snap.docs.length; i += 400) { const b = db.batch(); snap.docs.slice(i, i + 400).forEach(d => b.delete(d.ref)); await b.commit(); } };
+  toast('جارٍ الحذف…', 'info');
+  try {
+    await wipe(ref.collection('payments')); await wipe(ref.collection('proofs')); await wipe(db.collection('invites').where('jamiyaId', '==', id)); await wipe(ref.collection('members'));
+    await ref.delete(); await db.collection('admin_notes').doc('j_' + id).delete().catch(() => {});
+    A.jamiyat = A.jamiyat.filter(x => x.id !== id); delete A.notes['j_' + id];
+    logEvent('adm_jam_del', { target: id, targetName: j.name, info: 'المشرف: ' + (j.creatorName || '') });
+    closeModal(); render(); toast('تم حذف الجمعية');
+  } catch (e) { toast('تعذر الحذف: ' + e.message + ' — تأكد من نشر القواعد المحدّثة', 'error'); }
+}
 const ADMIN_ACTIONS = {
+  'adm-jam-del': el => adminDeleteJam(el.dataset.id),
   'adm-tab': el => { state.admin.tab = el.dataset.v; render(); window.scrollTo(0, 0); },
   'adm-uf': el => { state.admin.uf = el.dataset.v; state.admin.ulimit = 40; render(); },
   'adm-more': () => { state.admin.ulimit += 40; const b = $('adm-ulist'); if (b) b.innerHTML = userListHtml(); },
@@ -1562,6 +1608,50 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && state.user && state.profile && ssGet('jm_sess_' + state.user.uid)) db.collection('activity').doc(state.user.uid).set({ lastSeen: FV.serverTimestamp() }, { merge: true }).catch(() => {});
 });
 
+
+
+/* ============ إشعارات النظام (تظهر خارج التطبيق على الجوال) ============ */
+const notifSupported = () => 'Notification' in window;
+const notifOn = () => notifSupported() && Notification.permission === 'granted' && lsGet('jm_notif') !== '0';
+const notifCanAsk = () => notifSupported() && Notification.permission === 'default' && (!isIOS() || isStandalone());
+async function showSysNotif(title, body, tag, jid) {
+  const opts = { body, tag, icon: 'icon-192.png', badge: 'icon-192.png', lang: 'ar', dir: 'rtl', data: { jid: jid || '', url: location.pathname } };
+  try { const reg = await navigator.serviceWorker.getRegistration(); if (reg) return await reg.showNotification(title, opts); } catch (e) {}
+  try { new Notification(title, opts); } catch (e) {}
+}
+// تُعرض فقط والتطبيق في الخلفية (داخل التطبيق تكفي الرسائل)، ولا تتكرر لنفس الحدث
+function pushLocal(title, body, tag, jid) {
+  if (!notifOn()) return;
+  let seen = []; try { seen = JSON.parse(lsGet('jm_nseen') || '[]'); } catch (e) {}
+  if (seen.includes(tag)) return;
+  if (document.visibilityState === 'hidden') { showSysNotif(title, body, tag, jid); }
+  else if (document.visibilityState === 'visible' && !String(tag).startsWith('al_')) { /* مرئي: نسجله كمُشاهَد */ }
+  else return; // تنبيهات المواعيد تنتظر حتى يصبح التطبيق في الخلفية
+  seen.push(tag); lsSet('jm_nseen', JSON.stringify(seen.slice(-300)));
+}
+async function enableNotifs() {
+  if (!notifSupported()) return toast('هذا المتصفح لا يدعم الإشعارات' + (isIOS() ? ' — على الآيفون ثبّت التطبيق على الشاشة الرئيسية أولاً' : ''), 'error');
+  if (isIOS() && !isStandalone()) return toast('على الآيفون ثبّت التطبيق على الشاشة الرئيسية ثم افتحه وفعّل الإشعارات', 'error');
+  let p = Notification.permission; if (p === 'default') p = await Notification.requestPermission();
+  if (p === 'granted') { lsSet('jm_notif', '1'); toast('تم تفعيل الإشعارات'); showSysNotif('الجمعية الذكية', 'الإشعارات مفعّلة ✓', 'welcome_' + Date.now()); }
+  else toast('لم يُسمح بالإشعارات. فعّلها من إعدادات المتصفح للموقع', 'error');
+  renderBanner(); if (state.view === 'profile') render();
+}
+function testNotif() { if (!notifOn()) return toast('فعّل الإشعارات أولاً', 'error'); showSysNotif('الجمعية الذكية', 'هذا إشعار تجريبي. أغلق التطبيق أو انتقل لتطبيق آخر لتجربة ظهوره خارج الصفحة.', 'test_' + Date.now()); toast('أُرسل إشعار تجريبي', 'info'); }
+function notifyPays(j, pays) {
+  const uid = state.user.uid;
+  pays.forEach(p => {
+    if (p.uid === uid && p.status === 'confirmed') pushLocal('تم تأكيد سدادك ✓', `جمعية «${j.name}» — ${fmtNum(p.amount)} ريال`, 'pc_' + p.id, j.id);
+    if (p.uid !== uid && p.status === 'pending' && (p.recipientUid === uid || j.creatorUid === uid)) pushLocal('إيصال جديد بانتظار تأكيدك', `جمعية «${j.name}» — ${fmtNum(p.amount)} ريال`, 'pp_' + p.id, j.id);
+  });
+}
+function notifyAlerts() {
+  if (!state.user || !state.profile || state.isAdmin) return;
+  homeAlerts().forEach(a => pushLocal(a.title, a.text, 'al_' + a.id + '_' + a.lvl + '_' + dayKey(), a.id));
+}
+setInterval(notifyAlerts, 10 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') setTimeout(notifyAlerts, 1500); });
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { const d = e.data; if (d && d.type === 'open-jamiya' && d.jid) openJamiya(d.jid); });
 
 /* ============ الواجهات ============ */
 function render() {
@@ -1735,6 +1825,7 @@ function vJamiya() {
       <div><p class="font-bold">${esc(dispName(m))} ${u === j.creatorUid ? '<span class="text-[10px] text-indigo-600">(مشرف)</span>' : ''}</p><p class="text-[10px] text-slate-400">دوره: ${periodLabel(j, i)}</p>${contact}${detail ? `<p class="text-[10px] text-slate-500">${detail}</p>` : ''}</div></div>
       <div class="flex items-center gap-2 flex-wrap">
         ${c.finished ? '' : `<span class="px-2 py-1 rounded-lg font-bold ${b[1]}">${b[0]}</span>`}
+        ${c.isCreator && u !== j.creatorUid && !ac.mine.length && (!c.started || i > c.cur) ? `<button class="px-2 py-1 bg-rose-50 text-rose-600 rounded-lg" data-act="rm-member" data-uid="${esc(u)}" aria-label="حذف العضو"><i class="fa-solid fa-user-minus"></i> حذف</button>` : ''}
         ${ac.mine.length ? `<button class="${canReview ? 'btn bg-emerald-600 text-white' : 'px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg'}" data-act="member-pays" data-uid="${esc(u)}"><i class="fa-solid ${canReview ? 'fa-check' : 'fa-paperclip'}"></i> ${canReview ? 'مراجعة وتأكيد (' + nPending + ')' : 'المدفوعات (' + ac.mine.length + ')'}</button>` : ''}
       </div></div>`;
   }).join('');
@@ -1760,7 +1851,7 @@ function vJamiya() {
       <div><button class="text-xs text-slate-400 mb-1" data-act="go-home">← رجوع</button><h2 class="text-2xl font-black">${j.icon ? esc(j.icon) + ' ' : ''}${esc(j.name)}</h2>
       <p class="text-xs text-slate-500 mt-1">${freqOf(j).label} • القسط ${money(j.amount)} • السداد حتى يوم ${j.lastDay}${freqOf(j).days ? ' من الدورة' : ''} • الصرف يوم ${j.payDay}${freqOf(j).days ? ' من الدورة' : ''} • تبدأ ${fmtDate(new Date(j.startDate + 'T00:00:00'))}</p></div>
       <div class="chips w-full md:w-auto md:flex-wrap">
-        ${c.isCreator ? `<button class="btn b-pri" data-act="invite-modal"><i class="fa-solid fa-user-plus"></i> دعوة عضو</button><button class="btn b-sec" data-act="remind"><i class="fa-solid fa-bell"></i> تذكير بالبريد</button><button class="btn bg-emerald-50 text-emerald-700" data-act="wa-remind"><i class="fa-brands fa-whatsapp"></i> تذكير واتساب</button><button class="btn b-sec" data-act="edit-modal"><i class="fa-solid fa-gear"></i> تعديل</button><button class="btn b-red" data-act="delete-modal"><i class="fa-solid fa-trash"></i> حذف</button>` : ''}
+        ${c.isCreator ? `${j.memberUids.length >= j.count ? '<button class="btn b-sec" data-act="full-note"><i class="fa-solid fa-user-check"></i> اكتمل العدد</button>' : '<button class="btn b-pri" data-act="invite-modal"><i class="fa-solid fa-user-plus"></i> دعوة عضو</button>'}<button class="btn b-sec" data-act="remind"><i class="fa-solid fa-bell"></i> تذكير بالبريد</button><button class="btn bg-emerald-50 text-emerald-700" data-act="wa-remind"><i class="fa-brands fa-whatsapp"></i> تذكير واتساب</button><button class="btn b-sec" data-act="edit-modal"><i class="fa-solid fa-gear"></i> تعديل</button><button class="btn b-red" data-act="delete-modal"><i class="fa-solid fa-trash"></i> حذف</button>` : ''}
         <button class="btn b-sec" data-act="export-modal"><i class="fa-solid fa-file-export"></i> تصدير الكشف</button>
         <button class="btn b-sec" data-act="add-cal"><i class="fa-solid fa-calendar-plus"></i> أضف للتقويم</button>
         <button class="btn b-sec" data-act="mod-modal"><i class="fa-solid fa-pen-to-square"></i> اقتراح تعديل</button></div></div>
@@ -1784,6 +1875,9 @@ function vProfile() {
   return `<div class="max-w-xl mx-auto space-y-4"><div class="card p-6 space-y-5"><div class="flex justify-between items-center gap-3"><div class="flex items-center gap-3 min-w-0"><div class="jicon !rounded-full"><i class="fa-solid fa-user"></i></div><div class="min-w-0"><h3 class="font-black text-lg truncate">${esc(p.name)}</h3><p class="text-xs text-slate-500 truncate" dir="ltr">${esc(p.email)}</p></div></div><button class="btn b-sec hidden md:inline-flex" data-act="go-home">الرئيسية</button></div>
     <form id="f-profile" class="space-y-3"><div><label class="text-xs font-semibold block mb-1">الاسم</label><input name="name" class="inp" value="${esc(p.name)}" required></div>${bankFields(p)}
     <button class="btn b-pri w-full py-3" type="submit">حفظ التعديلات</button></form></div>
+    <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-bell text-amber-500"></i> إشعارات الجوال</h4>
+      <p class="text-xs text-slate-500 leading-relaxed">${!notifSupported() ? 'هذا المتصفح لا يدعم الإشعارات.' : Notification.permission === 'denied' ? 'الإشعارات محظورة لهذا الموقع، فعّلها من إعدادات المتصفح.' : notifOn() ? 'الإشعارات مفعّلة ✓ ستصلك تنبيهات الدعوات والإيصالات ومواعيد السداد.' : 'فعّلها لتصلك تنبيهات الدعوات والإيصالات ومواعيد السداد خارج التطبيق.'}${isIOS() && !isStandalone() ? ' على الآيفون يلزم تثبيت التطبيق أولاً.' : ''}</p>
+      <div class="flex flex-wrap gap-2">${notifOn() ? '<button class="btn b-sec" data-act="test-notif"><i class="fa-solid fa-paper-plane"></i> إشعار تجريبي</button>' : '<button class="btn b-pri" data-act="enable-notif"><i class="fa-solid fa-bell"></i> تفعيل الإشعارات</button>'}</div></div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-mobile-screen-button text-emerald-600"></i> التطبيق</h4>
       <p class="text-xs text-slate-500 leading-relaxed">${inst ? 'أنت تستخدم التطبيق المثبّت على جهازك ✓' : 'ثبّت الجمعية الذكية على شاشتك الرئيسية لتعمل كتطبيق كامل وبسرعة أكبر.'}</p>
       <div class="flex flex-wrap gap-2">${inst ? '' : '<button class="btn b-pri" data-act="install-app"><i class="fa-solid fa-download"></i> تثبيت التطبيق</button>'}<button class="btn b-sec" data-act="share-app"><i class="fa-solid fa-share-nodes"></i> مشاركة التطبيق</button></div></div>
@@ -1813,11 +1907,12 @@ function openModal(kind) {
   if (kind === 'mod') showModal('اقتراح تعديل على الشروط', `<form id="f-mod" class="space-y-3"><textarea name="text" rows="3" class="inp" required placeholder="اكتب التعديل المقترح بوضوح..."></textarea>
     <p class="text-[11px] text-slate-500">يُقبل الطلب عند موافقة أكثر من نصف الأعضاء، ثم يطبّقه المشرف.</p><button class="btn b-pri w-full py-3" type="submit">إرسال للتصويت</button></form>`);
   if (kind === 'edit') {
-    const minCount = Math.max(2, c.j.memberUids.length, c.started ? c.cur + 1 : 2), locked = editLocked(c), dl = dayLabels(c.j.frequency);
+    const minCount = Math.max(2, c.j.memberUids.length, c.started ? c.cur + 1 : 2), dl = dayLabels(c.j.frequency);
     showModal('تعديل إعدادات الجمعية', `<form id="f-edit" class="space-y-3"><div><label class="text-xs font-semibold block mb-1">الاسم</label><input name="jname" class="inp" value="${esc(c.j.name)}" required></div>
     ${iconPicker(c.j.icon || '')}
-    <div><label class="text-xs font-semibold block mb-1">نوع الجمعية (مدة الدورة)</label><select name="frequency" class="inp" data-freq ${locked ? 'disabled' : ''}>${freqOpts(c.j.frequency || 'monthly')}</select>
-      ${locked ? '<p class="text-[11px] text-slate-500 mt-1">لا يمكن تغيير مدة الدورة بعد بدء الجمعية أو تسجيل أول دفعة، حتى لا يختل الجدول.</p>' : ''}</div>
+    <div><label class="text-xs font-semibold block mb-1">نوع الجمعية (مدة الدورة)</label><select name="frequency" class="inp" data-freq>${freqOpts(c.j.frequency || 'monthly')}</select>
+      ${c.started ? '<p class="text-[11px] text-amber-700 mt-1 leading-relaxed">تنبيه: عند تغيير المدة بعد البدء ستبدأ الدورة الحالية من اليوم بالمدة الجديدة، ويبقى ترتيب القبض والمدفوعات كما هي.</p>' : ''}</div>
+    ${!c.started && !state.payments.length ? `<div><label class="text-xs font-semibold block mb-1">تاريخ البداية</label><input name="start" type="date" class="inp" value="${esc(c.j.startDate || '')}"></div>` : ''}
     <div class="grid grid-cols-2 gap-3"><div><label class="text-xs font-semibold block mb-1">عدد الأعضاء (الدورات)</label><input name="count" type="number" min="${minCount}" max="30" class="inp" value="${c.j.count}" required></div>
     <div><label class="text-xs font-semibold block mb-1">قيمة القسط (ريال)</label><input name="amount" type="number" step="0.01" class="inp" value="${c.j.amount}" required></div></div>
     <p class="text-[11px] text-slate-500">أقل عدد ممكن الآن: ${minCount}. عند تغيير قيمة القسط بعد وجود مدفوعات، يُعاد احتساب مدفوعات كل عضو وتقسيمها على القيمة الجديدة وتراها قبل الحفظ.</p>
@@ -1854,9 +1949,10 @@ function launchAction() {
 }
 function renderBanner() {
   const el = $('banner');
-  const bar = (icon, title, text, btn, closable = true) => `<div class="ibar fade"><img src="icon-192.png" alt=""><div class="flex-1 min-w-0"><p class="text-sm font-black">${title}</p><p class="text-[11px] text-slate-300 leading-snug">${text}</p></div>${btn}${closable ? '<button class="x" data-act="dismiss-ib" aria-label="إخفاء"><i class="fa-solid fa-xmark"></i></button>' : ''}</div>`;
+  const bar = (icon, title, text, btn, closable = true, closeAct = 'dismiss-ib') => `<div class="ibar fade"><img src="icon-192.png" alt=""><div class="flex-1 min-w-0"><p class="text-sm font-black">${title}</p><p class="text-[11px] text-slate-300 leading-snug">${text}</p></div>${btn}${closable ? `<button class="x" data-act="${closeAct}" aria-label="إخفاء"><i class="fa-solid fa-xmark"></i></button>` : ''}</div>`;
   let h = '';
   if (state.updateReady) h = bar('', 'يتوفر تحديث جديد', 'أعد تحميل التطبيق للحصول على آخر التحسينات', '<button class="btn b-pri" data-act="reload-app">تحديث</button>', false);
+  else if (state.user && state.profile && notifCanAsk() && Date.now() - Number(lsGet('jm_nb_dismiss') || 0) > 7 * 86400000) h = bar('', 'فعّل الإشعارات', 'تصلك تنبيهات السداد والدعوات حتى والتطبيق في الخلفية', '<button class="btn b-pri" data-act="enable-notif">تفعيل</button>', true, 'dismiss-nb');
   else if (!isStandalone() && !ibDismissed()) {
     if (state.appInstalled) h = bar('', 'التطبيق مثبّت لديك', 'افتحه من الشاشة الرئيسية لتجربة أسرع', '');
     else if (deferredPrompt) h = bar('', 'ثبّت التطبيق', 'أضفه لشاشتك الرئيسية ليعمل كتطبيق كامل', '<button class="btn b-pri" data-act="install-app">تثبيت</button>');
@@ -1931,6 +2027,8 @@ const actions = {
   'od-up': (el) => orderMove(+el.dataset.i, -1), 'od-down': (el) => orderMove(+el.dataset.i, 1),
   'od-shuffle': orderShuffle, 'od-save': orderSave,
   'view-proof': (el) => viewProof(el.dataset.id),
+  'rm-member': (el) => removeMember(el.dataset.uid), 'full-note': () => toast('اكتمل عدد الأعضاء. احذف عضواً (زر «حذف» بجانب اسمه) لتتمكن من دعوة بديل', 'info'),
+  'enable-notif': enableNotifs, 'test-notif': testNotif, 'dismiss-nb': () => { lsSet('jm_nb_dismiss', String(Date.now())); renderBanner(); },
   'refresh-admin': loadAdmin, 'test-mail': testMail, ...ADMIN_ACTIONS,
   'copy-invite': () => navigator.clipboard.writeText(inviteText(state.lastInvite)).then(() => toast('تم نسخ نص الدعوة')).catch(() => toast('تعذر النسخ', 'error')),
   'install-app': installApp, 'reload-app': () => location.reload(),
@@ -1947,7 +2045,7 @@ document.addEventListener('change', e => {
     const dl = dayLabels(e.target.value), fm = e.target.form;
     const l1 = fm.querySelector('[data-lbl-last]'), l2 = fm.querySelector('[data-lbl-pay]');
     if (l1) l1.textContent = dl.last; if (l2) l2.textContent = dl.pay;
-    ['lastDay', 'payDay'].forEach(n => { if (fm[n]) fm[n].max = dl.max; });
+    ['lastDay', 'payDay'].forEach(n => { if (fm[n]) { fm[n].max = dl.max; if (+fm[n].value > dl.max) fm[n].value = dl.max; } });
   }
   if (e.target.name === 'bank' && e.target.form) {
     const box = e.target.form.querySelector('[data-other]');
