@@ -179,7 +179,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.10</footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2</footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -232,7 +232,7 @@ const dispName = m => (m && ((m.showAs === 'nick' && m.nick) ? m.nick : m.name))
 const canSeeField = (m, key) => {
   const me = state.user && state.user.uid; if (!m) return false;
   if (m.uid === me) return true;
-  if (state.j && state.j.creatorUid === me) return true; // المشرف يرى كل البيانات
+  if (state.j && (state.j.creatorUid === me || (state.j.deputyUid && state.j.deputyUid === me))) return true; // المشرف يرى كل البيانات
   return key === 'phone' ? !!m.showPhone : !!m.showEmail;
 };
 const memberDoc = (uid, p) => ({ uid, name: p.name, email: lc(state.user.email), phone: p.phone, bank: p.bank, iban: p.iban, waOptIn: p.waOptIn !== false,
@@ -378,7 +378,7 @@ function ctx() {
   const acct = {}; turns.forEach(u => { acct[u] = accountFor(j, turns, cur, started, state.payments, u); });
   const curPays = state.payments.filter(p => p.month === cur);
   return { j, idx, cur, finished, started, turns, recUid, rec, pays: state.payments, curPays, acct,
-           isCreator: j.creatorUid === state.user.uid, isRec: recUid === state.user.uid,
+           isCreator: j.creatorUid === state.user.uid, isDeputy: !!j.deputyUid && j.deputyUid === state.user.uid, canManage: j.creatorUid === state.user.uid || (!!j.deputyUid && j.deputyUid === state.user.uid), isRec: recUid === state.user.uid,
            me: acct[state.user.uid] || null, f: freqOf(j) };
 }
 function payStatus(c, uid) {
@@ -525,6 +525,24 @@ async function recheckVerification() {
 }
 
 /* ============ الدعوات ============ */
+/* ============ نائب المشرف: دعوة أعضاء وتذكيرهم فقط ============ */
+function openDeputyModal() {
+  const c = ctx(); if (!c || !c.isCreator) return;
+  const opts = c.turns.filter(u => u !== c.j.creatorUid && state.members[u]).map(u => `<option value="${esc(u)}" ${u === c.j.deputyUid ? 'selected' : ''}>${esc(dispName(state.members[u]))}</option>`).join('');
+  showModal('نائب المشرف', `<form id="f-deputy" class="space-y-3">
+    <p class="text-xs text-slate-600 leading-relaxed">اختر نائباً واحداً من أعضاء الجمعية. صلاحياته: دعوة أعضاء جدد وتذكير المتأخرين بالسداد فقط. لا يستطيع التعديل أو الحذف أو تأكيد الدفعات.</p>
+    ${opts ? `<select name="uid" class="inp" required><option value="">اختر العضو…</option>${opts}</select>` : '<p class="text-xs text-slate-400">لا يوجد أعضاء آخرون في الجمعية بعد.</p>'}
+    <div class="flex gap-2">${opts ? '<button class="btn b-pri flex-1 py-3" type="submit">حفظ</button>' : ''}${c.j.deputyUid ? '<button class="btn b-red py-3" type="button" data-act="deputy-clear">إلغاء النيابة</button>' : ''}</div></form>`);
+}
+async function setDeputy(uid) {
+  const c = ctx(); if (!c || !c.isCreator) return;
+  if (uid && (!c.j.memberUids.includes(uid) || uid === c.j.creatorUid)) return toast('اختر عضواً من الجمعية', 'error');
+  try {
+    await db.collection('jamiyat').doc(c.j.id).update({ deputyUid: uid || '' });
+    closeModal(); toast(uid ? 'تم تعيين نائب المشرف' : 'أُلغيت النيابة', 'success');
+    if (uid) sendNotifs([uid], 'تم تعيينك نائباً للمشرف', `في جمعية «${c.j.name}»: يمكنك دعوة الأعضاء وتذكيرهم بالسداد`, c.j.id, 'member');
+  } catch (e) { toast(e.message, 'error'); }
+}
 async function handleInvite(f) {
   const c = ctx(); const name = f.name.value.trim(), phone = normPhone(f.phone.value), email = lc(f.email.value);
   if (name.length < 2) return toast('اكتب اسم العضو', 'error');
@@ -593,7 +611,7 @@ async function removeMember(uid) {
   if (c.started && i <= c.cur) return toast('لا يمكن حذف عضو حلّ دوره في القبض', 'error');
   if (!confirm('حذف ' + dispName(m) + ' من الجمعية؟ سيصبح مكانه شاغراً ويمكنك دعوة عضو بديل.')) return;
   const ref = db.collection('jamiyat').doc(c.j.id), batch = db.batch();
-  batch.update(ref, { memberUids: FV.arrayRemove(uid), turns: FV.arrayRemove(uid) });
+  batch.update(ref, { memberUids: FV.arrayRemove(uid), turns: FV.arrayRemove(uid), ...(c.j.deputyUid === uid ? { deputyUid: '' } : {}) });
   batch.delete(ref.collection('members').doc(uid));
   try { await batch.commit(); toast('تم حذف العضو'); } catch (e) { toast('تعذر الحذف: ' + e.message, 'error'); }
 }
@@ -632,9 +650,12 @@ function syncPayListeners() {
   });
   Object.keys(state.payLs).forEach(id => { if (!want.has(id)) { state.payLs[id](); delete state.payLs[id]; } });
   state.jamiyat.forEach(j => {
+    const staff = j.creatorUid === uid || (!!j.deputyUid && j.deputyUid === uid); state.payRole = state.payRole || {};
+    if (state.payLs[j.id] && state.payRole[j.id] !== staff) { state.payLs[j.id](); delete state.payLs[j.id]; }
     if (!want.has(j.id) || state.payLs[j.id]) return;
+    state.payRole[j.id] = staff;
     const col = db.collection('jamiyat').doc(j.id).collection('payments');
-    const q = j.creatorUid === uid ? col : col.where('uid', '==', uid);
+    const q = staff ? col : col.where('uid', '==', uid);
     state.payLs[j.id] = q.onSnapshot(s => {
       state.pays[j.id] = s.docs.map(d => ({ id: d.id, ...d.data() })); notifyPays(j, state.pays[j.id]);
       if (state.view === 'home') render();
@@ -667,7 +688,7 @@ function homeAlerts() {
         text: `المتبقي عليك ${fmtNum(mine.remaining)} ريال — ${late ? 'متأخر، سدّد في أقرب وقت' : when(left)} (${fmtDate(due)})` });
     }
     // 2) المشرف: أعضاء لم يسددوا
-    if (j.creatorUid === uid && (left <= SOON)) {
+    if ((j.creatorUid === uid || (j.deputyUid && j.deputyUid === uid)) && (left <= SOON)) {
       const n = turns.filter(u => u !== uid && owes(u)).length;
       if (n > 0) out.push({ lvl: left < 0 ? 0 : 1, id: j.id, remind: true, title: `جمعية «${j.name}»`,
         text: `${n} ${n === 1 ? 'عضو لم يسدد' : 'أعضاء لم يسددوا'} بعد — ${when(left)} (${fmtDate(due)})` });
@@ -798,7 +819,7 @@ function openJamiya(id) {
   state.jUnsubs.push(
     ref.onSnapshot(s => { if (!s.exists) { toast('الجمعية غير متاحة', 'error'); state.view = 'home'; return render(); }
       state.j = { id: s.id, ...s.data() };
-      if (state.j.creatorUid === state.user.uid && !state.jInviteSub) subscribeInvites(id);
+      if ((state.j.creatorUid === state.user.uid || (state.j.deputyUid && state.j.deputyUid === state.user.uid)) && !state.jInviteSub) subscribeInvites(id);
       render(); }, e => toast(e.message, 'error')),
     ref.collection('members').onSnapshot(s => { state.members = {}; s.docs.forEach(d => state.members[d.id] = d.data()); state.gotM = true; if (state.view === 'jamiya') render(); runAfterOpen(); }),
     ref.collection('payments').onSnapshot(s => { state.payments = s.docs.map(d => ({ id: d.id, ...d.data() })); state.gotP = true; state.pays[id] = state.payments; if (state.view === 'jamiya') render(); runAfterOpen(); })
@@ -806,9 +827,10 @@ function openJamiya(id) {
 }
 function subscribeInvites(id) {
   state.jInviteSub = true;
-  state.jUnsubs.push(db.collection('invites').where('jamiyaId', '==', id).where('creatorUid', '==', state.user.uid).onSnapshot(s => {
+  const asCreator = state.j && state.j.creatorUid === state.user.uid; // النائب يرى الدعوات التي أرسلها هو فقط
+  state.jUnsubs.push(db.collection('invites').where('jamiyaId', '==', id).where(asCreator ? 'creatorUid' : 'invitedBy', '==', state.user.uid).onSnapshot(s => {
     state.jInvites = s.docs.map(d => ({ id: d.id, ...d.data() })); if (state.view === 'jamiya') render();
-  }, e => toast('خطأ في الدعوات: ' + e.message, 'error')));
+  }, e => { if (e.code !== 'permission-denied') toast('خطأ في الدعوات: ' + e.message, 'error'); }));
 }
 
 /* ============ المدفوعات ============ */
@@ -875,12 +897,13 @@ async function confirmPayment(payId) {
   catch (e) { toast(e.message, 'error'); }
 }
 async function remindUnpaid() {
-  const c = ctx(); let n = 0;
+  const c = ctx(); if (!c || !c.canManage) return; let n = 0; const late = [];
   c.turns.forEach(uid => {
     const m = state.members[uid]; if (!m || !needsPay(c, uid)) return;
-    n++;
+    n++; late.push(uid);
     sendMail(m.email, m.name, `تذكير بسداد قسط ${c.j.name}`, `السلام عليكم ${dispName(m)}،\nتذكير ودي بسداد قسط جمعية "${c.j.name}". المتبقي عليك ${fmtNum(c.acct[uid].remaining)} ريال، وآخر موعد للسداد ${fmtDate(dayIn(c.j, c.cur, c.j.lastDay))}.${mailLink()}`).catch(e => toast('فشل إرسال التذكير إلى ' + m.email + ': ' + (mailErrHint(e).hint || mailErrHint(e).raw), 'error'));
   });
+  late.forEach(u => sendNotifs([u], 'تذكير بسداد القسط', `جمعية «${c.j.name}» — المتبقي عليك ${fmtNum(c.acct[u].remaining)} ريال`, c.j.id, 'remind'));
   toast(n ? `جارٍ إرسال التذكير إلى ${n} عضو` : 'لا يوجد أعضاء متأخرون', n ? 'success' : 'info');
 }
 
@@ -1043,7 +1066,7 @@ async function saveProfile(f) {
 function waNumber(phone) { const d = String(phone || '').replace(/\D/g, ''); return d.startsWith('05') ? '966' + d.slice(1) : d.startsWith('5') && d.length === 9 ? '966' + d : d; }
 function waLink(phone, text) { const n = phone ? waNumber(phone) : ''; return `https://wa.me/${n}?text=${encodeURIComponent(text)}`; }
 function openWaReminders() {
-  const c = ctx(); if (!c || !c.isCreator) return;
+  const c = ctx(); if (!c || !c.canManage) return;
   const due = fmtDate(dayIn(c.j, c.cur, c.j.lastDay));
   const rows = c.turns.filter(u => needsPay(c, u)).map(u => {
     const m = state.members[u]; if (!m) return '';
@@ -1851,8 +1874,8 @@ function vHome() {
 
 function dayLabels(freq) {
   const f = FREQS[freq] || FREQS.monthly;
-  return f.days ? { last: `آخر يوم للسداد (من 1 إلى ${f.days}: يوم الدورة)`, pay: `يوم الاستلام (من 1 إلى ${f.days}: يوم الدورة)`, max: f.days }
-                : { last: 'آخر يوم للسداد كل شهر (1–31)', pay: 'يوم الاستلام من الشهر (1–31)', max: 31 };
+  return f.days ? { last: `آخر يوم للسداد (من 1 إلى ${f.days}: يوم الدورة)`, pay: `يوم الصرف (من 1 إلى ${f.days}: يوم الدورة)`, max: f.days }
+                : { last: 'آخر يوم للسداد كل شهر (1–31)', pay: 'يوم الصرف من الشهر (1–31)', max: 31 };
 }
 function freqOpts(sel) { return Object.entries(FREQS).map(([k, v]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${v.label}</option>`).join(''); }
 function vCreate() {
@@ -1885,7 +1908,7 @@ function vJamiya() {
       <div><p class="text-xs font-bold text-yellow-100">${c.started ? 'مستلم دفعة ' + periodLabel(j, c.cur) : 'أول مستلم (لم تبدأ الجمعية بعد)'}</p>
       <h3 class="text-xl font-black">${c.rec ? esc(dispName(c.rec)) : 'لم يكتمل ترتيب الأعضاء'}</h3>
       ${c.rec ? `<p class="text-xs text-amber-100 mt-1">${esc(c.rec.bank)} ${c.rec.iban ? '• <span dir="ltr">' + esc(c.rec.iban) + '</span>' : ''}</p>` : ''}
-      <p class="text-xs text-amber-100 mt-1">آخر موعد للسداد: ${fmtDate(due)} • الاستلام: ${fmtDate(payout)}</p></div>
+      <p class="text-xs text-amber-100 mt-1">آخر موعد للسداد: ${fmtDate(due)} • الصرف: ${fmtDate(payout)}</p></div>
       <div>${c.isRec ? '<span class="px-3 py-1 bg-yellow-300 text-slate-900 text-xs font-bold rounded-xl">أنت مستلم هذه الدورة</span>'
         : !c.started || !j.memberUids.includes(uid) ? ''
         : me && ['unpaid', 'partial'].includes(me.status) ? `<div class="text-center space-y-1.5"><div class="text-[11px] text-amber-50">المتبقي عليك <b>${fmtNum(me.remaining)}</b> ريال</div><button class="btn bg-white text-orange-600" data-act="pay-modal"><i class="fa-solid fa-file-arrow-up"></i> رفع إثبات السداد</button></div>`
@@ -1903,7 +1926,7 @@ function vJamiya() {
     const detail = c.started ? `مدفوع ${fmtNum(ac.paid)} من ${fmtNum(ac.owed)}${ac.credit > 0 ? ` • رصيد مقدّم ${fmtNum(ac.credit)}` : ac.remaining > 0 ? ` • متبقي ${fmtNum(ac.remaining)}` : ''}` : '';
     return `<div class="p-3 bg-slate-50 border border-slate-100 rounded-xl flex flex-wrap justify-between items-center gap-2 text-xs">
       <div class="flex items-center gap-3"><span class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center">${i + 1}</span>
-      <div><p class="font-bold">${esc(dispName(m))} ${u === j.creatorUid ? '<span class="text-[10px] text-indigo-600">(مشرف)</span>' : ''}</p><p class="text-[10px] text-slate-400">دوره: ${periodLabel(j, i)}</p>${contact}${detail ? `<p class="text-[10px] text-slate-500">${detail}</p>` : ''}</div></div>
+      <div><p class="font-bold">${esc(dispName(m))} ${u === j.creatorUid ? '<span class="text-[10px] text-indigo-600">(مشرف)</span>' : ''}${j.deputyUid && u === j.deputyUid ? '<span class="text-[10px] text-amber-600">(نائب المشرف)</span>' : ''}</p><p class="text-[10px] text-slate-400">دوره: ${periodLabel(j, i)}</p>${contact}${detail ? `<p class="text-[10px] text-slate-500">${detail}</p>` : ''}</div></div>
       <div class="flex items-center gap-2 flex-wrap">
         ${c.finished ? '' : `<span class="px-2 py-1 rounded-lg font-bold ${b[1]}">${b[0]}</span>`}
         ${c.isCreator && u !== j.creatorUid && !ac.mine.length && (!c.started || i > c.cur) ? `<button class="px-2 py-1 bg-rose-50 text-rose-600 rounded-lg" data-act="rm-member" data-uid="${esc(u)}" aria-label="حذف العضو"><i class="fa-solid fa-user-minus"></i> حذف</button>` : ''}
@@ -1930,9 +1953,9 @@ function vJamiya() {
   return `<div class="space-y-5">
     <div class="card p-6 flex flex-wrap justify-between items-center gap-4">
       <div><button class="text-xs text-slate-400 mb-1" data-act="go-home">← رجوع</button><h2 class="text-2xl font-black">${j.icon ? esc(j.icon) + ' ' : ''}${esc(j.name)}</h2>
-      <p class="text-xs text-slate-500 mt-1">${freqOf(j).label} • القسط ${money(j.amount)} • السداد حتى يوم ${j.lastDay}${freqOf(j).days ? ' من الدورة' : ''} • الاستلام يوم ${j.payDay}${freqOf(j).days ? ' من الدورة' : ''} • تبدأ ${fmtDate(new Date(j.startDate + 'T00:00:00'))}</p></div>
+      <p class="text-xs text-slate-500 mt-1">${freqOf(j).label} • القسط ${money(j.amount)} • السداد حتى يوم ${j.lastDay}${freqOf(j).days ? ' من الدورة' : ''} • الصرف يوم ${j.payDay}${freqOf(j).days ? ' من الدورة' : ''} • تبدأ ${fmtDate(new Date(j.startDate + 'T00:00:00'))}</p></div>
       <div class="chips w-full md:w-auto md:flex-wrap">
-        ${c.isCreator ? `${j.memberUids.length >= j.count ? '<button class="btn b-sec" data-act="full-note"><i class="fa-solid fa-user-check"></i> اكتمل العدد</button>' : '<button class="btn b-pri" data-act="invite-modal"><i class="fa-solid fa-user-plus"></i> دعوة عضو</button>'}<button class="btn b-sec" data-act="remind"><i class="fa-solid fa-bell"></i> تذكير بالبريد</button><button class="btn bg-emerald-50 text-emerald-700" data-act="wa-remind"><i class="fa-brands fa-whatsapp"></i> تذكير واتساب</button><button class="btn b-sec" data-act="notif-modal"><i class="fa-solid fa-bullhorn"></i> إشعار للأعضاء</button><button class="btn b-sec" data-act="edit-modal"><i class="fa-solid fa-gear"></i> تعديل</button><button class="btn b-red" data-act="delete-modal"><i class="fa-solid fa-trash"></i> حذف</button>` : ''}
+        ${c.canManage ? `${j.memberUids.length >= j.count ? '<button class="btn b-sec" data-act="full-note"><i class="fa-solid fa-user-check"></i> اكتمل العدد</button>' : '<button class="btn b-pri" data-act="invite-modal"><i class="fa-solid fa-user-plus"></i> دعوة عضو</button>'}<button class="btn b-sec" data-act="remind"><i class="fa-solid fa-bell"></i> تذكير بالبريد</button><button class="btn bg-emerald-50 text-emerald-700" data-act="wa-remind"><i class="fa-brands fa-whatsapp"></i> تذكير واتساب</button>` : ''}${c.isCreator ? `<button class="btn b-sec" data-act="notif-modal"><i class="fa-solid fa-bullhorn"></i> إشعار للأعضاء</button><button class="btn b-sec" data-act="deputy-modal"><i class="fa-solid fa-user-shield"></i> نائب المشرف</button><button class="btn b-sec" data-act="edit-modal"><i class="fa-solid fa-gear"></i> تعديل</button><button class="btn b-red" data-act="delete-modal"><i class="fa-solid fa-trash"></i> حذف</button>` : ''}
         <button class="btn b-sec" data-act="export-modal"><i class="fa-solid fa-file-export"></i> تصدير الكشف</button>
         <button class="btn b-sec" data-act="add-cal"><i class="fa-solid fa-calendar-plus"></i> أضف للتقويم</button>
         <button class="btn b-sec" data-act="mod-modal"><i class="fa-solid fa-pen-to-square"></i> اقتراح تعديل</button></div></div>
@@ -1946,7 +1969,7 @@ function vJamiya() {
         <div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-chart-pie text-indigo-600"></i> تحصيل هذه الدورة</h4>
           <div class="text-xs space-y-2"><div class="flex justify-between"><span>المستهدف</span><b>${money(target)}</b></div><div class="flex justify-between"><span>المؤكد</span><b class="text-emerald-600">${money(collected)}</b></div>
           <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden"><div class="bg-emerald-500 h-full" style="width:${pct}%"></div></div></div></div>
-        ${c.isCreator ? `<div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-clock-rotate-left text-amber-500"></i> دعوات معلّقة</h4><div class="space-y-2">${pend || '<p class="text-xs text-slate-400">لا توجد دعوات معلّقة.</p>'}</div></div>` : ''}
+        ${c.canManage ? `<div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-clock-rotate-left text-amber-500"></i> دعوات معلّقة</h4><div class="space-y-2">${pend || '<p class="text-xs text-slate-400">لا توجد دعوات معلّقة.</p>'}</div></div>` : ''}
         <div class="card p-5"><h4 class="font-bold text-sm mb-2"><i class="fa-solid fa-calendar-days text-teal-600"></i> الجدول الزمني</h4>${sched}</div>
       </div></div></div>`;
 }
@@ -2089,7 +2112,7 @@ const actions = {
   'open': (el) => openJamiya(el.dataset.id),
   'accept': (el) => acceptInvite(el.dataset.id),
   'decline': (el) => declineInvite(el.dataset.id),
-  'delete-modal': openDeleteModal, 'invite-modal': () => openModal('invite'), 'pay-modal': () => openModal('pay'), 'mod-modal': () => openModal('mod'), 'notif-modal': () => openModal('notif'), 'edit-modal': () => openModal('edit'),
+  'delete-modal': openDeleteModal, 'invite-modal': () => openModal('invite'), 'pay-modal': () => openModal('pay'), 'mod-modal': () => openModal('mod'), 'notif-modal': () => openModal('notif'), 'deputy-modal': openDeputyModal, 'deputy-clear': () => setDeputy(''), 'edit-modal': () => openModal('edit'),
   'close': closeModal,
   'confirm-pay': (el) => confirmPayment(el.dataset.id),
   'member-pays': (el) => openMemberPays(el.dataset.uid),
@@ -2140,7 +2163,7 @@ document.addEventListener('input', e => {
   if (e.target.name === 'icon') fm.querySelectorAll('.emo').forEach(b => b.classList.toggle('on', b.dataset.v === e.target.value.trim()));
 });
 const forms = { 'f-register': doRegister, 'f-login': doLogin, 'f-reset': doReset, 'f-complete': doCompleteProfile, 'f-create': handleCreate,
-  'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-notif': submitNotif, 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete };
+  'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-notif': submitNotif, 'f-deputy': f => setDeputy(f.uid.value), 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete };
 Object.assign(forms, ADMIN_FORMS);
 document.addEventListener('submit', e => { const fn = forms[e.target.id]; if (fn) { e.preventDefault(); fn(e.target); } });
 
