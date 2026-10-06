@@ -30,6 +30,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 <style>
 :root{--brand:#0d9488;--brand-2:#059669;--ink:#0f172a;--bg:#f3f6f5;--tab-h:64px;--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px)}
 *{-webkit-tap-highlight-color:transparent}
@@ -178,7 +179,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.1</footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.3</footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -448,6 +449,7 @@ function startListeners() {
       invA = s.docs.map(d => ({ id: d.id, ...d.data() })); merge();
     }, e => toast('خطأ في تحميل الدعوات: ' + e.message, 'error'))
   );
+  listenNotifs(); registerPush();
   if (validPhone(phone)) state.unsubs.push(
     db.collection('invites').where('phone', '==', phone).where('status', '==', 'pending').onSnapshot(s => {
       invB = s.docs.map(d => ({ id: d.id, ...d.data() })); merge();
@@ -582,7 +584,7 @@ async function acceptInvite(inviteId) {
   batch.update(jRef, { memberUids: FV.arrayUnion(uid), turns: FV.arrayUnion(uid) });
   batch.update(db.collection('invites').doc(inviteId), { status: 'accepted' });
   batch.set(jRef.collection('members').doc(uid), memberDoc(uid, p));
-  try { await batch.commit(); toast('تم الانضمام للجمعية'); } catch (e) { toast(e.code === 'permission-denied' ? 'تعذر الانضمام: ربما اكتمل عدد أعضاء الجمعية أو أُلغيت الدعوة' : 'تعذر الانضمام: ' + e.message, 'error'); }
+  try { await batch.commit(); toast('تم الانضمام للجمعية'); notifyJoin(inv); } catch (e) { toast(e.code === 'permission-denied' ? 'تعذر الانضمام: ربما اكتمل عدد أعضاء الجمعية أو أُلغيت الدعوة' : 'تعذر الانضمام: ' + e.message, 'error'); }
 }
 async function removeMember(uid) {
   const c = ctx(); if (!c || !c.isCreator || uid === c.j.creatorUid) return;
@@ -827,6 +829,7 @@ async function submitPayment(f) {
       status: 'pending', recipientUid: c.recUid, createdAt: FV.serverTimestamp()
     });
     await batch.commit();
+    sendNotifs([c.recUid, c.j.creatorUid], 'إيصال جديد بانتظار تأكيدك', `${dispName(state.profile)} — جمعية «${c.j.name}» — ${fmtNum(amount)} ريال`, c.j.id, 'pay', 'pp_' + pid);
     closeModal(); toast('أُرسل الإيصال للمستلم للتأكيد');
     if (c.rec && c.rec.email) sendMail(c.rec.email, c.rec.name, `إيصال سداد جديد - ${c.j.name}`, `رفع ${dispName(state.profile)} إيصال سداد بقيمة ${amount} ريال لجمعية "${c.j.name}". افتح التطبيق للمراجعة والتأكيد:${mailLink()}`).catch(() => {});
   } catch (e) { toast('تعذر الرفع: ' + e.message, 'error'); btn.disabled = false; btn.textContent = 'إرسال الإيصال'; }
@@ -865,7 +868,10 @@ async function viewProof(payId) {
   } catch (e) { toast('تعذر فتح الإيصال: ' + e.message, 'error'); }
 }
 async function confirmPayment(payId) {
-  try { await db.collection('jamiyat').doc(state.j.id).collection('payments').doc(payId).update({ status: 'confirmed' }); closeModal(); toast('تم تأكيد الاستلام'); }
+  const pay = (state.payments || []).find(x => x.id === payId);
+  try { await db.collection('jamiyat').doc(state.j.id).collection('payments').doc(payId).update({ status: 'confirmed' });
+    if (pay) sendNotifs([pay.uid], 'تم تأكيد سدادك ✓', `جمعية «${state.j.name}» — ${fmtNum(pay.amount)} ريال`, state.j.id, 'pay', 'pc_' + payId);
+    closeModal(); toast('تم تأكيد الاستلام'); }
   catch (e) { toast(e.message, 'error'); }
 }
 async function remindUnpaid() {
@@ -925,6 +931,7 @@ async function orderSave() {
 async function submitMod(f) {
   const text = f.text.value.trim(); if (!text) return;
   try { await db.collection('jamiyat').doc(state.j.id).update({ modRequest: { text, byUid: state.user.uid, byName: dispName(state.profile), approvals: [state.user.uid], rejections: [], status: 'pending' } });
+    sendNotifs(state.j.memberUids, 'طلب تعديل جديد يحتاج تصويتك', `${dispName(state.profile)} في جمعية «${state.j.name}»: ${text.slice(0, 120)}`, state.j.id, 'mod');
     closeModal(); toast('أُرسل الطلب للتصويت'); } catch (e) { toast(e.message, 'error'); }
 }
 async function voteMod(approve) {
@@ -933,7 +940,9 @@ async function voteMod(approve) {
   (approve ? r.approvals : r.rejections).push(uid);
   const total = state.j.memberUids.length;
   if (r.approvals.length > total / 2) r.status = 'approved'; else if (r.rejections.length >= total / 2) r.status = 'rejected';
-  try { await db.collection('jamiyat').doc(state.j.id).update({ modRequest: r }); } catch (e) { toast(e.message, 'error'); }
+  try { await db.collection('jamiyat').doc(state.j.id).update({ modRequest: r });
+    if (r.status === 'approved' || r.status === 'rejected') sendNotifs(state.j.memberUids, r.status === 'approved' ? 'اعتُمد طلب التعديل ✓' : 'رُفض طلب التعديل', `جمعية «${state.j.name}»: ${String(r.text || '').slice(0, 120)}`, state.j.id, 'mod');
+  } catch (e) { toast(e.message, 'error'); }
 }
 async function closeMod() { try { await db.collection('jamiyat').doc(state.j.id).update({ modRequest: null }); } catch (e) { toast(e.message, 'error'); } }
 const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -1429,6 +1438,10 @@ function tabSettings() {
     ${sw('regClosed', s.regClosed, 'إيقاف تسجيل الحسابات الجديدة')}
     <input name="regMsg" class="inp" maxlength="200" value="${esc(s.regMsg || '')}" placeholder="رسالة تظهر لمن يحاول التسجيل (اختياري)">
     <button class="btn b-pri w-full py-3" type="submit"><i class="fa-solid fa-floppy-disk"></i> حفظ الإعدادات</button></form>
+  <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-bullhorn text-teal-600"></i> إشعار مخصص للأعضاء</h4>
+    <form id="f-adm-bc" class="space-y-3"><select name="target" class="inp"><option value="all">كل المستخدمين</option>${A.jamiyat.map(j => `<option value="${esc(j.id)}">أعضاء جمعية: ${esc(j.name)}</option>`).join('')}</select>
+    <input name="title" class="inp" maxlength="100" placeholder="عنوان الإشعار" required><textarea name="body" rows="3" class="inp" maxlength="500" placeholder="نص الإشعار…" required></textarea>
+    <button class="btn b-pri w-full py-3" type="submit"><i class="fa-solid fa-paper-plane"></i> إرسال الإشعار</button></form></div>
   <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-user-shield text-violet-600"></i> المشرفون</h4>
     <div class="space-y-1.5">${adm.map(a => `<div class="p-2.5 bg-slate-50 rounded-xl text-xs flex justify-between items-center gap-2"><span><b>${esc(a.name)}</b> <span class="text-slate-500" dir="ltr">${esc(a.email)}</span></span>${owner ? `<button class="btn b-red" data-act="adm-admin-del" data-id="${esc(a.id)}">إزالة</button>` : ''}</div>`).join('') || '<p class="text-xs text-slate-400">لا يوجد مشرفون إضافيون (المالك يملك الصلاحية دائماً).</p>'}</div>
     ${owner ? `<form id="f-adm-addadmin" class="flex gap-2"><input name="email" type="email" dir="ltr" class="inp flex-1" placeholder="بريد مستخدم مسجّل لمنحه صلاحية المشرف" required><button class="btn b-pri" type="submit">إضافة</button></form>` : '<p class="text-[11px] text-slate-400">إدارة المشرفين للمالك فقط.</p>'}</div>
@@ -1593,7 +1606,7 @@ const ADMIN_ACTIONS = {
   'adm-copy-rules': () => navigator.clipboard.writeText(ADMIN_RULES).then(() => toast('تم نسخ القواعد')).catch(() => toast('تعذر النسخ', 'error')),
   'ann-x': () => { ssSet('jm_ann', String(state.settings.annVer)); render(); }
 };
-const ADMIN_FORMS = { 'f-adm-note': addNote, 'f-adm-block': doBlock, 'f-adm-mail': sendAdminMail, 'f-adm-settings': saveSettings, 'f-adm-addadmin': addAdminByEmail };
+const ADMIN_FORMS = { 'f-adm-note': addNote, 'f-adm-block': doBlock, 'f-adm-mail': sendAdminMail, 'f-adm-bc': sendAdminBroadcast, 'f-adm-settings': saveSettings, 'f-adm-addadmin': addAdminByEmail };
 document.addEventListener('input', e => {
   const t = e.target; if (!t.matches || !t.matches('[data-adm-q]')) return;
   const k = t.dataset.admQ; state.admin[k] = t.value; if (k === 'q') state.admin.ulimit = 40;
@@ -1633,7 +1646,7 @@ async function enableNotifs() {
   if (!notifSupported()) return toast('هذا المتصفح لا يدعم الإشعارات' + (isIOS() ? ' — على الآيفون ثبّت التطبيق على الشاشة الرئيسية أولاً' : ''), 'error');
   if (isIOS() && !isStandalone()) return toast('على الآيفون ثبّت التطبيق على الشاشة الرئيسية ثم افتحه وفعّل الإشعارات', 'error');
   let p = Notification.permission; if (p === 'default') p = await Notification.requestPermission();
-  if (p === 'granted') { lsSet('jm_notif', '1'); toast('تم تفعيل الإشعارات'); showSysNotif('الجمعية الذكية', 'الإشعارات مفعّلة ✓', 'welcome_' + Date.now()); }
+  if (p === 'granted') { lsSet('jm_notif', '1'); toast('تم تفعيل الإشعارات'); registerPush(); showSysNotif('الجمعية الذكية', 'الإشعارات مفعّلة ✓', 'welcome_' + Date.now()); }
   else toast('لم يُسمح بالإشعارات. فعّلها من إعدادات المتصفح للموقع', 'error');
   renderBanner(); if (state.view === 'profile') render();
 }
@@ -1648,6 +1661,74 @@ function notifyPays(j, pays) {
 function notifyAlerts() {
   if (!state.user || !state.profile || state.isAdmin) return;
   homeAlerts().forEach(a => pushLocal(a.title, a.text, 'al_' + a.id + '_' + a.lvl + '_' + dayKey(), a.id));
+}
+
+/* ============ دفع الإشعارات للجوال المغلق (FCM) ============
+   الصق هنا مفتاح الويب (Web Push certificate / VAPID) من: Firebase ← إعدادات المشروع ← Cloud Messaging */
+const VAPID_KEY = 'BG6l6SR11DQISd1WtcgOLJSS6rVbTN5uudknpGyt8yZBhYqCnjQpaJ9QKC6QQuILPbvtUWVpWnSroZFrSCJsYPM';
+async function registerPush() {
+  try {
+    if (!VAPID_KEY || !state.user || !notifOn() || !firebase.messaging || !(await firebase.messaging.isSupported())) return;
+    const reg = await navigator.serviceWorker.ready;
+    const tok = await firebase.messaging().getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+    const mark = state.user.uid + ':' + tok;
+    if (tok && lsGet('jm_fcm') !== mark) { await db.collection('users').doc(state.user.uid).set({ fcmTokens: FV.arrayUnion(tok) }, { merge: true }); lsSet('jm_fcm', mark); }
+  } catch (e) { console.warn('push', e.code || e.message); }
+}
+/* ============ مركز الإشعارات: مستند لكل إشعار يصل للمستلم (يُسلَّم فور فتح التطبيق أو وهو في الخلفية) ============ */
+async function sendNotifs(uids, title, body, jid, kind, tag) {
+  const me = state.user && state.user.uid;
+  const list = [...new Set(uids || [])].filter(u => u && u !== me);
+  if (!list.length) return 0;
+  try {
+    for (let i = 0; i < list.length; i += 400) {
+      const b = db.batch();
+      list.slice(i, i + 400).forEach(to => b.set(db.collection('notifs').doc(), { toUid: to, fromUid: me, title: String(title).slice(0, 100), body: String(body).slice(0, 500), jid: jid || '', kind: kind || 'info', tag: tag || '', createdAt: FV.serverTimestamp() }));
+      await b.commit();
+    }
+    return list.length;
+  } catch (e) { console.warn('notif', e.code || e.message); return 0; }
+}
+function listenNotifs() {
+  const uid = state.user.uid; state.nq = [];
+  state.unsubs.push(db.collection('notifs').where('toUid', '==', uid).onSnapshot(s => {
+    s.docChanges().forEach(c => { if (c.type === 'added' && !c.doc.metadata.hasPendingWrites) state.nq.push({ id: c.doc.id, ...c.doc.data() }); });
+    flushNotifs();
+  }, () => {}));
+}
+function flushNotifs() {
+  const q = state.nq || []; if (!q.length) return;
+  const hidden = document.visibilityState === 'hidden';
+  if (hidden && !notifOn()) return; // تبقى بانتظار فتح التطبيق
+  state.nq = [];
+  let seen = []; try { seen = JSON.parse(lsGet('jm_nseen') || '[]'); } catch (e) {}
+  const tg = n => n.tag || ('n_' + n.id);
+  const fresh = q.filter(n => !seen.includes(tg(n)));
+  fresh.sort((a, b) => ((a.createdAt && a.createdAt.seconds) || 0) - ((b.createdAt && b.createdAt.seconds) || 0));
+  const show = (title, body, tag, jid) => hidden ? showSysNotif(title, body, tag, jid) : toast(title + ' — ' + body, 'info');
+  fresh.slice(0, 3).forEach(n => show(n.title, n.body, tg(n), n.jid));
+  if (fresh.length > 3) show('الجمعية الذكية', 'لديك ' + nf(fresh.length - 3) + ' إشعارات أخرى جديدة', 'more_' + Date.now(), '');
+  fresh.forEach(n => seen.push(tg(n))); lsSet('jm_nseen', JSON.stringify(seen.slice(-300)));
+  q.forEach(n => db.collection('notifs').doc(n.id).delete().catch(() => {}));
+}
+document.addEventListener('visibilitychange', flushNotifs);
+async function notifyJoin(inv) {
+  try { const j = (await db.collection('jamiyat').doc(inv.jamiyaId).get()).data();
+    await sendNotifs(j.memberUids, 'عضو جديد في الجمعية', `${dispName(state.profile)} انضم إلى جمعية «${j.name}»`, inv.jamiyaId, 'member'); } catch (e) {}
+}
+async function submitNotif(f) {
+  const j = state.j, title = f.title.value.trim(), body = f.body.value.trim(); if (!j || !title || !body) return;
+  const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+  const n = await sendNotifs(j.memberUids, title, body, j.id, 'custom');
+  closeModal(); toast(n ? 'أُرسل الإشعار إلى ' + nf(n) + ' عضو' : 'تعذر الإرسال', n ? 'success' : 'error');
+}
+async function sendAdminBroadcast(f) {
+  const A = state.admin, t = f.target.value, title = f.title.value.trim(), body = f.body.value.trim(); if (!title || !body) return;
+  const j = t === 'all' ? null : A.jamiyat.find(x => x.id === t);
+  const uids = t === 'all' ? A.users.map(u => u.id) : (j ? j.memberUids || [] : []);
+  if (!confirm('إرسال الإشعار إلى ' + nf(uids.length) + ' مستخدم؟')) return;
+  const n = await sendNotifs(uids, title, body, j ? j.id : '', 'custom');
+  logEvent('adm_notif', { info: title + ' (' + n + ')' }); toast(n ? 'أُرسل الإشعار إلى ' + nf(n) + ' مستخدم' : 'تعذر الإرسال (راجع قواعد Firestore)', n ? 'success' : 'error'); if (n) f.reset();
 }
 setInterval(notifyAlerts, 10 * 60 * 1000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') setTimeout(notifyAlerts, 1500); });
@@ -1851,7 +1932,7 @@ function vJamiya() {
       <div><button class="text-xs text-slate-400 mb-1" data-act="go-home">← رجوع</button><h2 class="text-2xl font-black">${j.icon ? esc(j.icon) + ' ' : ''}${esc(j.name)}</h2>
       <p class="text-xs text-slate-500 mt-1">${freqOf(j).label} • القسط ${money(j.amount)} • السداد حتى يوم ${j.lastDay}${freqOf(j).days ? ' من الدورة' : ''} • الصرف يوم ${j.payDay}${freqOf(j).days ? ' من الدورة' : ''} • تبدأ ${fmtDate(new Date(j.startDate + 'T00:00:00'))}</p></div>
       <div class="chips w-full md:w-auto md:flex-wrap">
-        ${c.isCreator ? `${j.memberUids.length >= j.count ? '<button class="btn b-sec" data-act="full-note"><i class="fa-solid fa-user-check"></i> اكتمل العدد</button>' : '<button class="btn b-pri" data-act="invite-modal"><i class="fa-solid fa-user-plus"></i> دعوة عضو</button>'}<button class="btn b-sec" data-act="remind"><i class="fa-solid fa-bell"></i> تذكير بالبريد</button><button class="btn bg-emerald-50 text-emerald-700" data-act="wa-remind"><i class="fa-brands fa-whatsapp"></i> تذكير واتساب</button><button class="btn b-sec" data-act="edit-modal"><i class="fa-solid fa-gear"></i> تعديل</button><button class="btn b-red" data-act="delete-modal"><i class="fa-solid fa-trash"></i> حذف</button>` : ''}
+        ${c.isCreator ? `${j.memberUids.length >= j.count ? '<button class="btn b-sec" data-act="full-note"><i class="fa-solid fa-user-check"></i> اكتمل العدد</button>' : '<button class="btn b-pri" data-act="invite-modal"><i class="fa-solid fa-user-plus"></i> دعوة عضو</button>'}<button class="btn b-sec" data-act="remind"><i class="fa-solid fa-bell"></i> تذكير بالبريد</button><button class="btn bg-emerald-50 text-emerald-700" data-act="wa-remind"><i class="fa-brands fa-whatsapp"></i> تذكير واتساب</button><button class="btn b-sec" data-act="notif-modal"><i class="fa-solid fa-bullhorn"></i> إشعار للأعضاء</button><button class="btn b-sec" data-act="edit-modal"><i class="fa-solid fa-gear"></i> تعديل</button><button class="btn b-red" data-act="delete-modal"><i class="fa-solid fa-trash"></i> حذف</button>` : ''}
         <button class="btn b-sec" data-act="export-modal"><i class="fa-solid fa-file-export"></i> تصدير الكشف</button>
         <button class="btn b-sec" data-act="add-cal"><i class="fa-solid fa-calendar-plus"></i> أضف للتقويم</button>
         <button class="btn b-sec" data-act="mod-modal"><i class="fa-solid fa-pen-to-square"></i> اقتراح تعديل</button></div></div>
@@ -1876,7 +1957,7 @@ function vProfile() {
     <form id="f-profile" class="space-y-3"><div><label class="text-xs font-semibold block mb-1">الاسم</label><input name="name" class="inp" value="${esc(p.name)}" required></div>${bankFields(p)}
     <button class="btn b-pri w-full py-3" type="submit">حفظ التعديلات</button></form></div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-bell text-amber-500"></i> إشعارات الجوال</h4>
-      <p class="text-xs text-slate-500 leading-relaxed">${!notifSupported() ? 'هذا المتصفح لا يدعم الإشعارات.' : Notification.permission === 'denied' ? 'الإشعارات محظورة لهذا الموقع، فعّلها من إعدادات المتصفح.' : notifOn() ? 'الإشعارات مفعّلة ✓ ستصلك تنبيهات الدعوات والإيصالات ومواعيد السداد.' : 'فعّلها لتصلك تنبيهات الدعوات والإيصالات ومواعيد السداد خارج التطبيق.'}${isIOS() && !isStandalone() ? ' على الآيفون يلزم تثبيت التطبيق أولاً.' : ''}</p>
+      <p class="text-xs text-slate-500 leading-relaxed">${!notifSupported() ? 'هذا المتصفح لا يدعم الإشعارات.' : Notification.permission === 'denied' ? 'الإشعارات محظورة لهذا الموقع، فعّلها من إعدادات المتصفح.' : notifOn() ? 'الإشعارات مفعّلة ✓ ستصلك تنبيهات الدعوات والإيصالات والأعضاء الجدد وطلبات التعديل ورسائل الإدارة ومواعيد السداد.' : 'فعّلها لتصلك تنبيهات الدعوات والإيصالات ومواعيد السداد خارج التطبيق.'}${isIOS() && !isStandalone() ? ' على الآيفون يلزم تثبيت التطبيق أولاً.' : ''}</p>
       <div class="flex flex-wrap gap-2">${notifOn() ? '<button class="btn b-sec" data-act="test-notif"><i class="fa-solid fa-paper-plane"></i> إشعار تجريبي</button>' : '<button class="btn b-pri" data-act="enable-notif"><i class="fa-solid fa-bell"></i> تفعيل الإشعارات</button>'}</div></div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-mobile-screen-button text-emerald-600"></i> التطبيق</h4>
       <p class="text-xs text-slate-500 leading-relaxed">${inst ? 'أنت تستخدم التطبيق المثبّت على جهازك ✓' : 'ثبّت الجمعية الذكية على شاشتك الرئيسية لتعمل كتطبيق كامل وبسرعة أكبر.'}</p>
@@ -1893,6 +1974,7 @@ function closeModal() { $('modal').innerHTML = ''; }
 
 function openModal(kind) {
   const c = ctx();
+  if (kind === 'notif') { showModal('إشعار لأعضاء الجمعية', `<form id="f-notif" class="space-y-3"><input name="title" class="inp" maxlength="100" placeholder="عنوان الإشعار" required><textarea name="body" rows="4" class="inp" maxlength="500" placeholder="نص الإشعار…" required></textarea><p class="text-[11px] text-slate-500">يصل لكل أعضاء الجمعية على جوالهم.</p><button class="btn b-pri w-full py-3" type="submit"><i class="fa-solid fa-bullhorn"></i> إرسال</button></form>`); return; }
   if (kind === 'invite') showModal('دعوة عضو للجمعية', `<form id="f-invite" class="space-y-3"><div><label class="text-xs font-semibold block mb-1">اسم العضو</label><input name="name" class="inp" required></div>
     <div><label class="text-xs font-semibold block mb-1">رقم جواله (05xxxxxxxx)</label><input name="phone" type="tel" inputmode="tel" dir="ltr" class="inp" placeholder="05xxxxxxxx" required></div>
     <div><label class="text-xs font-semibold block mb-1">بريده الإلكتروني (اختياري)</label><input name="email" type="email" dir="ltr" class="inp"></div>
@@ -2007,7 +2089,7 @@ const actions = {
   'open': (el) => openJamiya(el.dataset.id),
   'accept': (el) => acceptInvite(el.dataset.id),
   'decline': (el) => declineInvite(el.dataset.id),
-  'delete-modal': openDeleteModal, 'invite-modal': () => openModal('invite'), 'pay-modal': () => openModal('pay'), 'mod-modal': () => openModal('mod'), 'edit-modal': () => openModal('edit'),
+  'delete-modal': openDeleteModal, 'invite-modal': () => openModal('invite'), 'pay-modal': () => openModal('pay'), 'mod-modal': () => openModal('mod'), 'notif-modal': () => openModal('notif'), 'edit-modal': () => openModal('edit'),
   'close': closeModal,
   'confirm-pay': (el) => confirmPayment(el.dataset.id),
   'member-pays': (el) => openMemberPays(el.dataset.uid),
@@ -2058,7 +2140,7 @@ document.addEventListener('input', e => {
   if (e.target.name === 'icon') fm.querySelectorAll('.emo').forEach(b => b.classList.toggle('on', b.dataset.v === e.target.value.trim()));
 });
 const forms = { 'f-register': doRegister, 'f-login': doLogin, 'f-reset': doReset, 'f-complete': doCompleteProfile, 'f-create': handleCreate,
-  'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete };
+  'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-notif': submitNotif, 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete };
 Object.assign(forms, ADMIN_FORMS);
 document.addEventListener('submit', e => { const fn = forms[e.target.id]; if (fn) { e.preventDefault(); fn(e.target); } });
 
