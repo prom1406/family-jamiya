@@ -1665,7 +1665,7 @@ function notifyAlerts() {
 
 /* ============ دفع الإشعارات للجوال المغلق (FCM) ============
    الصق هنا مفتاح الويب (Web Push certificate / VAPID) من: Firebase ← إعدادات المشروع ← Cloud Messaging */
-const VAPID_KEY = '';
+const VAPID_KEY = 'BG6l6SR11DQISd1WtcgOLJSS6rVbTN5uudknpGyt8yZBhYqCnjQpaJ9QKC6QQuILPbvtUWVpWnSroZFrSCJsYPM';
 async function registerPush() {
   try {
     if (!VAPID_KEY || !state.user || !notifOn() || !firebase.messaging || !(await firebase.messaging.isSupported())) return;
