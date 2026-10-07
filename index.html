@@ -182,7 +182,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.4</footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.3</footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -616,6 +616,7 @@ async function removeMember(uid) {
   const ref = db.collection('jamiyat').doc(c.j.id), batch = db.batch();
   batch.update(ref, { memberUids: FV.arrayRemove(uid), turns: FV.arrayRemove(uid), ...(c.j.deputyUid === uid ? { deputyUid: '' } : {}) });
   batch.delete(ref.collection('members').doc(uid));
+  batch.delete(ref.collection('wishes').doc(uid));
   try { await batch.commit(); toast('تم حذف العضو'); } catch (e) { toast('تعذر الحذف: ' + e.message, 'error'); }
 }
 async function declineInvite(inviteId) {
@@ -833,13 +834,15 @@ function openExportModal() {
 function openJamiya(id) {
   cleanup(state.jUnsubs); state.jInviteSub = false; state.gotM = state.gotP = false;
   if (state.afterOpen && state.afterOpen.id !== id) state.afterOpen = null;
-  state.activeId = id; state.j = null; state.members = {}; state.payments = []; state.jInvites = [];
+  state.activeId = id; state.j = null; state.members = {}; state.payments = []; state.jInvites = []; state.wishes = {}; state.wishMode = null;
   state.view = 'jamiya'; render();
   const ref = db.collection('jamiyat').doc(id);
+  state.jUnsubs.push(stopChat, () => { if (state.wishUnsub) { state.wishUnsub(); state.wishUnsub = null; } });
   state.jUnsubs.push(
     ref.onSnapshot(s => { if (!s.exists) { toast('الجمعية غير متاحة', 'error'); state.view = 'home'; return render(); }
       state.j = { id: s.id, ...s.data() };
       if ((state.j.creatorUid === state.user.uid || (state.j.deputyUid && state.j.deputyUid === state.user.uid)) && !state.jInviteSub) subscribeInvites(id);
+      syncWishes(); if (state.chatUnsub) paintChat();
       render(); }, e => toast(e.message, 'error')),
     ref.collection('members').onSnapshot(s => { state.members = {}; s.docs.forEach(d => state.members[d.id] = d.data()); state.gotM = true; if (state.view === 'jamiya') render(); runAfterOpen(); }),
     ref.collection('payments').onSnapshot(s => { state.payments = s.docs.map(d => ({ id: d.id, ...d.data() })); state.gotP = true; state.pays[id] = state.payments; if (state.view === 'jamiya') render(); runAfterOpen(); })
@@ -1055,6 +1058,8 @@ async function submitDelete(f) {
   try {
     await wipe(ref.collection('payments'));
     await wipe(ref.collection('proofs'));
+    await wipe(ref.collection('wishes'));
+    await wipe(ref.collection('chat'));
     await wipe(db.collection('invites').where('jamiyaId', '==', id).where('creatorUid', '==', uid));
     await wipe(ref.collection('members'));
     await ref.delete();
@@ -1314,8 +1319,8 @@ function miniUser(x, extra) {
 /* --- الواجهة الرئيسية --- */
 function vAdmin() {
   const A = state.admin, t = A.tab;
-  const tabs = [['overview', 'fa-gauge-high', 'نظرة عامة'], ['users', 'fa-users', 'المستخدمون'], ['jam', 'fa-people-roof', 'الجمعيات'], ['traffic', 'fa-chart-line', 'الترافيك'], ['log', 'fa-clock-rotate-left', 'السجل'], ['settings', 'fa-sliders', 'التحكم']];
-  const body = !A.loaded ? '<div class="card p-10 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>' : ({ overview: tabOverview, users: tabUsers, jam: tabJam, traffic: tabTraffic, log: tabLog, settings: tabSettings }[t] || tabOverview)();
+  const tabs = [['overview', 'fa-gauge-high', 'نظرة عامة'], ['users', 'fa-users', 'المستخدمون'], ['jam', 'fa-people-roof', 'الجمعيات'], ['traffic', 'fa-chart-line', 'الترافيك'], ['log', 'fa-clock-rotate-left', 'السجل'], ['wa', 'fa-paper-plane', 'رسالة واتساب'], ['settings', 'fa-sliders', 'التحكم']];
+  const body = !A.loaded ? '<div class="card p-10 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>' : ({ overview: tabOverview, users: tabUsers, jam: tabJam, traffic: tabTraffic, log: tabLog, wa: tabWa, settings: tabSettings }[t] || tabOverview)();
   return `<div class="space-y-4"><div class="card p-5 !bg-slate-900 text-white flex flex-wrap justify-between items-center gap-3">
     <div><span class="px-3 py-1 bg-indigo-500/30 text-indigo-200 text-xs font-bold rounded-full inline-block mb-2"><i class="fa-solid fa-shield-halved"></i> لوحة المالك</span><h2 class="text-xl font-black">إدارة المنصة</h2>
     <p class="text-xs text-slate-300 mt-1" dir="ltr">${esc(state.user.email)}</p></div>
@@ -1677,14 +1682,68 @@ async function adminDeleteJam(id) {
   const ref = db.collection('jamiyat').doc(id), wipe = async q => { const snap = await q.get(); for (let i = 0; i < snap.docs.length; i += 400) { const b = db.batch(); snap.docs.slice(i, i + 400).forEach(d => b.delete(d.ref)); await b.commit(); } };
   toast('جارٍ الحذف…', 'info');
   try {
-    await wipe(ref.collection('payments')); await wipe(ref.collection('proofs')); await wipe(db.collection('invites').where('jamiyaId', '==', id)); await wipe(ref.collection('members'));
+    await wipe(ref.collection('payments')); await wipe(ref.collection('proofs')); await wipe(ref.collection('wishes')); await wipe(ref.collection('chat')); await wipe(db.collection('invites').where('jamiyaId', '==', id)); await wipe(ref.collection('members'));
     await ref.delete(); await db.collection('admin_notes').doc('j_' + id).delete().catch(() => {});
     A.jamiyat = A.jamiyat.filter(x => x.id !== id); delete A.notes['j_' + id];
     logEvent('adm_jam_del', { target: id, targetName: j.name, info: 'المشرف: ' + (j.creatorName || '') });
     closeModal(); render(); toast('تم حذف الجمعية');
   } catch (e) { toast('تعذر الحذف: ' + e.message + ' — تأكد من نشر القواعد المحدّثة', 'error'); }
 }
+/* ===== رسالة واتساب جماعية: يختار المالك المستلمين واحداً واحداً، ومن أُرسل له يخرج من القائمة ===== */
+const waDoc = () => state.admin.notes.wa_broadcast || {};
+const waText = () => state.admin.waText !== undefined ? state.admin.waText : (waDoc().text || '');
+const waFill = (txt, u) => txt.replace(/\{الاسم\}/g, String(u.name || '').trim().split(/\s+/)[0] || '');
+function waLists() {
+  const A = state.admin, sent = new Set(waDoc().sentUids || []), q = lc(A.waQ), qd = normPhone(A.waQ);
+  const eligible = A.users.filter(u => admWa(u.phone) && (!A.waOnlyOpt || u.waOptIn !== false));
+  const todo = eligible.filter(u => !sent.has(u.id) && (!q || lc(u.name).includes(q) || lc(u.nick).includes(q) || (qd && String(u.phone || '').includes(qd))))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar'));
+  return { todo, left: eligible.filter(u => !sent.has(u.id)).length, done: eligible.filter(u => sent.has(u.id)).length, noPhone: A.users.filter(u => !admWa(u.phone)).length };
+}
+function waStatsHtml() { const L = waLists(); return `المتبقي <b>${nf(L.left)}</b> • أُرسل لهم <b>${nf(L.done)}</b>${L.noPhone ? ` • بدون رقم صالح ${nf(L.noPhone)}` : ''}`; }
+function waListHtml() {
+  const { todo, left } = waLists();
+  if (!todo.length) return `<p class="text-xs text-slate-400 p-3 text-center">${left ? 'لا توجد نتائج للبحث.' : 'انتهت القائمة 🎉 أُرسلت الرسالة لجميع المستخدمين.'}</p>`;
+  return todo.map(u => `<div class="p-3 bg-slate-50 rounded-xl flex items-center justify-between gap-2 text-xs"><div class="min-w-0"><b class="block truncate">${esc(u.name || '—')}${u.waOptIn === false ? ' ' + bdg('لم يفعّل واتساب', 'bg-amber-50 text-amber-700') : ''}</b><span class="text-[11px] text-slate-500" dir="ltr">${esc(u.phone || '')}</span></div>
+    <button class="btn b-pri flex-none" data-act="wa-bc-send" data-id="${esc(u.id)}"><i class="fa-brands fa-whatsapp"></i> إرسال</button></div>`).join('');
+}
+function paintWa() { const s = $('wa-stats'), l = $('wa-list'); if (s) s.innerHTML = waStatsHtml(); if (l) l.innerHTML = waListHtml(); }
+function tabWa() {
+  const A = state.admin;
+  return `<div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-brands fa-whatsapp text-emerald-600"></i> رسالة واتساب لجميع المستخدمين</h4>
+    <textarea data-wa-text rows="5" maxlength="1000" class="inp" placeholder="اكتب الرسالة… استخدم {الاسم} ليُستبدل بالاسم الأول لكل مستخدم">${esc(waText())}</textarea>
+    <label class="flex items-center gap-2 text-xs font-semibold"><input type="checkbox" data-wa-opt class="w-4 h-4 accent-teal-600" ${A.waOnlyOpt ? 'checked' : ''}> إخفاء من لم يوافق على تنبيهات واتساب</label>
+    <p class="text-[11px] text-slate-500 leading-relaxed">اضغط «إرسال» بجانب كل مستخدم: تُفتح محادثة واتساب جاهزة بالرسالة وتضغط إرسال بنفسك، ثم يختفي من القائمة. التقدّم محفوظ فيمكنك المتابعة لاحقاً.</p></div>
+  <div class="card p-5 space-y-3"><div class="flex flex-wrap items-center justify-between gap-2"><p class="text-xs" id="wa-stats">${waStatsHtml()}</p><button class="btn b-sec" data-act="wa-bc-reset"><i class="fa-solid fa-rotate-left"></i> إعادة القائمة من البداية</button></div>
+    <input data-wa-q class="inp" value="${esc(A.waQ || '')}" placeholder="بحث بالاسم أو الجوال…"><div id="wa-list" class="space-y-2">${waListHtml()}</div></div>`;
+}
+async function waBcSend(uid) {
+  const A = state.admin, u = A.users.find(x => x.id === uid); if (!u) return;
+  const txt = waText().trim(); if (!txt) return toast('اكتب نص الرسالة أولاً', 'error');
+  const link = admWa(u.phone); if (!link) return toast('رقم الجوال غير صالح', 'error');
+  const w = window.open(link + '?text=' + encodeURIComponent(waFill(txt, u)), '_blank');
+  if (!w) return toast('منع المتصفح فتح واتساب، اسمح بالنوافذ المنبثقة لهذا الموقع', 'error');
+  try { w.opener = null; } catch (e) {}
+  const prev = waDoc();
+  A.notes.wa_broadcast = { ...prev, text: txt, sentUids: [...new Set([...(prev.sentUids || []), uid])] };
+  paintWa();
+  try { await db.collection('admin_notes').doc('wa_broadcast').set({ text: txt, sentUids: FV.arrayUnion(uid), updatedAt: FV.serverTimestamp() }, { merge: true }); }
+  catch (e) { toast('تعذر حفظ التقدّم: ' + e.message, 'error'); }
+}
+async function waBcReset() {
+  if (!confirm('إعادة القائمة كاملة؟ سيظهر من أُرسل لهم سابقاً مرة أخرى.')) return;
+  const A = state.admin; A.notes.wa_broadcast = { ...waDoc(), sentUids: [] }; paintWa();
+  try { await db.collection('admin_notes').doc('wa_broadcast').set({ sentUids: [], updatedAt: FV.serverTimestamp() }, { merge: true }); toast('أُعيدت القائمة', 'info'); }
+  catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
+}
+document.addEventListener('input', e => {
+  const t = e.target; if (!t.matches) return;
+  if (t.matches('[data-wa-text]')) state.admin.waText = t.value;
+  if (t.matches('[data-wa-q]')) { state.admin.waQ = t.value; paintWa(); }
+});
+document.addEventListener('change', e => { const t = e.target; if (t.matches && t.matches('[data-wa-opt]')) { state.admin.waOnlyOpt = t.checked; paintWa(); } });
 const ADMIN_ACTIONS = {
+  'wa-bc-send': el => waBcSend(el.dataset.id), 'wa-bc-reset': waBcReset,
   'adm-jam-del': el => adminDeleteJam(el.dataset.id),
   'adm-tab': el => { state.admin.tab = el.dataset.v; render(); window.scrollTo(0, 0); },
   'adm-uf': el => { state.admin.uf = el.dataset.v; state.admin.ulimit = 40; render(); },
@@ -2054,6 +2113,7 @@ function vJamiya() {
         <div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-chart-pie text-indigo-600"></i> تحصيل هذه الدورة</h4>
           <div class="text-xs space-y-2"><div class="flex justify-between"><span>المستهدف</span><b>${money(target)}</b></div><div class="flex justify-between"><span>المؤكد</span><b class="text-emerald-600">${money(collected)}</b></div>
           <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden"><div class="bg-emerald-500 h-full" style="width:${pct}%"></div></div></div></div>
+        ${wishCard(c)}${chatCard(c)}
         ${c.canManage ? `<div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-clock-rotate-left text-amber-500"></i> دعوات معلّقة</h4><div class="space-y-2">${pend || '<p class="text-xs text-slate-400">لا توجد دعوات معلّقة.</p>'}</div></div>` : ''}
         <div class="card p-5"><h4 class="font-bold text-sm mb-2"><i class="fa-solid fa-calendar-days text-teal-600"></i> الجدول الزمني</h4>${sched}</div>
       </div></div></div>`;
@@ -2075,10 +2135,11 @@ function vProfile() {
 
 /* ============ النوافذ المنبثقة ============ */
 function showModal(title, body) {
+  stopChat();
   $('modal').innerHTML = `<div class="sheet-wrap fade" data-bg><div class="sheet space-y-4" role="dialog" aria-modal="true">
     <div class="flex justify-between items-center"><h3 class="font-black text-lg">${title}</h3><button data-act="close" class="w-9 h-9 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center" aria-label="إغلاق"><i class="fa-solid fa-xmark"></i></button></div>${body}</div></div>`;
 }
-function closeModal() { $('modal').innerHTML = ''; }
+function closeModal() { stopChat(); $('modal').innerHTML = ''; }
 
 function openModal(kind) {
   const c = ctx();
@@ -2126,6 +2187,136 @@ function openMemberPays(uid) {
   }).join('');
   showModal(`مدفوعات ${esc(dispName(m))}`, `<div class="space-y-2"><div class="text-[11px] text-slate-600">مدفوع ${fmtNum(ac.paid)} من المستحق ${fmtNum(ac.owed)} ريال${ac.credit > 0 ? ` • رصيد مقدّم ${fmtNum(ac.credit)}` : ac.remaining > 0 ? ` • متبقي ${fmtNum(ac.remaining)}` : ''}</div>${rows || '<p class="text-xs text-slate-400">لا توجد مدفوعات.</p>'}</div>`);
 }
+
+/* ============ رغبة الاستلام + دردشة الجمعية (يفتحها المشرف ويغلقها) ============ */
+const isStaffJ = j => !!j && !!state.user && (j.creatorUid === state.user.uid || (!!j.deputyUid && j.deputyUid === state.user.uid));
+const openPill = o => `<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold ${o ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}"><i class="fa-solid ${o ? 'fa-lock-open' : 'fa-lock'}"></i> ${o ? 'مفتوحة' : 'مغلقة'}</span>`;
+const jref = () => db.collection('jamiyat').doc(state.j.id);
+
+// المشرف ونائبه يريان كل الرغبات، والعضو يرى رغبته فقط
+function syncWishes() {
+  const j = state.j; if (!j || !state.user) return;
+  const mode = isStaffJ(j) ? 'all' : 'mine';
+  if (state.wishMode === mode) return;
+  if (state.wishUnsub) { state.wishUnsub(); state.wishUnsub = null; }
+  state.wishMode = mode; state.wishes = {};
+  const col = jref().collection('wishes'), uid = state.user.uid, redraw = () => { if (state.view === 'jamiya') render(); };
+  const onErr = e => { if (e.code !== 'permission-denied') toast('خطأ في تحميل الرغبات: ' + e.message, 'error'); };
+  state.wishUnsub = mode === 'all'
+    ? col.onSnapshot(s => { state.wishes = {}; s.docs.forEach(d => state.wishes[d.id] = d.data()); redraw(); }, onErr)
+    : col.doc(uid).onSnapshot(s => { state.wishes = s.exists ? { [uid]: s.data() } : {}; redraw(); }, onErr);
+}
+const wishLine = (j, w) => `${w.pos ? 'الدور ' + w.pos + ' — ' + periodLabel(j, w.pos - 1) : 'بلا دور محدد'}${w.text ? ' • ' + esc(w.text) : ''}`;
+function wishCard(c) {
+  const j = c.j, open = !!j.wishOpen, uid = state.user.uid; if (!j.memberUids.includes(uid)) return '';
+  const mine = state.wishes[uid];
+  const myBox = mine ? `<div class="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-xs"><p class="text-[10px] text-emerald-700 font-bold mb-0.5">رغبتك</p>${wishLine(j, mine)}</div>`
+    : `<p class="text-xs text-slate-400">${open ? 'لم تكتب رغبتك بعد.' : 'لم تكتب رغبة في هذه الجمعية.'}</p>`;
+  let all = '';
+  if (c.canManage) {
+    const list = c.turns.filter(u => state.wishes[u]), missing = c.turns.filter(u => !state.wishes[u]);
+    all = `<div class="pt-3 mt-3 border-t border-slate-100 space-y-1.5"><p class="text-[11px] font-bold text-slate-600">رغبات الأعضاء (${list.length}/${c.turns.length})</p>
+      ${list.map(u => `<div class="p-2 bg-slate-50 rounded-xl text-[11px]"><b>${esc(dispName(state.members[u]))}</b> <span class="text-slate-400">(ترتيبه الحالي ${c.turns.indexOf(u) + 1})</span><div class="text-slate-600">${wishLine(j, state.wishes[u])}</div></div>`).join('') || '<p class="text-[11px] text-slate-400">لا توجد رغبات بعد.</p>'}
+      ${missing.length && list.length ? `<p class="text-[10px] text-slate-400">لم يكتب بعد: ${missing.map(u => esc(dispName(state.members[u]))).join('، ')}</p>` : ''}
+      ${c.isCreator && c.turns.length > 1 ? '<button class="btn b-sec w-full" data-act="order-modal"><i class="fa-solid fa-arrow-down-1-9"></i> تعديل ترتيب القبض</button>' : ''}</div>`;
+  }
+  return `<div class="card p-5"><div class="flex justify-between items-center mb-3"><h4 class="font-bold text-sm"><i class="fa-solid fa-hand-holding-heart text-rose-500"></i> رغبة الاستلام</h4>${openPill(open)}</div>
+    <div class="space-y-2.5">${myBox}${open ? `<button class="btn b-pri w-full" data-act="wish-modal"><i class="fa-solid fa-pen"></i> ${mine ? 'تعديل رغبتي' : 'اكتب رغبتي في الاستلام'}</button>` : '<p class="text-[11px] text-slate-500 leading-relaxed">يفتح المشرف الباب عندما يريد جمع رغبات الأعضاء في ترتيب الاستلام.</p>'}
+    ${c.isCreator ? `<button class="btn ${open ? 'b-red' : 'b-sec'} w-full" data-act="wish-toggle"><i class="fa-solid ${open ? 'fa-lock' : 'fa-lock-open'}"></i> ${open ? 'إغلاق باب الرغبات' : 'فتح باب الرغبات للأعضاء'}</button>` : ''}</div>${all}</div>`;
+}
+function openWishModal() {
+  const c = ctx(); if (!c) return;
+  if (!c.j.wishOpen) return toast('باب الرغبات مغلق الآن', 'error');
+  const w = state.wishes[state.user.uid] || {}, opts = ['<option value="0">لا أفضّل دوراً معيناً</option>'];
+  for (let i = lockedCount(c); i < c.j.count; i++) opts.push(`<option value="${i + 1}" ${w.pos === i + 1 ? 'selected' : ''}>الدور ${i + 1} — ${periodLabel(c.j, i)}</option>`);
+  showModal('رغبتي في الاستلام', `<form id="f-wish" class="space-y-3">
+    <div><label class="text-xs font-semibold block mb-1">الدور الذي تفضّله</label><select name="pos" class="inp">${opts.join('')}</select></div>
+    <div><label class="text-xs font-semibold block mb-1">ملاحظة للمشرف (اختياري)</label><textarea name="text" rows="3" maxlength="200" class="inp" placeholder="مثال: أحتاج المبلغ قبل بداية الدراسة">${esc(w.text || '')}</textarea></div>
+    <p class="text-[11px] text-slate-500 leading-relaxed">رغبتك تظهر للمشرف ونائبه فقط، والقرار النهائي في ترتيب القبض للمشرف.</p>
+    <button class="btn b-pri w-full py-3" type="submit">حفظ رغبتي</button>${w.uid ? '<button type="button" class="btn b-red w-full" data-act="wish-del">حذف رغبتي</button>' : ''}</form>`);
+}
+async function submitWish(f) {
+  const j = state.j; if (!j) return;
+  if (!j.wishOpen) return toast('باب الرغبات مغلق الآن', 'error');
+  const text = f.text.value.trim().slice(0, 200), pos = parseInt(f.pos.value, 10) || 0, uid = state.user.uid;
+  if (!text && !pos) return toast('اختر الدور الذي تفضّله أو اكتب ملاحظتك', 'error');
+  const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+  const first = !state.wishes[uid];
+  try {
+    await jref().collection('wishes').doc(uid).set({ uid, text, pos, updatedAt: FV.serverTimestamp() });
+    closeModal(); toast('تم حفظ رغبتك');
+    if (first) sendNotifs([j.creatorUid], 'رغبة استلام جديدة', `${dispName(state.profile)} كتب رغبته في جمعية «${j.name}»`, j.id, 'wish');
+  } catch (e) { btn.disabled = false; toast(e.code === 'permission-denied' ? 'تعذر الحفظ: الباب أُغلق أو قواعد Firestore غير منشورة' : 'تعذر الحفظ: ' + e.message, 'error'); }
+}
+async function deleteWish() {
+  if (!state.j) return;
+  try { await jref().collection('wishes').doc(state.user.uid).delete(); closeModal(); toast('حُذفت رغبتك', 'info'); } catch (e) { toast('تعذر الحذف: ' + e.message, 'error'); }
+}
+async function toggleWishOpen() {
+  const c = ctx(); if (!c || !c.isCreator) return;
+  const open = !c.j.wishOpen;
+  try {
+    await jref().update({ wishOpen: open });
+    toast(open ? 'فُتح باب الرغبات للأعضاء' : 'أُغلق باب الرغبات', open ? 'success' : 'info');
+    if (open) sendNotifs(c.j.memberUids, 'باب رغبة الاستلام مفتوح', `اكتب الدور الذي تفضّله في جمعية «${c.j.name}»`, c.j.id, 'wish');
+  } catch (e) { toast('تعذر التنفيذ: ' + e.message, 'error'); }
+}
+
+/* --- الدردشة --- */
+function chatCard(c) {
+  const j = c.j, open = !!j.chatOpen; if (!j.memberUids.includes(state.user.uid)) return '';
+  return `<div class="card p-5"><div class="flex justify-between items-center mb-3"><h4 class="font-bold text-sm"><i class="fa-solid fa-comments text-teal-600"></i> دردشة الجمعية</h4>${openPill(open)}</div>
+    <p class="text-[11px] text-slate-500 leading-relaxed mb-3">${open ? 'الدردشة مفتوحة لنقاش الأعضاء.' : 'الدردشة مغلقة حالياً، يفتحها المشرف عند الحاجة، ويمكنك قراءة الرسائل السابقة.'}</p>
+    <div class="space-y-2"><button class="btn b-pri w-full" data-act="chat-open"><i class="fa-solid fa-comments"></i> ${open ? 'دخول الدردشة' : 'عرض الرسائل السابقة'}</button>
+    ${c.isCreator ? `<button class="btn ${open ? 'b-red' : 'b-sec'} w-full" data-act="chat-toggle"><i class="fa-solid ${open ? 'fa-lock' : 'fa-lock-open'}"></i> ${open ? 'إغلاق الدردشة' : 'فتح الدردشة للأعضاء'}</button>` : ''}</div></div>`;
+}
+function stopChat() { if (state.chatUnsub) { state.chatUnsub(); state.chatUnsub = null; } state.chat = []; }
+function openChat() {
+  const j = state.j; if (!j || !j.memberUids.includes(state.user.uid)) return;
+  showModal('<i class="fa-solid fa-comments text-teal-600"></i> دردشة ' + esc(j.name), `<div class="space-y-3"><div id="chat-status"></div>
+    <div id="chat-list" class="h-72 overflow-y-auto space-y-2 p-2 bg-slate-50 rounded-2xl text-xs"></div>
+    <form id="f-chat" class="flex gap-2 items-center"><input name="text" class="inp flex-1" maxlength="500" autocomplete="off" placeholder="اكتب رسالتك…" required><button class="btn b-pri" type="submit" aria-label="إرسال"><i class="fa-solid fa-paper-plane"></i></button></form></div>`);
+  state.chat = [];
+  state.chatUnsub = jref().collection('chat').orderBy('createdAt', 'desc').limit(100).onSnapshot(s => {
+    state.chat = s.docs.map(d => ({ id: d.id, ...d.data() })).reverse(); paintChat(true);
+  }, e => { const b = $('chat-list'); if (b) b.innerHTML = '<p class="text-center text-slate-400 py-6">تعذر تحميل الرسائل' + (e.code === 'permission-denied' ? ' (انشر قواعد Firestore المحدّثة)' : '') + '</p>'; });
+  paintChat(true);
+}
+function paintChat(stick) {
+  const box = $('chat-list'), j = state.j; if (!box || !j) return;
+  const me = state.user.uid, isSup = j.creatorUid === me, open = !!j.chatOpen;
+  const st = $('chat-status');
+  if (st) st.innerHTML = `<div class="flex items-center justify-between gap-2 p-2.5 rounded-xl text-[11px] ${open ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}"><span><i class="fa-solid ${open ? 'fa-lock-open' : 'fa-lock'}"></i> ${open ? 'الدردشة مفتوحة لأعضاء الجمعية' : 'الدردشة مغلقة — للقراءة فقط'}</span>${isSup ? `<button class="btn ${open ? 'b-red' : 'b-pri'} !min-h-[32px] !py-1" data-act="chat-toggle">${open ? 'إغلاق' : 'فتح'}</button>` : ''}</div>`;
+  const fm = $('f-chat'); if (fm) fm.classList.toggle('hide', !open);
+  const near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  box.innerHTML = state.chat.length ? state.chat.map(m => {
+    const mine = m.uid === me, mem = state.members[m.uid], t = tsd(m.createdAt);
+    const tm = t ? t.toLocaleString('ar-SA-u-ca-gregory', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'الآن';
+    const tag = m.uid === j.creatorUid ? ' <span class="opacity-70">(مشرف)</span>' : (j.deputyUid && m.uid === j.deputyUid) ? ' <span class="opacity-70">(نائب)</span>' : '';
+    return `<div class="flex ${mine ? 'justify-start' : 'justify-end'}"><div class="max-w-[85%] px-3 py-2 rounded-2xl ${mine ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-100'}">
+      <p class="text-[10px] font-bold ${mine ? 'text-emerald-100' : 'text-teal-700'}">${mem ? esc(dispName(mem)) : 'عضو سابق'}${tag}</p>
+      <p class="whitespace-pre-wrap break-words">${esc(m.text)}</p>
+      <p class="text-[9px] opacity-60 mt-0.5 flex gap-2 items-center">${tm}${isSup ? `<button class="underline" data-act="chat-del" data-id="${esc(m.id)}">حذف</button>` : ''}</p></div></div>`;
+  }).join('') : `<p class="text-center text-slate-400 py-10">${open ? 'ابدأ النقاش بأول رسالة 👋' : 'لا توجد رسائل.'}</p>`;
+  if (stick || near) box.scrollTop = box.scrollHeight;
+}
+async function sendChat(f) {
+  const j = state.j, text = f.text.value.trim(); if (!j || !text) return;
+  if (!j.chatOpen) return toast('الدردشة مغلقة الآن', 'error');
+  f.text.value = ''; f.text.focus();
+  try { await jref().collection('chat').add({ uid: state.user.uid, text: text.slice(0, 500), createdAt: FV.serverTimestamp() }); }
+  catch (e) { f.text.value = text; toast(e.code === 'permission-denied' ? 'تعذر الإرسال: الدردشة مغلقة أو قواعد Firestore غير منشورة' : 'تعذر الإرسال: ' + e.message, 'error'); }
+}
+async function toggleChatOpen() {
+  const j = state.j; if (!j || j.creatorUid !== state.user.uid) return;
+  const open = !j.chatOpen;
+  try {
+    await jref().update({ chatOpen: open });
+    toast(open ? 'فُتحت الدردشة للأعضاء' : 'أُغلقت الدردشة', open ? 'success' : 'info');
+    if (open) sendNotifs(j.memberUids, 'فُتحت دردشة الجمعية', `يمكنك المشاركة في نقاش جمعية «${j.name}» الآن`, j.id, 'chat');
+  } catch (e) { toast('تعذر التنفيذ: ' + e.message, 'error'); }
+}
+function chatDelete(id) { if (state.j) jref().collection('chat').doc(id).delete().catch(e => toast('تعذر حذف الرسالة: ' + e.message, 'error')); }
 
 /* ============ التوجيه والأحداث ============ */
 /* ============ تطبيق PWA: التثبيت والتحديث ============ */
@@ -2244,7 +2435,9 @@ const actions = {
   'app-uninstalled': () => { try { localStorage.removeItem('jm_installed'); } catch (e) {} closeModal(); renderBanner(); renderNav(); },
   'dismiss-ib': () => { try { localStorage.setItem(ibKey, Date.now()); } catch (e) {} state.updateReady = false; renderBanner(); },
   'pick-icon': (el) => { const fm = el.closest('form'); if (!fm) return; fm.icon.value = el.dataset.v; fm.querySelectorAll('.emo').forEach(b => b.classList.toggle('on', b === el)); },
-  'vote-yes': () => voteMod(true), 'vote-no': () => voteMod(false), 'close-mod': closeMod
+  'vote-yes': () => voteMod(true), 'vote-no': () => voteMod(false), 'close-mod': closeMod,
+  'wish-modal': openWishModal, 'wish-toggle': toggleWishOpen, 'wish-del': deleteWish,
+  'chat-open': openChat, 'chat-toggle': toggleChatOpen, 'chat-del': el => chatDelete(el.dataset.id)
 };
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
@@ -2268,7 +2461,7 @@ document.addEventListener('input', e => {
   if (e.target.name === 'icon') fm.querySelectorAll('.emo').forEach(b => b.classList.toggle('on', b.dataset.v === e.target.value.trim()));
 });
 const forms = { 'f-register': doRegister, 'f-login': doLogin, 'f-reset': doReset, 'f-complete': doCompleteProfile, 'f-create': handleCreate,
-  'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-notif': submitNotif, 'f-deputy': f => setDeputy(f.uid.value), 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete };
+  'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-notif': submitNotif, 'f-deputy': f => setDeputy(f.uid.value), 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete, 'f-wish': submitWish, 'f-chat': sendChat };
 Object.assign(forms, ADMIN_FORMS);
 document.addEventListener('submit', e => { const fn = forms[e.target.id]; if (fn) { e.preventDefault(); fn(e.target); } });
 
