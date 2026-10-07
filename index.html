@@ -182,7 +182,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.35</footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.4</footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -704,12 +704,27 @@ function homeAlerts() {
 }
 const ALERT_ST = [['bg-rose-50 border-rose-200', 'fa-triangle-exclamation text-rose-500'], ['bg-amber-50 border-amber-200', 'fa-clock text-amber-500'], ['bg-indigo-50 border-indigo-200', 'fa-gift text-indigo-500']];
 const alertCount = () => { try { return state.user && state.profile ? homeAlerts().length : 0; } catch (e) { return 0; } };
-function showAlertsModal() {
-  const L = homeAlerts();
-  const items = L.map(a => `<div class="p-4 ${ALERT_ST[a.lvl][0]} border rounded-2xl text-xs space-y-2.5">
+const KIND_IC = { pay: 'fa-coins text-emerald-600', member: 'fa-user-plus text-sky-600', mod: 'fa-pen-to-square text-indigo-600', custom: 'fa-bullhorn text-teal-600', remind: 'fa-bell text-amber-500' };
+const bellCount = () => alertCount() + unreadCount();
+function showAlertsModal(tab) {
+  const A = homeAlerts(), N = state.inbox || [], un = unreadCount();
+  tab = tab || (un ? 'inbox' : 'alerts');
+  const chips = `<div class="atabs"><button class="achip ${tab === 'alerts' ? 'on' : ''}" data-act="alerts-tab" data-v="alerts"><i class="fa-solid fa-clock"></i> المواعيد${A.length ? ' (' + nf(A.length) + ')' : ''}</button><button class="achip ${tab === 'inbox' ? 'on' : ''}" data-act="alerts-tab" data-v="inbox"><i class="fa-solid fa-inbox"></i> الإشعارات${un ? ' (' + nf(un) + ')' : ''}</button></div>`;
+  const empty = t => `<div class="text-center py-8 text-slate-400"><i class="fa-regular fa-bell-slash text-3xl mb-2 block"></i><p class="text-xs">${t}</p></div>`;
+  let body;
+  if (tab === 'alerts') body = A.length ? `<div class="space-y-2.5">${A.map(a => `<div class="p-4 ${ALERT_ST[a.lvl][0]} border rounded-2xl text-xs space-y-2.5">
       <div class="min-w-0"><p class="font-bold text-sm"><i class="fa-solid ${ALERT_ST[a.lvl][1]}"></i> ${esc(a.title)}</p><p class="text-slate-600 mt-0.5 leading-relaxed">${esc(a.text)}</p></div>
-      <div class="flex gap-2"><button class="btn b-sec" data-act="alert-go" data-id="${esc(a.id)}">فتح الجمعية</button>${a.remind ? `<button class="btn bg-emerald-50 text-emerald-700" data-act="alert-remind" data-id="${esc(a.id)}"><i class="fa-brands fa-whatsapp"></i> تذكير</button>` : ''}</div></div>`).join('');
-  showModal('التنبيهات' + (L.length ? ` (${nf(L.length)})` : ''), items ? `<div class="space-y-2.5">${items}</div>` : '<div class="text-center py-8 text-slate-400"><i class="fa-regular fa-bell-slash text-3xl mb-2 block"></i><p class="text-xs">لا توجد تنبيهات حالياً 🎉</p></div>');
+      <div class="flex gap-2"><button class="btn b-sec" data-act="alert-go" data-id="${esc(a.id)}">فتح الجمعية</button>${a.remind ? `<button class="btn bg-emerald-50 text-emerald-700" data-act="alert-remind" data-id="${esc(a.id)}"><i class="fa-brands fa-whatsapp"></i> تذكير</button>` : ''}</div></div>`).join('')}</div>` : empty('لا توجد مواعيد قريبة 🎉');
+  else body = N.length ? `<div class="space-y-2">${N.map(n => `<button class="w-full text-right p-3 rounded-2xl border text-xs ${n.read !== true ? 'bg-teal-50 border-teal-200' : 'bg-slate-50 border-slate-100'}" data-act="inbox-go" data-id="${esc(n.jid || '')}">
+      <div class="flex justify-between gap-2"><b><i class="fa-solid ${KIND_IC[n.kind] || 'fa-bell text-slate-500'}"></i> ${esc(n.title)}</b><span class="text-[10px] text-slate-400 flex-none">${ago(tsd(n.createdAt))}</span></div>
+      <p class="text-slate-600 mt-1 leading-relaxed">${esc(n.body)}</p></button>`).join('')}</div><button class="btn b-sec w-full" data-act="inbox-clear"><i class="fa-solid fa-trash-can"></i> مسح الكل</button>` : empty('لا توجد إشعارات بعد');
+  showModal('التنبيهات', chips + body);
+  if (tab === 'inbox') markInboxRead();
+}
+async function clearInbox() {
+  const N = state.inbox || []; if (!N.length || !confirm('مسح كل الإشعارات؟')) return;
+  try { const b = db.batch(); N.slice(0, 400).forEach(n => b.delete(db.collection('notifs').doc(n.id))); await b.commit(); state.inbox = []; renderNav(); showAlertsModal('inbox'); }
+  catch (e) { toast('تعذر المسح: ' + e.message, 'error'); }
 }
 
 // ملف تقويم (.ics): مواعيد السداد ويوم القبض لعضو محدد، مع تنبيه قبلها بيوم وصباح اليوم نفسه
@@ -867,12 +882,12 @@ function compressImage(file) {
     const img = new Image(), url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
-      let scale = Math.min(1, 1000 / Math.max(img.width, img.height));
+      let scale = Math.min(1, 900 / Math.max(img.width, img.height));
       for (let attempt = 0; attempt < 6; attempt++) {
         const cv = document.createElement('canvas');
         cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
         const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0, cv.width, cv.height);
-        const limit = attempt < 2 ? 220000 : 600000; // الهدف إيصال أقل من ~220KB، ثم نتساهل إن لزم
+        const limit = attempt < 2 ? 140000 : 350000; // الهدف إيصال أقل من ~220KB، ثم نتساهل إن لزم
         for (const q of [0.72, 0.58, 0.45]) {
           const out = cv.toDataURL('image/jpeg', q);
           if (out.length < limit) return resolve(out);
@@ -1149,11 +1164,19 @@ function trafficSource() {
   } catch (e) {}
   return 'مباشر';
 }
-function incStat(spec) {
+// الإحصاءات تُجمَّع في الذاكرة وتُكتب دفعة واحدة كل 30 ثانية (بدل كتابة لكل نقرة)
+let statBuf = {}, statTimer = null;
+const mergeSpec = (t, sp) => { Object.entries(sp).forEach(([k, v]) => { if (v && typeof v === 'object') mergeSpec(t[k] = t[k] || {}, v); else t[k] = (t[k] || 0) + v; }); return t; };
+function incStat(spec) { mergeSpec(statBuf, spec); if (!statTimer) statTimer = setTimeout(flushStats, 30000); return Promise.resolve(); }
+function flushStats() {
+  clearTimeout(statTimer); statTimer = null;
+  const spec = statBuf; statBuf = {}; if (!Object.keys(spec).length) return Promise.resolve();
   const conv = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v && typeof v === 'object' ? conv(v) : FV.increment(v)]));
   const d = dayKey();
   return db.collection('stats').doc(d).set({ day: d, ...conv(spec) }, { merge: true }).catch(() => {});
 }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushStats(); });
+window.addEventListener('pagehide', flushStats);
 function logEvent(type, extra = {}) {
   const u = auth.currentUser; if (!u) return Promise.resolve();
   return db.collection('events').add({ type, uid: u.uid, email: lc(u.email), name: (state.profile && state.profile.name) || u.displayName || '', ts: FV.serverTimestamp(), ...extra }).catch(() => {});
@@ -1167,13 +1190,15 @@ function trackView(v) {
   if (!state.user || !state.profile || state.isAdmin || v === 'loading' || state._tv === v) return;
   state._tv = v; incStat({ pv: 1, views: { [v]: 1 } });
 }
-let hbTimer = null;
+let hbTimer = null, lastBeat = 0;
+function beat() { // آخر ظهور: كتابة واحدة كل 5 دقائق كحد أدنى
+  if (!state.user || !state.profile || document.visibilityState !== 'visible' || Date.now() - lastBeat < 300000) return;
+  lastBeat = Date.now(); db.collection('activity').doc(state.user.uid).set({ lastSeen: FV.serverTimestamp() }, { merge: true }).catch(() => {});
+}
 function stopHeartbeat() { if (hbTimer) clearInterval(hbTimer); hbTimer = null; }
 function startHeartbeat() {
   stopHeartbeat();
-  hbTimer = setInterval(() => {
-    if (document.visibilityState === 'visible' && state.user) db.collection('activity').doc(state.user.uid).set({ lastSeen: FV.serverTimestamp() }, { merge: true }).catch(() => {});
-  }, 150000);
+  hbTimer = setInterval(() => beat(), 600000);
 }
 async function trackSession() { // يُحتسب "دخول" واحد لكل جلسة (لا تحتسب إعادة تحميل الصفحة)
   const u = state.user, k = 'jm_sess_' + u.uid;
@@ -1238,9 +1263,11 @@ function annHtml() {
 }
 
 /* --- تحميل بيانات لوحة المالك --- */
-async function loadAdmin() {
+async function loadAdmin(force) {
   if (!state.isAdmin) return;
-  const A = state.admin; A.loading = true; A.errors = []; if (state.view === 'admin') render();
+  const A = state.admin;
+  if (!force && A.loaded && Date.now() - (A.at || 0) < 300000) { if (state.view === 'admin') render(); return; } // لا نعيد قراءة كل البيانات خلال 5 دقائق
+  A.loading = true; A.errors = []; if (state.view === 'admin') render();
   const g = (name, q) => q.get().catch(e => { A.errors.push(name + ' (' + (e.code || e.message) + ')'); return null; });
   const [j, u, ac, bl, nt, ad, st, ev] = await Promise.all([
     g('jamiyat', db.collection('jamiyat')), g('users', db.collection('users')), g('activity', db.collection('activity')), g('blocked', db.collection('blocked')),
@@ -1251,13 +1278,13 @@ async function loadAdmin() {
   if (u) A.users = u.docs.map(d => ({ id: d.id, ...d.data() }));
   A.act = map(ac); A.blocked = map(bl); A.notes = map(nt); A.admins = map(ad); A.stats = map(st);
   A.events = ev ? ev.docs.map(d => ({ id: d.id, ...d.data() })) : [];
-  A.loaded = true; A.loading = false;
+  A.loaded = true; A.loading = false; A.at = Date.now();
   if (state.view === 'admin') render();
 }
 function userInfo(u) {
   const A = state.admin, a = A.act[u.id] || {}, n = A.notes[u.id] || {}, ll = tsd(a.lastLogin), ls = tsd(a.lastSeen);
   return { u, id: u.id, a, logins: a.loginCount || 0, ll, ls, fl: tsd(a.firstLogin), created: tsd(u.createdAt), lastAct: ls || ll,
-    online: !!(ls && Date.now() - ls.getTime() < 5 * 60000), blocked: !!A.blocked[u.id], flag: n.flag || '', nNotes: (n.items || []).length, notes: n.items || [],
+    online: !!(ls && Date.now() - ls.getTime() < 15 * 60000), blocked: !!A.blocked[u.id], flag: n.flag || '', nNotes: (n.items || []).length, notes: n.items || [],
     jc: A.jamiyat.filter(j => (j.memberUids || []).includes(u.id)).length, isAdm: !!A.admins[u.id] || lc(u.email) === OWNER_EMAIL };
 }
 const lastTime = x => (x.lastAct ? x.lastAct.getTime() : 0);
@@ -1685,9 +1712,7 @@ document.addEventListener('change', e => {
   if (t.matches('[data-adm-sort]')) { state.admin.us = t.value; const b = $('adm-ulist'); if (b) b.innerHTML = userListHtml(); }
   if (t.matches('[data-adm-flag]')) setFlag(t.dataset.t, t.value);
 });
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && state.user && state.profile && ssGet('jm_sess_' + state.user.uid)) db.collection('activity').doc(state.user.uid).set({ lastSeen: FV.serverTimestamp() }, { merge: true }).catch(() => {});
-});
+document.addEventListener('visibilitychange', () => { if (state.user && ssGet('jm_sess_' + state.user.uid)) beat(); });
 
 
 
@@ -1751,17 +1776,26 @@ async function sendNotifs(uids, title, body, jid, kind, tag) {
   try {
     for (let i = 0; i < list.length; i += 400) {
       const b = db.batch();
-      list.slice(i, i + 400).forEach(to => b.set(db.collection('notifs').doc(), { toUid: to, fromUid: me, title: String(title).slice(0, 100), body: String(body).slice(0, 500), jid: jid || '', kind: kind || 'info', tag: tag || '', createdAt: FV.serverTimestamp() }));
+      list.slice(i, i + 400).forEach(to => b.set(db.collection('notifs').doc(), { toUid: to, fromUid: me, title: String(title).slice(0, 100), body: String(body).slice(0, 500), jid: jid || '', kind: kind || 'info', tag: tag || '', pushed: false, read: false, createdAt: FV.serverTimestamp() }));
       await b.commit();
     }
     return list.length;
   } catch (e) { console.warn('notif', e.code || e.message); return 0; }
 }
+const nSecs = n => (n.createdAt && n.createdAt.seconds) || 0;
+const unreadCount = () => (state.inbox || []).filter(n => n.read !== true).length;
 function listenNotifs() {
-  const uid = state.user.uid; state.nq = [];
+  const uid = state.user.uid; state.nq = []; state.inbox = []; state._pruned = new Set();
   state.unsubs.push(db.collection('notifs').where('toUid', '==', uid).onSnapshot(s => {
-    s.docChanges().forEach(c => { if (c.type === 'added' && !c.doc.metadata.hasPendingWrites) state.nq.push({ id: c.doc.id, ...c.doc.data() }); });
-    flushNotifs();
+    state.inbox = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => nSecs(b) - nSecs(a));
+    s.docChanges().forEach(c => {
+      if (c.type !== 'added' || c.doc.metadata.hasPendingWrites) return;
+      const n = { id: c.doc.id, ...c.doc.data() };
+      // يُعرض محلياً إن لم يدفعه الخادم لجهاز المستخدم (أو لم يكن للمستخدم جهاز مسجّل)
+      if (n.read !== true && n.delivered !== true && (n.pushed !== true || n.noPush === true)) state.nq.push(n);
+    });
+    state.inbox.slice(30).forEach(n => { if (!state._pruned.has(n.id)) { state._pruned.add(n.id); db.collection('notifs').doc(n.id).delete().catch(() => {}); } }); // نحتفظ بآخر 30
+    flushNotifs(); renderNav();
   }, () => {}));
 }
 function flushNotifs() {
@@ -1772,12 +1806,17 @@ function flushNotifs() {
   let seen = []; try { seen = JSON.parse(lsGet('jm_nseen') || '[]'); } catch (e) {}
   const tg = n => n.tag || ('n_' + n.id);
   const fresh = q.filter(n => !seen.includes(tg(n)));
-  fresh.sort((a, b) => ((a.createdAt && a.createdAt.seconds) || 0) - ((b.createdAt && b.createdAt.seconds) || 0));
+  fresh.sort((a, b) => nSecs(a) - nSecs(b));
   const show = (title, body, tag, jid) => hidden ? showSysNotif(title, body, tag, jid) : toast(title + ' — ' + body, 'info');
   fresh.slice(0, 3).forEach(n => show(n.title, n.body, tg(n), n.jid));
   if (fresh.length > 3) show('الجمعية الذكية', 'لديك ' + nf(fresh.length - 3) + ' إشعارات أخرى جديدة', 'more_' + Date.now(), '');
   fresh.forEach(n => seen.push(tg(n))); lsSet('jm_nseen', JSON.stringify(seen.slice(-300)));
-  q.forEach(n => db.collection('notifs').doc(n.id).delete().catch(() => {}));
+  q.forEach(n => db.collection('notifs').doc(n.id).update({ pushed: true, delivered: true }).catch(() => {}));
+}
+async function markInboxRead() {
+  const un = (state.inbox || []).filter(n => n.read !== true).slice(0, 30); if (!un.length) return;
+  un.forEach(n => { n.read = true; }); renderNav();
+  try { const b = db.batch(); un.forEach(n => b.update(db.collection('notifs').doc(n.id), { read: true })); await b.commit(); } catch (e) {}
 }
 document.addEventListener('visibilitychange', flushNotifs);
 async function notifyJoin(inv) {
@@ -1821,7 +1860,7 @@ function renderNav() {
   const shareBtn = '<button class="btn b-sec" data-act="share-app" aria-label="مشاركة التطبيق"><i class="fa-solid fa-share-nodes"></i><span class="hidden sm:inline"> مشاركة</span></button>';
   if (!state.user || !state.profile) { nav.innerHTML = instBtn + shareBtn; sub.textContent = 'منصة الجمعيات العائلية'; tb.classList.add('hide'); return; }
   sub.textContent = state.profile.name;
-  const nAl = alertCount(), bellBtn = `<button class="btn b-sec bellbtn" data-act="alerts-open" aria-label="التنبيهات"><i class="fa-solid fa-bell ${nAl ? 'text-rose-500' : ''}"></i>${nAl ? `<span class="cnt">${nf(nAl)}</span>` : ''}</button>`;
+  const nAl = bellCount(), bellBtn = `<button class="btn b-sec bellbtn" data-act="alerts-open" aria-label="التنبيهات"><i class="fa-solid fa-bell ${nAl ? 'text-rose-500' : ''}"></i>${nAl ? `<span class="cnt">${nf(nAl)}</span>` : ''}</button>`;
   nav.innerHTML = `${instBtn}${bellBtn}${shareBtn}<div class="dnav">${state.isAdmin ? '<button class="btn b-pri" data-act="go-admin"><i class="fa-solid fa-shield-halved"></i> لوحة المالك</button>' : ''}
     <button class="btn b-sec" data-act="go-home"><i class="fa-solid fa-house"></i> جمعياتي</button>
     <button class="btn b-sec" data-act="go-profile"><i class="fa-solid fa-user-gear"></i> حسابي</button>
@@ -1912,7 +1951,7 @@ function vHome() {
       <p class="text-xs text-emerald-50/90 mt-1">جمعياتك ودعواتك في مكان واحد</p>
       <div class="flex flex-wrap items-center gap-3 mt-4"><div class="stat"><p class="text-[11px] text-emerald-50">جمعياتي</p><b class="text-lg">${state.jamiyat.length}</b></div>
       <div class="stat"><p class="text-[11px] text-emerald-50">دعوات</p><b class="text-lg">${state.invites.length}</b></div>
-      <button class="stat text-right" data-act="alerts-open"><p class="text-[11px] text-emerald-50"><i class="fa-solid fa-bell"></i> تنبيهات</p><b class="text-lg">${alertCount()}</b></button>
+      <button class="stat text-right" data-act="alerts-open"><p class="text-[11px] text-emerald-50"><i class="fa-solid fa-bell"></i> تنبيهات</p><b class="text-lg">${bellCount()}</b></button>
       <button class="btn b-white mr-auto" data-act="go-create"><i class="fa-solid fa-circle-plus"></i> جمعية جديدة</button></div></div>
     ${inv ? `<div class="space-y-2"><h3 class="font-black text-sm"><i class="fa-solid fa-envelope-open-text text-amber-500"></i> دعوات بانتظارك</h3>${inv}</div>` : ''}
     <div class="space-y-2.5"><h3 class="font-black text-sm">جمعياتك</h3>${js || '<div class="card p-8 text-center text-xs text-slate-400"><i class="fa-regular fa-folder-open text-3xl mb-2 block"></i>لا توجد جمعيات بعد. أنشئ جمعيتك الأولى أو انتظر دعوة.</div>'}</div></div>`;
@@ -2186,7 +2225,8 @@ const actions = {
   'export-modal': openExportModal,
   'export-csv': exportCsv,
   'export-print': exportPrint,
-  'alerts-open': showAlertsModal,
+  'alerts-open': () => showAlertsModal(), 'alerts-tab': (el) => showAlertsModal(el.dataset.v), 'inbox-clear': clearInbox,
+  'inbox-go': (el) => { closeModal(); const id = el.dataset.id; if (id && state.jamiyat.some(j => j.id === id)) openJamiya(id); },
   'alert-go': (el) => { closeModal(); openJamiya(el.dataset.id); },
   'alert-remind': (el) => { closeModal(); state.afterOpen = { id: el.dataset.id, act: 'wa-remind' }; openJamiya(el.dataset.id); },
   'cancel-inv': (el) => db.collection('invites').doc(el.dataset.id).delete().then(() => toast('أُلغيت الدعوة', 'info')).catch(e => toast(e.message, 'error')),
@@ -2198,7 +2238,7 @@ const actions = {
   'view-proof': (el) => viewProof(el.dataset.id),
   'rm-member': (el) => removeMember(el.dataset.uid), 'full-note': () => toast('اكتمل عدد الأعضاء. احذف عضواً (زر «حذف» بجانب اسمه) لتتمكن من دعوة بديل', 'info'),
   'enable-notif': enableNotifs, 'test-notif': testNotif, 'dismiss-nb': () => { lsSet('jm_nb_dismiss', String(Date.now())); renderBanner(); },
-  'refresh-admin': loadAdmin, 'test-mail': testMail, ...ADMIN_ACTIONS,
+  'refresh-admin': () => loadAdmin(true), 'test-mail': testMail, ...ADMIN_ACTIONS,
   'copy-invite': () => navigator.clipboard.writeText(inviteText(state.lastInvite)).then(() => toast('تم نسخ نص الدعوة')).catch(() => toast('تعذر النسخ', 'error')),
   'install-app': installApp, 'reload-app': () => location.reload(), 'install-done': markInstalled, 'open-app-help': openAppHelp,
   'app-uninstalled': () => { try { localStorage.removeItem('jm_installed'); } catch (e) {} closeModal(); renderBanner(); renderNav(); },
