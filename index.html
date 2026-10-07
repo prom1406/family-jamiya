@@ -118,6 +118,8 @@ textarea.inp{min-height:96px}
   body [class*="text-[10px]"]{font-size:.7rem}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+body.has-ibar{padding-bottom:calc(var(--tab-h) + var(--sab) + 104px)}
+@media(min-width:768px){body.has-ibar{padding-bottom:104px}}
 #print-root{display:none}
 @media print{body>*:not(#print-root){display:none!important}#print-root{display:block!important}@page{margin:12mm}}
 
@@ -179,7 +181,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2</footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.3</footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -1771,7 +1773,7 @@ function render() {
 }
 function renderNav() {
   const nav = $('nav'), sub = $('hdrSub'), tb = $('tabbar');
-  const canInst = !isStandalone() && (deferredPrompt || isIOS());
+  const canInst = !isStandalone() && !instFlag() && (deferredPrompt || isIOS());
   const instBtn = canInst ? '<button class="btn b-pri" data-act="install-app" aria-label="تثبيت التطبيق"><i class="fa-solid fa-download"></i><span class="hidden sm:inline"> تثبيت</span></button>' : '';
   const shareBtn = '<button class="btn b-sec" data-act="share-app" aria-label="مشاركة التطبيق"><i class="fa-solid fa-share-nodes"></i><span class="hidden sm:inline"> مشاركة</span></button>';
   if (!state.user || !state.profile) { nav.innerHTML = instBtn + shareBtn; sub.textContent = 'منصة الجمعيات العائلية'; tb.classList.add('hide'); return; }
@@ -1874,8 +1876,8 @@ function vHome() {
 
 function dayLabels(freq) {
   const f = FREQS[freq] || FREQS.monthly;
-  return f.days ? { last: `آخر يوم للسداد (من 1 إلى ${f.days}: يوم الدورة)`, pay: `يوم الصرف (من 1 إلى ${f.days}: يوم الدورة)`, max: f.days }
-                : { last: 'آخر يوم للسداد كل شهر (1–31)', pay: 'يوم الصرف من الشهر (1–31)', max: 31 };
+  return f.days ? { last: `آخر يوم للسداد (من 1 إلى ${f.days}: يوم الدورة)`, pay: `يوم الاستلام (من 1 إلى ${f.days}: يوم الدورة)`, max: f.days }
+                : { last: 'آخر يوم للسداد كل شهر (1–31)', pay: 'يوم الاستلام من الشهر (1–31)', max: 31 };
 }
 function freqOpts(sel) { return Object.entries(FREQS).map(([k, v]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${v.label}</option>`).join(''); }
 function vCreate() {
@@ -1908,7 +1910,7 @@ function vJamiya() {
       <div><p class="text-xs font-bold text-yellow-100">${c.started ? 'مستلم دفعة ' + periodLabel(j, c.cur) : 'أول مستلم (لم تبدأ الجمعية بعد)'}</p>
       <h3 class="text-xl font-black">${c.rec ? esc(dispName(c.rec)) : 'لم يكتمل ترتيب الأعضاء'}</h3>
       ${c.rec ? `<p class="text-xs text-amber-100 mt-1">${esc(c.rec.bank)} ${c.rec.iban ? '• <span dir="ltr">' + esc(c.rec.iban) + '</span>' : ''}</p>` : ''}
-      <p class="text-xs text-amber-100 mt-1">آخر موعد للسداد: ${fmtDate(due)} • الصرف: ${fmtDate(payout)}</p></div>
+      <p class="text-xs text-amber-100 mt-1">آخر موعد للسداد: ${fmtDate(due)} • الاستلام: ${fmtDate(payout)}</p></div>
       <div>${c.isRec ? '<span class="px-3 py-1 bg-yellow-300 text-slate-900 text-xs font-bold rounded-xl">أنت مستلم هذه الدورة</span>'
         : !c.started || !j.memberUids.includes(uid) ? ''
         : me && ['unpaid', 'partial'].includes(me.status) ? `<div class="text-center space-y-1.5"><div class="text-[11px] text-amber-50">المتبقي عليك <b>${fmtNum(me.remaining)}</b> ريال</div><button class="btn bg-white text-orange-600" data-act="pay-modal"><i class="fa-solid fa-file-arrow-up"></i> رفع إثبات السداد</button></div>`
@@ -1953,7 +1955,7 @@ function vJamiya() {
   return `<div class="space-y-5">
     <div class="card p-6 flex flex-wrap justify-between items-center gap-4">
       <div><button class="text-xs text-slate-400 mb-1" data-act="go-home">← رجوع</button><h2 class="text-2xl font-black">${j.icon ? esc(j.icon) + ' ' : ''}${esc(j.name)}</h2>
-      <p class="text-xs text-slate-500 mt-1">${freqOf(j).label} • القسط ${money(j.amount)} • السداد حتى يوم ${j.lastDay}${freqOf(j).days ? ' من الدورة' : ''} • الصرف يوم ${j.payDay}${freqOf(j).days ? ' من الدورة' : ''} • تبدأ ${fmtDate(new Date(j.startDate + 'T00:00:00'))}</p></div>
+      <p class="text-xs text-slate-500 mt-1">${freqOf(j).label} • القسط ${money(j.amount)} • السداد حتى يوم ${j.lastDay}${freqOf(j).days ? ' من الدورة' : ''} • الاستلام يوم ${j.payDay}${freqOf(j).days ? ' من الدورة' : ''} • تبدأ ${fmtDate(new Date(j.startDate + 'T00:00:00'))}</p></div>
       <div class="chips w-full md:w-auto md:flex-wrap">
         ${c.canManage ? `${j.memberUids.length >= j.count ? '<button class="btn b-sec" data-act="full-note"><i class="fa-solid fa-user-check"></i> اكتمل العدد</button>' : '<button class="btn b-pri" data-act="invite-modal"><i class="fa-solid fa-user-plus"></i> دعوة عضو</button>'}<button class="btn b-sec" data-act="remind"><i class="fa-solid fa-bell"></i> تذكير بالبريد</button><button class="btn bg-emerald-50 text-emerald-700" data-act="wa-remind"><i class="fa-brands fa-whatsapp"></i> تذكير واتساب</button>` : ''}${c.isCreator ? `<button class="btn b-sec" data-act="notif-modal"><i class="fa-solid fa-bullhorn"></i> إشعار للأعضاء</button><button class="btn b-sec" data-act="deputy-modal"><i class="fa-solid fa-user-shield"></i> نائب المشرف</button><button class="btn b-sec" data-act="edit-modal"><i class="fa-solid fa-gear"></i> تعديل</button><button class="btn b-red" data-act="delete-modal"><i class="fa-solid fa-trash"></i> حذف</button>` : ''}
         <button class="btn b-sec" data-act="export-modal"><i class="fa-solid fa-file-export"></i> تصدير الكشف</button>
@@ -2052,23 +2054,39 @@ function ibDismissed() { try { return Date.now() - Number(localStorage.getItem(i
 function launchAction() {
   try { const a = new URLSearchParams(location.search).get('action'); if (a) history.replaceState(null, '', location.pathname); return a === 'create' ? 'create' : null; } catch (e) { return null; }
 }
+const isMobileUA = () => /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent) || isIOS();
+const instFlag = () => lsGet('jm_installed') === '1';
 function renderBanner() {
   const el = $('banner');
-  const bar = (icon, title, text, btn, closable = true, closeAct = 'dismiss-ib') => `<div class="ibar fade"><img src="icon-192.png" alt=""><div class="flex-1 min-w-0"><p class="text-sm font-black">${title}</p><p class="text-[11px] text-slate-300 leading-snug">${text}</p></div>${btn}${closable ? `<button class="x" data-act="${closeAct}" aria-label="إخفاء"><i class="fa-solid fa-xmark"></i></button>` : ''}</div>`;
+  const bar = (title, text, btn, closable = false, closeAct = 'dismiss-ib') => `<div class="ibar fade"><img src="icon-192.png" alt=""><div class="flex-1 min-w-0"><p class="text-sm font-black">${title}</p><p class="text-[11px] text-slate-300 leading-snug">${text}</p></div>${btn}${closable ? `<button class="x" data-act="${closeAct}" aria-label="إخفاء"><i class="fa-solid fa-xmark"></i></button>` : ''}</div>`;
   let h = '';
-  if (state.updateReady) h = bar('', 'يتوفر تحديث جديد', 'أعد تحميل التطبيق للحصول على آخر التحسينات', '<button class="btn b-pri" data-act="reload-app">تحديث</button>', false);
-  else if (state.user && state.profile && notifCanAsk() && Date.now() - Number(lsGet('jm_nb_dismiss') || 0) > 7 * 86400000) h = bar('', 'فعّل الإشعارات', 'تصلك تنبيهات السداد والدعوات حتى والتطبيق في الخلفية', '<button class="btn b-pri" data-act="enable-notif">تفعيل</button>', true, 'dismiss-nb');
-  else if (!isStandalone() && !ibDismissed()) {
-    if (state.appInstalled) h = bar('', 'التطبيق مثبّت لديك', 'افتحه من الشاشة الرئيسية لتجربة أسرع', '');
-    else if (deferredPrompt) h = bar('', 'ثبّت التطبيق', 'أضفه لشاشتك الرئيسية ليعمل كتطبيق كامل', '<button class="btn b-pri" data-act="install-app">تثبيت</button>');
-    else if (isIOS()) h = bar('', 'أضف التطبيق للشاشة الرئيسية', 'من زر المشاركة في سفاري', '<button class="btn b-pri" data-act="install-app">كيف؟</button>');
-  }
+  if (isStandalone()) lsSet('jm_installed', '1');
+  if (state.updateReady) h = bar('يتوفر تحديث جديد', 'أعد تحميل التطبيق للحصول على آخر التحسينات', '<button class="btn b-pri" data-act="reload-app">تحديث</button>', true);
+  else if (!isStandalone() && instFlag()) // مثبّت لديه لكنه يتصفح من المتصفح: يبقى الطلب حتى يفتح من التطبيق
+    h = bar('افتح التطبيق من أيقونته', 'أنت تتصفح من المتصفح. افتح «الجمعية الذكية» من شاشتك الرئيسية لتعمل الإشعارات والروابط كما يجب', '<button class="btn b-pri" data-act="open-app-help">كيف؟</button>');
+  else if (!isStandalone() && (deferredPrompt || isMobileUA())) // غير مثبّت: يبقى الطلب حتى يثبّت
+    h = bar('ثبّت التطبيق لفتح الرابط كتطبيق', 'مطلوب لتصلك الإشعارات وتُفتح الدعوات والجمعيات داخل التطبيق مباشرة', deferredPrompt ? '<button class="btn b-pri" data-act="install-app">تثبيت</button>' : '<button class="btn b-pri" data-act="install-app">كيف؟</button>');
+  else if (state.user && state.profile && notifCanAsk() && Date.now() - Number(lsGet('jm_nb_dismiss') || 0) > 7 * 86400000)
+    h = bar('فعّل الإشعارات', 'تصلك تنبيهات السداد والدعوات حتى والتطبيق في الخلفية', '<button class="btn b-pri" data-act="enable-notif">تفعيل</button>', true, 'dismiss-nb');
   el.innerHTML = h;
+  document.body.classList.toggle('has-ibar', !!h);
+}
+function markInstalled() { lsSet('jm_installed', '1'); closeModal(); renderBanner(); renderNav(); toast('جميل! افتح التطبيق من أيقونته في الشاشة الرئيسية', 'info'); }
+function openAppHelp() {
+  const ios = isIOS();
+  showModal('افتح التطبيق من أيقونته', `<div class="space-y-3 text-xs leading-relaxed">
+    <p class="text-slate-600">فتح الرابط من المتصفح لا يعطيك مزايا التطبيق (الإشعارات والتحديث السريع). افتح التطبيق من الشاشة الرئيسية:</p>
+    <ol class="space-y-2.5">
+      <li class="flex gap-3 items-center"><span class="jicon !w-9 !h-9 !text-sm">1</span><span>اخرج من المتصفح وارجع للشاشة الرئيسية في جوالك.</span></li>
+      <li class="flex gap-3 items-center"><span class="jicon !w-9 !h-9 !text-sm">2</span><span>اضغط أيقونة <b>الجمعية الذكية</b> (ابحث عنها في التطبيقات إن لم تجدها).</span></li>
+      <li class="flex gap-3 items-center"><span class="jicon !w-9 !h-9 !text-sm">3</span><span>ستجد حسابك وجمعياتك ودعواتك كما هي.</span></li></ol>
+    ${ios ? '<p class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">على الآيفون لا تفتح الروابط المشاركة داخل التطبيق تلقائياً، لذلك افتح التطبيق من أيقونته دائماً.</p>' : '<p class="p-3 bg-sky-50 border border-sky-200 rounded-xl text-sky-900">في كروم يمكنك أيضاً: القائمة ⋮ ثم «فتح في التطبيق» إن ظهر الخيار.</p>'}
+    <button class="btn b-sec w-full" data-act="app-uninstalled">لم أعد أملك التطبيق على جوالي</button></div>`);
 }
 async function installApp() {
   if (deferredPrompt) {
     const p = deferredPrompt; deferredPrompt = null; p.prompt();
-    try { await p.userChoice; } catch (e) {}
+    try { const r = await p.userChoice; if (r && r.outcome === 'accepted') lsSet('jm_installed', '1'); } catch (e) {}
     renderBanner(); renderNav(); return;
   }
   const note = '<div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-900 leading-relaxed">بعد التثبيت افتح التطبيق من الشاشة الرئيسية، وستجد دعواتك وجمعياتك تلقائياً عند الدخول بنفس بريدك.</div>';
@@ -2079,16 +2097,16 @@ async function installApp() {
         <li class="flex gap-3 items-center"><span class="jicon !w-9 !h-9 !text-sm">1</span><span>اضغط زر المشاركة <i class="fa-solid fa-arrow-up-from-bracket text-sky-600"></i> أسفل الشاشة.</span></li>
         <li class="flex gap-3 items-center"><span class="jicon !w-9 !h-9 !text-sm">2</span><span>مرّر للأسفل واختر <b>إضافة إلى الشاشة الرئيسية</b> <i class="fa-regular fa-square-plus"></i>.</span></li>
         <li class="flex gap-3 items-center"><span class="jicon !w-9 !h-9 !text-sm">3</span><span>اضغط <b>إضافة</b>، وستظهر أيقونة التطبيق في شاشتك.</span></li></ol>
-      ${note}<p class="text-[11px] text-slate-500">ملاحظة: نظام آيفون لا يفتح الروابط المشاركة داخل التطبيق تلقائياً، افتح التطبيق من أيقونته.</p></div>`);
+      ${note}<p class="text-[11px] text-slate-500">ملاحظة: نظام آيفون لا يفتح الروابط المشاركة داخل التطبيق تلقائياً، افتح التطبيق من أيقونته.</p><button class="btn b-pri w-full" data-act="install-done"><i class="fa-solid fa-check"></i> ثبّتُّه بالفعل</button></div>`);
   }
   showModal('تثبيت التطبيق', `<div class="space-y-3 text-xs leading-relaxed"><ol class="space-y-2.5">
       <li class="flex gap-3 items-center"><span class="jicon !w-9 !h-9 !text-sm">1</span><span>افتح قائمة المتصفح <i class="fa-solid fa-ellipsis-vertical"></i> في الأعلى.</span></li>
-      <li class="flex gap-3 items-center"><span class="jicon !w-9 !h-9 !text-sm">2</span><span>اختر <b>تثبيت التطبيق</b> أو <b>إضافة إلى الشاشة الرئيسية</b>.</span></li></ol>${note}</div>`);
+      <li class="flex gap-3 items-center"><span class="jicon !w-9 !h-9 !text-sm">2</span><span>اختر <b>تثبيت التطبيق</b> أو <b>إضافة إلى الشاشة الرئيسية</b>.</span></li></ol>${note}<button class="btn b-pri w-full" data-act="install-done"><i class="fa-solid fa-check"></i> ثبّتُّه بالفعل</button></div>`);
 }
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; renderBanner(); renderNav(); });
-window.addEventListener('appinstalled', () => { deferredPrompt = null; toast('تم تثبيت التطبيق، افتحه من الشاشة الرئيسية'); renderBanner(); renderNav(); });
+window.addEventListener('appinstalled', () => { deferredPrompt = null; lsSet('jm_installed', '1'); toast('تم تثبيت التطبيق، افتحه من الشاشة الرئيسية'); renderBanner(); renderNav(); });
 if (isStandalone()) document.body.classList.add('standalone');
-if (navigator.getInstalledRelatedApps && !isStandalone()) navigator.getInstalledRelatedApps().then(a => { state.appInstalled = a.length > 0; renderBanner(); }).catch(() => {});
+if (navigator.getInstalledRelatedApps && !isStandalone()) navigator.getInstalledRelatedApps().then(a => { state.appInstalled = a.length > 0; if (a.length) lsSet('jm_installed', '1'); renderBanner(); }).catch(() => {});
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').then(reg => {
     reg.addEventListener('updatefound', () => { const w = reg.installing; if (w) w.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) { state.updateReady = true; renderBanner(); } }); });
@@ -2136,7 +2154,8 @@ const actions = {
   'enable-notif': enableNotifs, 'test-notif': testNotif, 'dismiss-nb': () => { lsSet('jm_nb_dismiss', String(Date.now())); renderBanner(); },
   'refresh-admin': loadAdmin, 'test-mail': testMail, ...ADMIN_ACTIONS,
   'copy-invite': () => navigator.clipboard.writeText(inviteText(state.lastInvite)).then(() => toast('تم نسخ نص الدعوة')).catch(() => toast('تعذر النسخ', 'error')),
-  'install-app': installApp, 'reload-app': () => location.reload(),
+  'install-app': installApp, 'reload-app': () => location.reload(), 'install-done': markInstalled, 'open-app-help': openAppHelp,
+  'app-uninstalled': () => { try { localStorage.removeItem('jm_installed'); } catch (e) {} closeModal(); renderBanner(); renderNav(); },
   'dismiss-ib': () => { try { localStorage.setItem(ibKey, Date.now()); } catch (e) {} state.updateReady = false; renderBanner(); },
   'pick-icon': (el) => { const fm = el.closest('form'); if (!fm) return; fm.icon.value = el.dataset.v; fm.querySelectorAll('.emo').forEach(b => b.classList.toggle('on', b === el)); },
   'vote-yes': () => voteMod(true), 'vote-no': () => voteMod(false), 'close-mod': closeMod
