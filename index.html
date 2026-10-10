@@ -182,7 +182,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.3</footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.4</footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -357,8 +357,8 @@ const fmtNum = n => Number(r2(n)).toLocaleString('ar-SA', { maximumFractionDigit
 // حساب العضو التراكمي: كل ما دفعه يُقسَّم على قيمة القسط الحالية.
 // المستحق = (عدد الدورات حتى الآن ما عدا دور استلامه) × القسط. الزائد رصيد مقدّم يغطي الدفعات القادمة.
 function accountFor(j, turns, cur, started, payments, uid, amount = j.amount) {
-  const ownIdx = turns.indexOf(uid);
-  let n = 0; if (started) for (let k = 0; k <= cur; k++) if (k !== ownIdx) n++;
+  const sh = Math.max(1, turns.filter(x => x === uid).length); // عدد أسهمه: كل سهم له دور
+  let n = 0; if (started) for (let k = 0; k <= cur; k++) n += sh - (turns[k] === uid ? 1 : 0);
   const owed = r2(n * amount);
   let confirmed = 0, pending = 0;
   payments.forEach(p => { if (p.uid !== uid) return; if (p.status === 'confirmed') confirmed += Number(p.amount) || 0; else pending += Number(p.amount) || 0; });
@@ -378,17 +378,19 @@ function ctx() {
   const recUid = turns[cur] || null;
   const rec = recUid ? state.members[recUid] : null;
   const started = idx >= 0, finished = idx >= j.count;
-  const acct = {}; turns.forEach(u => { acct[u] = accountFor(j, turns, cur, started, state.payments, u); });
+  const uniq = [...new Set(turns)]; const acct = {}; uniq.forEach(u => { acct[u] = accountFor(j, turns, cur, started, state.payments, u); });
   const curPays = state.payments.filter(p => p.month === cur);
-  return { j, idx, cur, finished, started, turns, recUid, rec, pays: state.payments, curPays, acct,
+  return { j, idx, cur, finished, started, turns, uniq, recUid, rec, pays: state.payments, curPays, acct,
            isCreator: j.creatorUid === state.user.uid, isDeputy: !!j.deputyUid && j.deputyUid === state.user.uid, canManage: j.creatorUid === state.user.uid || (!!j.deputyUid && j.deputyUid === state.user.uid), isRec: recUid === state.user.uid,
            me: acct[state.user.uid] || null, f: freqOf(j) };
 }
 function payStatus(c, uid) {
-  if (uid === c.recUid) return 'recipient';
+  if (uid === c.recUid && (sharesOf(c.turns, uid) === 1 || !c.acct[uid] || c.acct[uid].remaining <= 0.005)) return 'recipient';
   return c.acct[uid] ? c.acct[uid].status : 'unpaid';
 }
-const needsPay = (c, u) => u !== c.recUid && c.acct[u] && ['unpaid', 'partial'].includes(c.acct[u].status);
+const sharesOf = (turns, u) => Math.max(1, (turns || []).filter(x => x === u).length);
+const filledOf = j => Math.max((j.turns || []).length, (j.memberUids || []).length); // الأسهم المشغولة
+const needsPay = (c, u) => (u !== c.recUid || sharesOf(c.turns, u) > 1) && c.acct[u] && ['unpaid', 'partial'].includes(c.acct[u].status);
 
 /* ============ المصادقة ============ */
 auth.onAuthStateChanged(async user => {
@@ -531,7 +533,7 @@ async function recheckVerification() {
 /* ============ نائب المشرف: دعوة أعضاء وتذكيرهم فقط ============ */
 function openDeputyModal() {
   const c = ctx(); if (!c || !c.isCreator) return;
-  const opts = c.turns.filter(u => u !== c.j.creatorUid && state.members[u]).map(u => `<option value="${esc(u)}" ${u === c.j.deputyUid ? 'selected' : ''}>${esc(dispName(state.members[u]))}</option>`).join('');
+  const opts = c.uniq.filter(u => u !== c.j.creatorUid && state.members[u]).map(u => `<option value="${esc(u)}" ${u === c.j.deputyUid ? 'selected' : ''}>${esc(dispName(state.members[u]))}</option>`).join('');
   showModal('نائب المشرف', `<form id="f-deputy" class="space-y-3">
     <p class="text-xs text-slate-600 leading-relaxed">اختر نائباً واحداً من أعضاء الجمعية. صلاحياته: دعوة أعضاء جدد وتذكير المتأخرين بالسداد فقط. لا يستطيع التعديل أو الحذف أو تأكيد الدفعات.</p>
     ${opts ? `<select name="uid" class="inp" required><option value="">اختر العضو…</option>${opts}</select>` : '<p class="text-xs text-slate-400">لا يوجد أعضاء آخرون في الجمعية بعد.</p>'}
@@ -554,8 +556,8 @@ async function handleInvite(f) {
   if (Object.values(state.members).some(m => normPhone(m.phone) === phone || (email && lc(m.email) === email))) return toast('هذا الشخص عضو بالفعل', 'error');
   if (state.jInvites.some(i => i.status === 'pending' && (normPhone(i.phone) === phone || (email && lc(i.email) === email)))) return toast('توجد دعوة معلّقة لنفس الرقم أو البريد، أعد إرسالها من قائمة الدعوات', 'error');
   const pending = state.jInvites.filter(i => i.status === 'pending').length;
-  if (c.j.memberUids.length >= c.j.count) return toast('اكتمل عدد الأعضاء. احذف أحد الأعضاء أولاً لتتمكن من إضافة عضو جديد', 'error');
-  if (c.j.memberUids.length + pending >= c.j.count) return toast('عدد الأعضاء والدعوات المعلّقة وصل للحد. ألغِ دعوة معلّقة أو احذف عضواً', 'error');
+  if (filledOf(c.j) >= c.j.count) return toast('اكتمل عدد الأعضاء. احذف أحد الأعضاء أولاً لتتمكن من إضافة عضو جديد', 'error');
+  if (filledOf(c.j) + pending >= c.j.count) return toast('عدد الأعضاء والدعوات المعلّقة وصل للحد. ألغِ دعوة معلّقة أو احذف عضواً', 'error');
   const id = `${c.j.id}__p${phone}`;
   const inv = { jamiyaId: c.j.id, jamiyaName: c.j.name, amount: c.j.amount, every: freqOf(c.j).every, email, phone, name,
     invitedBy: state.user.uid, inviterName: dispName(state.profile), creatorUid: c.j.creatorUid, status: 'pending' };
@@ -682,7 +684,7 @@ function homeAlerts() {
     const idx = monthIdx(j); if (idx < 0 || idx >= j.count) return;
     const cur = idx, turns = j.turns || [], recUid = turns[cur];
     const due = dayIn(j, cur, j.lastDay), left = diff(due), payoutLeft = diff(dayIn(j, cur, j.payDay));
-    const owes = u => u !== recUid && ['unpaid', 'partial'].includes(accountFor(j, turns, cur, true, pays, u).status);
+    const owes = u => (u !== recUid || sharesOf(turns, u) > 1) && ['unpaid', 'partial'].includes(accountFor(j, turns, cur, true, pays, u).status);
     // 1) قسطي أنا
     if (turns.includes(uid) && owes(uid)) {
       const mine = accountFor(j, turns, cur, true, pays, uid);
@@ -693,7 +695,7 @@ function homeAlerts() {
     }
     // 2) المشرف: أعضاء لم يسددوا
     if ((j.creatorUid === uid || (j.deputyUid && j.deputyUid === uid)) && (left <= SOON)) {
-      const n = turns.filter(u => u !== uid && owes(u)).length;
+      const n = [...new Set(turns)].filter(u => u !== uid && owes(u)).length;
       if (n > 0) out.push({ lvl: left < 0 ? 0 : 1, id: j.id, remind: true, title: `جمعية «${j.name}»`,
         text: `${n} ${n === 1 ? 'عضو لم يسدد' : 'أعضاء لم يسددوا'} بعد — ${when(left)} (${fmtDate(due)})` });
     }
@@ -753,7 +755,7 @@ function buildIcs(j, uid) {
       `SUMMARY:${icsEsc(title)}`, `DESCRIPTION:${icsEsc(desc)}`, 'TRANSP:TRANSPARENT', ...alarm('-PT15H'), ...alarm('PT8H'), 'END:VEVENT']);
   };
   for (let k = 0; k < j.count; k++) {
-    if (k === my) add(k, 'recv', dayIn(j, k, j.payDay), `يوم قبضك في جمعية «${j.name}»`, `دورك في القبض — ${periodLabel(j, k)}`);
+    if (turns[k] === uid) add(k, 'recv', dayIn(j, k, j.payDay), `يوم قبضك في جمعية «${j.name}»`, `دورك في القبض — ${periodLabel(j, k)}`);
     else add(k, 'pay', dayIn(j, k, j.lastDay), `آخر موعد لسداد قسط «${j.name}»`, `القسط ${j.amount} ريال — ${periodLabel(j, k)}`);
   }
   if (!ev.length) return null;
@@ -775,8 +777,8 @@ function statementData() {
   const c = ctx(); if (!c) return null;
   const j = c.j, st = { recipient: 'المستلم', confirmed: 'تم السداد', pending: 'بانتظار التأكيد', partial: 'سداد جزئي', unpaid: 'لم يسدد', wait: 'لم تبدأ' };
   const nameOf = u => dispName(state.members[u]);
-  const summary = c.turns.map((u, i) => { const a = c.acct[u] || {};
-    return { order: i + 1, name: nameOf(u), turn: periodLabel(j, i), owed: a.owed || 0, confirmed: a.confirmed || 0, pending: a.pending || 0, remaining: a.remaining || 0, credit: a.credit || 0, status: st[payStatus(c, u)] || '' }; });
+  const summary = c.turns.map((u, i) => { const first = c.turns.indexOf(u) === i, a = first ? (c.acct[u] || {}) : {};
+    return { order: i + 1, name: nameOf(u) + (first ? '' : ' (سهم إضافي)'), turn: periodLabel(j, i), owed: a.owed || 0, confirmed: a.confirmed || 0, pending: a.pending || 0, remaining: a.remaining || 0, credit: a.credit || 0, status: first ? (st[payStatus(c, u)] || '') : '' }; });
   const toD = p => { const t = p.createdAt && p.createdAt.toDate ? p.createdAt.toDate() : null; return t; };
   const pays = [...state.payments].sort((a, b) => (a.month - b.month) || String(a.id).localeCompare(String(b.id)))
     .map(p => ({ name: state.members[p.uid] ? nameOf(p.uid) : (p.name || '—'), cycle: periodLabel(j, p.month), amount: Number(p.amount) || 0, status: p.status === 'confirmed' ? 'مؤكدة' : 'بانتظار التأكيد', ref: p.ref || '', date: toD(p) }));
@@ -834,15 +836,16 @@ function openExportModal() {
 function openJamiya(id) {
   cleanup(state.jUnsubs); state.jInviteSub = false; state.gotM = state.gotP = false;
   if (state.afterOpen && state.afterOpen.id !== id) state.afterOpen = null;
-  state.activeId = id; state.j = null; state.members = {}; state.payments = []; state.jInvites = []; state.wishes = {}; state.wishMode = null;
+  state.activeId = id; state.j = null; state.members = {}; state.payments = []; state.jInvites = []; state.wishes = {}; state.wishMode = null; state.shareReqs = {}; state.shareMode = null; state.swapReqs = [];
   state.view = 'jamiya'; render();
   const ref = db.collection('jamiyat').doc(id);
-  state.jUnsubs.push(stopChat, () => { if (state.wishUnsub) { state.wishUnsub(); state.wishUnsub = null; } });
+  state.jUnsubs.push(stopChat, () => { if (state.wishUnsub) { state.wishUnsub(); state.wishUnsub = null; } if (state.shareUnsub) { state.shareUnsub(); state.shareUnsub = null; } });
+  listenSwaps(id);
   state.jUnsubs.push(
     ref.onSnapshot(s => { if (!s.exists) { toast('الجمعية غير متاحة', 'error'); state.view = 'home'; return render(); }
       state.j = { id: s.id, ...s.data() };
       if ((state.j.creatorUid === state.user.uid || (state.j.deputyUid && state.j.deputyUid === state.user.uid)) && !state.jInviteSub) subscribeInvites(id);
-      syncWishes(); if (state.chatUnsub) paintChat();
+      syncWishes(); syncShareReqs(); if (state.chatUnsub) paintChat();
       render(); }, e => toast(e.message, 'error')),
     ref.collection('members').onSnapshot(s => { state.members = {}; s.docs.forEach(d => state.members[d.id] = d.data()); state.gotM = true; if (state.view === 'jamiya') render(); runAfterOpen(); }),
     ref.collection('payments').onSnapshot(s => { state.payments = s.docs.map(d => ({ id: d.id, ...d.data() })); state.gotP = true; state.pays[id] = state.payments; if (state.view === 'jamiya') render(); runAfterOpen(); })
@@ -921,7 +924,7 @@ async function confirmPayment(payId) {
 }
 async function remindUnpaid() {
   const c = ctx(); if (!c || !c.canManage) return; let n = 0; const late = [];
-  c.turns.forEach(uid => {
+  c.uniq.forEach(uid => {
     const m = state.members[uid]; if (!m || !needsPay(c, uid)) return;
     n++; late.push(uid);
     sendMail(m.email, m.name, `تذكير بسداد قسط ${c.j.name}`, `السلام عليكم ${dispName(m)}،\nتذكير ودي بسداد قسط جمعية "${c.j.name}". المتبقي عليك ${fmtNum(c.acct[uid].remaining)} ريال، وآخر موعد للسداد ${fmtDate(dayIn(c.j, c.cur, c.j.lastDay))}.${mailLink()}`).catch(e => toast('فشل إرسال التذكير إلى ' + m.email + ': ' + (mailErrHint(e).hint || mailErrHint(e).raw), 'error'));
@@ -998,7 +1001,7 @@ function reanchorStart(freq, idx) {
   return ymd(f.days ? new Date(t.getFullYear(), t.getMonth(), t.getDate() - idx * f.days) : new Date(t.getFullYear(), t.getMonth() - idx, 1));
 }
 async function submitEdit(f) {
-  const c = ctx(), minCount = Math.max(2, c.j.memberUids.length, c.started ? c.cur + 1 : 2);
+  const c = ctx(), minCount = Math.max(2, filledOf(c.j), c.started ? c.cur + 1 : 2);
   const upd = { name: f.jname.value.trim(), icon: cleanIcon(f.icon.value), count: parseInt(f.count.value), amount: parseFloat(f.amount.value), lastDay: parseInt(f.lastDay.value), payDay: parseInt(f.payDay.value) };
   const newFreq = FREQS[f.frequency.value] ? f.frequency.value : (c.j.frequency || 'monthly');
   if (newFreq !== (c.j.frequency || 'monthly')) {
@@ -1023,7 +1026,7 @@ async function saveEdit(upd) {
 // معاينة: كيف تُقسَّم مدفوعات كل عضو على القيمة الجديدة قبل الحفظ
 function showRepriceModal(c, upd) {
   const j = c.j, newJ = { ...j, ...upd };
-  const rows = c.turns.map(u => {
+  const rows = c.uniq.map(u => {
     const m = state.members[u] || { name: '...' };
     const o = c.acct[u], nw = accountFor(newJ, c.turns, c.cur, c.started, state.payments, u, upd.amount);
     const res = nw.remaining > 0 ? `<span class="text-rose-600 font-bold">متبقي ${fmtNum(nw.remaining)} ريال</span>`
@@ -1093,7 +1096,7 @@ function waLink(phone, text) { const n = phone ? waNumber(phone) : ''; return `h
 function openWaReminders() {
   const c = ctx(); if (!c || !c.canManage) return;
   const due = fmtDate(dayIn(c.j, c.cur, c.j.lastDay));
-  const rows = c.turns.filter(u => needsPay(c, u)).map(u => {
+  const rows = c.uniq.filter(u => needsPay(c, u)).map(u => {
     const m = state.members[u]; if (!m) return '';
     const txt = `السلام عليكم ${dispName(m)}،\nتذكير ودي بسداد قسط جمعية "${c.j.name}". المتبقي عليك ${fmtNum(c.acct[u].remaining)} ريال، وآخر موعد للسداد ${due}.\n${shareUrl()}`;
     return `<div class="p-3 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center gap-2 text-xs"><div><b>${esc(dispName(m))}</b><div class="text-[10px] ${m.waOptIn ? 'text-emerald-600' : 'text-slate-400'}">${m.waOptIn ? 'فعّل تنبيهات واتساب' : 'لم يفعّل تنبيهات واتساب'}</div></div>
@@ -1396,7 +1399,7 @@ function jamListHtml() {
   const A = state.admin, q = lc(A.jq);
   const L = A.jamiyat.filter(j => !q || lc(j.name).includes(q) || lc(j.creatorName).includes(q)).sort((a, b) => (tsd(b.createdAt) || 0) - (tsd(a.createdAt) || 0));
   return `<p class="text-[11px] text-slate-500 mb-2">${nf(L.length)} جمعية</p><div class="space-y-2">${L.map(j => {
-    const n = A.notes['j_' + j.id] || {}, fl = FLAGS[n.flag || ''], mem = (j.memberUids || []).length, full = mem >= j.count;
+    const n = A.notes['j_' + j.id] || {}, fl = FLAGS[n.flag || ''], mem = filledOf(j), full = mem >= j.count;
     return `<div class="p-3 bg-slate-50 rounded-2xl flex items-center gap-3"><span class="jicon !w-10 !h-10 !text-lg">${iconHtml(j)}</span>
       <div class="flex-1 min-w-0"><div class="flex items-center gap-1.5 flex-wrap"><b class="text-sm">${esc(j.name)}</b>${full ? bdg('مكتملة', 'bg-emerald-100 text-emerald-700') : bdg('تنتظر أعضاء', 'bg-slate-200 text-slate-600')}${n.flag ? bdg(fl[0], fl[1]) : ''}${(n.items || []).length ? bdg('<i class="fa-solid fa-note-sticky"></i> ' + nf(n.items.length), 'bg-amber-50 text-amber-700') : ''}</div>
       <p class="text-[11px] text-slate-500">المشرف: ${esc(j.creatorName || '—')} • ${nf(mem)}/${nf(j.count)} عضو • ${money(j.amount)} • ${ago(tsd(j.createdAt))}</p></div>
@@ -1404,7 +1407,7 @@ function jamListHtml() {
   }).join('') || '<p class="text-xs text-slate-400 p-3">لا توجد جمعيات.</p>'}</div>`;
 }
 function tabJam() {
-  const A = state.admin, J = A.jamiyat, full = J.filter(j => (j.memberUids || []).length >= j.count).length;
+  const A = state.admin, J = A.jamiyat, full = J.filter(j => filledOf(j) >= j.count).length;
   return `<div class="grid grid-cols-2 md:grid-cols-4 gap-3">${kpi('إجمالي الجمعيات', nf(J.length), 'fa-people-roof')}${kpi('مكتملة الأعضاء', nf(full), 'fa-circle-check', 'text-emerald-600')}${kpi('تنتظر أعضاء', nf(J.length - full), 'fa-hourglass-half', 'text-amber-600')}
     ${kpi('متوسط الأعضاء', J.length ? nf(Math.round(J.reduce((s, j) => s + (j.memberUids || []).length, 0) / J.length * 10) / 10) : '٠', 'fa-user-group')}</div>
     <div class="card p-5 space-y-3"><input class="inp" data-adm-q="jq" value="${esc(A.jq)}" placeholder="بحث باسم الجمعية أو المشرف…"><div id="adm-jlist">${jamListHtml()}</div></div>`;
@@ -1997,11 +2000,11 @@ function vHome() {
       <div><p class="font-bold text-sm">${esc(i.jamiyaName)}</p><p class="text-slate-500">دعوة من ${esc(i.inviterName)} • الاشتراك ${money(i.amount)} ${esc(i.every || 'شهرياً')}</p></div>
       <div class="flex gap-2"><button class="btn b-pri" data-act="accept" data-id="${esc(i.id)}">قبول</button><button class="btn b-red" data-act="decline" data-id="${esc(i.id)}">رفض</button></div></div>`).join('');
   const js = state.jamiyat.map(j => {
-    const pct = Math.min(100, Math.round(j.memberUids.length / j.count * 100)), mine = j.creatorUid === state.user.uid;
+    const pct = Math.min(100, Math.round(filledOf(j) / j.count * 100)), mine = j.creatorUid === state.user.uid;
     return `<div class="jcard" data-act="open" data-id="${j.id}">
       <div class="flex items-center gap-3 min-w-0"><div class="jicon">${iconHtml(j)}</div>
         <div class="min-w-0"><h4 class="font-black text-sm truncate">${esc(j.name)}</h4><p class="text-xs text-slate-500 mt-0.5">${money(j.amount)} ${freqOf(j).every}</p>
-        <div class="flex items-center gap-2 mt-1.5"><div class="bar w-20"><i style="width:${pct}%"></i></div><span class="text-[11px] text-slate-500">${j.memberUids.length}/${j.count}</span>
+        <div class="flex items-center gap-2 mt-1.5"><div class="bar w-20"><i style="width:${pct}%"></i></div><span class="text-[11px] text-slate-500">${filledOf(j)}/${j.count}</span>
         <span class="text-[10px] ${mine ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'} px-2 py-0.5 rounded-md font-bold">${mine ? 'مشرف' : 'عضو'}</span></div></div></div>
       <i class="fa-solid fa-chevron-left text-slate-300"></i></div>`;
   }).join('');
@@ -2051,7 +2054,7 @@ function vJamiya() {
     : `<div class="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-6 rounded-3xl shadow-lg"><div class="flex flex-wrap justify-between items-center gap-4">
       <div><p class="text-xs font-bold text-yellow-100">${c.started ? 'مستلم دفعة ' + periodLabel(j, c.cur) : 'أول مستلم (لم تبدأ الجمعية بعد)'}</p>
       <h3 class="text-xl font-black">${c.rec ? esc(dispName(c.rec)) : 'لم يكتمل ترتيب الأعضاء'}</h3>
-      ${c.rec ? `<p class="text-xs text-amber-100 mt-1">${esc(c.rec.bank)} ${c.rec.iban ? '• <span dir="ltr">' + esc(c.rec.iban) + '</span>' : ''}</p>` : ''}
+      ${c.rec ? `<p class="text-xs text-amber-100 mt-1">${esc(c.rec.bank)} ${c.rec.iban ? '• <span dir="ltr">' + esc(c.rec.iban) + '</span> <button class="mr-1 px-2 py-0.5 bg-white/25 rounded-lg text-[11px] font-bold" data-act="copy-iban" data-v="' + esc(fixIban(c.rec.iban)) + '"><i class="fa-regular fa-copy"></i> نسخ الآيبان</button>' : ''}</p>` : ''}
       <p class="text-xs text-amber-100 mt-1">آخر موعد للسداد: ${fmtDate(due)} • الاستلام: ${fmtDate(payout)}</p></div>
       <div>${c.isRec ? '<span class="px-3 py-1 bg-yellow-300 text-slate-900 text-xs font-bold rounded-xl">أنت مستلم هذه الدورة</span>'
         : !c.started || !j.memberUids.includes(uid) ? ''
@@ -2059,6 +2062,8 @@ function vJamiya() {
         : me ? `<div class="text-center space-y-1.5"><span class="px-3 py-1.5 bg-white/20 rounded-xl text-xs font-bold inline-block">${me.status === 'confirmed' ? 'تم تأكيد سدادك ✓' : 'إيصالك بانتظار تأكيد المستلم'}</span>${me.credit > 0 ? `<div class="text-[11px] text-amber-50">رصيد مقدّم ${fmtNum(me.credit)} ريال</div>` : ''}<button class="text-[11px] underline text-amber-50" data-act="pay-modal">دفعة مقدّمة</button></div>` : ''}</div></div></div>`;
 
   const rows = c.turns.map((u, i) => {
+    const nSh = sharesOf(c.turns, u);
+    if (c.turns.indexOf(u) !== i) return `<div class="p-3 bg-slate-50 border border-slate-100 rounded-xl flex flex-wrap justify-between items-center gap-2 text-xs"><div class="flex items-center gap-3"><span class="w-7 h-7 rounded-full bg-sky-100 text-sky-800 font-bold flex items-center justify-center">${i + 1}</span><div><p class="font-bold">${esc(dispName(state.members[u]))} <span class="text-[10px] text-sky-600">(سهم إضافي)</span></p><p class="text-[10px] text-slate-400">دوره: ${periodLabel(j, i)}</p></div></div>${swapBtn(c, i)}</div>`;
     const m = state.members[u] || { name: '...', email: '' };
     const st = payStatus(c, u), b = badge[st], ac = c.acct[u];
     const nPending = ac.mine.filter(p => p.status === 'pending').length;
@@ -2070,9 +2075,10 @@ function vJamiya() {
     const detail = c.started ? `مدفوع ${fmtNum(ac.paid)} من ${fmtNum(ac.owed)}${ac.credit > 0 ? ` • رصيد مقدّم ${fmtNum(ac.credit)}` : ac.remaining > 0 ? ` • متبقي ${fmtNum(ac.remaining)}` : ''}` : '';
     return `<div class="p-3 bg-slate-50 border border-slate-100 rounded-xl flex flex-wrap justify-between items-center gap-2 text-xs">
       <div class="flex items-center gap-3"><span class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center">${i + 1}</span>
-      <div><p class="font-bold">${esc(dispName(m))} ${u === j.creatorUid ? '<span class="text-[10px] text-indigo-600">(مشرف)</span>' : ''}${j.deputyUid && u === j.deputyUid ? '<span class="text-[10px] text-amber-600">(نائب المشرف)</span>' : ''}</p><p class="text-[10px] text-slate-400">دوره: ${periodLabel(j, i)}</p>${contact}${detail ? `<p class="text-[10px] text-slate-500">${detail}</p>` : ''}</div></div>
+      <div><p class="font-bold">${esc(dispName(m))} ${u === j.creatorUid ? '<span class="text-[10px] text-indigo-600">(مشرف)</span>' : ''}${j.deputyUid && u === j.deputyUid ? '<span class="text-[10px] text-amber-600">(نائب المشرف)</span>' : ''}${nSh > 1 ? ' <span class="text-[10px] text-sky-600">(' + nSh + ' أسهم)</span>' : ''}</p><p class="text-[10px] text-slate-400">دوره: ${periodLabel(j, i)}</p>${contact}${detail ? `<p class="text-[10px] text-slate-500">${detail}</p>` : ''}</div></div>
       <div class="flex items-center gap-2 flex-wrap">
         ${c.finished ? '' : `<span class="px-2 py-1 rounded-lg font-bold ${b[1]}">${b[0]}</span>`}
+        ${swapBtn(c, i)}
         ${c.isCreator && u !== j.creatorUid && !ac.mine.length && (!c.started || i > c.cur) ? `<button class="px-2 py-1 bg-rose-50 text-rose-600 rounded-lg" data-act="rm-member" data-uid="${esc(u)}" aria-label="حذف العضو"><i class="fa-solid fa-user-minus"></i> حذف</button>` : ''}
         ${ac.mine.length ? `<button class="${canReview ? 'btn bg-emerald-600 text-white' : 'px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg'}" data-act="member-pays" data-uid="${esc(u)}"><i class="fa-solid ${canReview ? 'fa-check' : 'fa-paperclip'}"></i> ${canReview ? 'مراجعة وتأكيد (' + nPending + ')' : 'المدفوعات (' + ac.mine.length + ')'}</button>` : ''}
       </div></div>`;
@@ -2099,7 +2105,7 @@ function vJamiya() {
       <div><button class="text-xs text-slate-400 mb-1" data-act="go-home">← رجوع</button><h2 class="text-2xl font-black">${j.icon ? esc(j.icon) + ' ' : ''}${esc(j.name)}</h2>
       <p class="text-xs text-slate-500 mt-1">${freqOf(j).label} • القسط ${money(j.amount)} • السداد حتى يوم ${j.lastDay}${freqOf(j).days ? ' من الدورة' : ''} • الاستلام يوم ${j.payDay}${freqOf(j).days ? ' من الدورة' : ''} • تبدأ ${fmtDate(new Date(j.startDate + 'T00:00:00'))}</p></div>
       <div class="chips w-full md:w-auto md:flex-wrap">
-        ${c.canManage ? `${j.memberUids.length >= j.count ? '<button class="btn b-sec" data-act="full-note"><i class="fa-solid fa-user-check"></i> اكتمل العدد</button>' : '<button class="btn b-pri" data-act="invite-modal"><i class="fa-solid fa-user-plus"></i> دعوة عضو</button>'}<button class="btn b-sec" data-act="remind"><i class="fa-solid fa-bell"></i> تذكير بالبريد</button><button class="btn bg-emerald-50 text-emerald-700" data-act="wa-remind"><i class="fa-brands fa-whatsapp"></i> تذكير واتساب</button>` : ''}${c.isCreator ? `<button class="btn b-sec" data-act="notif-modal"><i class="fa-solid fa-bullhorn"></i> إشعار للأعضاء</button><button class="btn b-sec" data-act="deputy-modal"><i class="fa-solid fa-user-shield"></i> نائب المشرف</button><button class="btn b-sec" data-act="edit-modal"><i class="fa-solid fa-gear"></i> تعديل</button><button class="btn b-red" data-act="delete-modal"><i class="fa-solid fa-trash"></i> حذف</button>` : ''}
+        ${c.canManage ? `${filledOf(j) >= j.count ? '<button class="btn b-sec" data-act="full-note"><i class="fa-solid fa-user-check"></i> اكتمل العدد</button>' : '<button class="btn b-pri" data-act="invite-modal"><i class="fa-solid fa-user-plus"></i> دعوة عضو</button>'}<button class="btn b-sec" data-act="remind"><i class="fa-solid fa-bell"></i> تذكير بالبريد</button><button class="btn bg-emerald-50 text-emerald-700" data-act="wa-remind"><i class="fa-brands fa-whatsapp"></i> تذكير واتساب</button>` : ''}${c.isCreator ? `<button class="btn b-sec" data-act="notif-modal"><i class="fa-solid fa-bullhorn"></i> إشعار للأعضاء</button><button class="btn b-sec" data-act="deputy-modal"><i class="fa-solid fa-user-shield"></i> نائب المشرف</button><button class="btn b-sec" data-act="edit-modal"><i class="fa-solid fa-gear"></i> تعديل</button><button class="btn b-red" data-act="delete-modal"><i class="fa-solid fa-trash"></i> حذف</button>` : ''}
         <button class="btn b-sec" data-act="export-modal"><i class="fa-solid fa-file-export"></i> تصدير الكشف</button>
         <button class="btn b-sec" data-act="add-cal"><i class="fa-solid fa-calendar-plus"></i> أضف للتقويم</button>
         <button class="btn b-sec" data-act="mod-modal"><i class="fa-solid fa-pen-to-square"></i> اقتراح تعديل</button></div></div>
@@ -2113,7 +2119,7 @@ function vJamiya() {
         <div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-chart-pie text-indigo-600"></i> تحصيل هذه الدورة</h4>
           <div class="text-xs space-y-2"><div class="flex justify-between"><span>المستهدف</span><b>${money(target)}</b></div><div class="flex justify-between"><span>المؤكد</span><b class="text-emerald-600">${money(collected)}</b></div>
           <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden"><div class="bg-emerald-500 h-full" style="width:${pct}%"></div></div></div></div>
-        ${wishCard(c)}${chatCard(c)}
+        ${sharesCard(c)}${swapCard(c)}${wishCard(c)}${chatCard(c)}
         ${c.canManage ? `<div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-clock-rotate-left text-amber-500"></i> دعوات معلّقة</h4><div class="space-y-2">${pend || '<p class="text-xs text-slate-400">لا توجد دعوات معلّقة.</p>'}</div></div>` : ''}
         <div class="card p-5"><h4 class="font-bold text-sm mb-2"><i class="fa-solid fa-calendar-days text-teal-600"></i> الجدول الزمني</h4>${sched}</div>
       </div></div></div>`;
@@ -2149,7 +2155,7 @@ function openModal(kind) {
     <div><label class="text-xs font-semibold block mb-1">بريده الإلكتروني (اختياري)</label><input name="email" type="email" dir="ltr" class="inp"></div>
     <p class="text-[11px] text-slate-500 leading-relaxed">تظهر الدعوة للعضو تلقائياً عند تسجيله أو دخوله بنفس رقم الجوال. بعد الإنشاء ترسلها له عبر واتساب بضغطة واحدة.</p>
     <button class="btn b-pri w-full py-3" type="submit"><i class="fa-brands fa-whatsapp"></i> إنشاء الدعوة</button></form>`);
-  if (kind === 'pay') showModal('إثبات سداد القسط', `<form id="f-pay" class="space-y-3"><p class="text-xs text-slate-500">حوّل إلى: <b>${esc(c.rec ? dispName(c.rec) : '')}</b> — ${esc(c.rec?.bank)} <span dir="ltr">${esc(c.rec?.iban || '')}</span></p>
+  if (kind === 'pay') showModal('إثبات سداد القسط', `<form id="f-pay" class="space-y-3"><p class="text-xs text-slate-500">حوّل إلى: <b>${esc(c.rec ? dispName(c.rec) : '')}</b> — ${esc(c.rec?.bank)} <span dir="ltr">${esc(c.rec?.iban || '')}</span></p>${c.rec?.iban ? `<button type="button" class="btn b-sec w-full" data-act="copy-iban" data-v="${esc(fixIban(c.rec.iban))}"><i class="fa-regular fa-copy"></i> نسخ الآيبان</button>` : ''}
     <div class="p-2.5 bg-slate-50 rounded-xl text-[11px] text-slate-600">القسط ${fmtNum(c.j.amount)} ريال ${c.f.every} • المستحق عليك حتى الآن ${fmtNum(c.me?.owed || 0)} • المتبقي <b>${fmtNum(c.me?.remaining || 0)}</b> ريال</div>
     <div><label class="text-xs font-semibold block mb-1">المبلغ المحوّل (ريال) — يمكنك دفع جزء أو أكثر من قسط</label><input name="amount" type="number" step="0.01" min="1" class="inp" value="${c.me && c.me.remaining > 0 ? c.me.remaining : c.j.amount}" required></div>
     <div><label class="text-xs font-semibold block mb-1">صورة الإيصال (لقطة شاشة أو صورة)</label><input name="file" type="file" accept="image/*" class="inp" required></div>
@@ -2158,7 +2164,7 @@ function openModal(kind) {
   if (kind === 'mod') showModal('اقتراح تعديل على الشروط', `<form id="f-mod" class="space-y-3"><textarea name="text" rows="3" class="inp" required placeholder="اكتب التعديل المقترح بوضوح..."></textarea>
     <p class="text-[11px] text-slate-500">يُقبل الطلب عند موافقة أكثر من نصف الأعضاء، ثم يطبّقه المشرف.</p><button class="btn b-pri w-full py-3" type="submit">إرسال للتصويت</button></form>`);
   if (kind === 'edit') {
-    const minCount = Math.max(2, c.j.memberUids.length, c.started ? c.cur + 1 : 2), dl = dayLabels(c.j.frequency);
+    const minCount = Math.max(2, filledOf(c.j), c.started ? c.cur + 1 : 2), dl = dayLabels(c.j.frequency);
     showModal('تعديل إعدادات الجمعية', `<form id="f-edit" class="space-y-3"><div><label class="text-xs font-semibold block mb-1">الاسم</label><input name="jname" class="inp" value="${esc(c.j.name)}" required></div>
     ${iconPicker(c.j.icon || '')}
     <div><label class="text-xs font-semibold block mb-1">نوع الجمعية (مدة الدورة)</label><select name="frequency" class="inp" data-freq>${freqOpts(c.j.frequency || 'monthly')}</select>
@@ -2214,9 +2220,9 @@ function wishCard(c) {
     : `<p class="text-xs text-slate-400">${open ? 'لم تكتب رغبتك بعد.' : 'لم تكتب رغبة في هذه الجمعية.'}</p>`;
   let all = '';
   if (c.canManage) {
-    const list = c.turns.filter(u => state.wishes[u]), missing = c.turns.filter(u => !state.wishes[u]);
-    all = `<div class="pt-3 mt-3 border-t border-slate-100 space-y-1.5"><p class="text-[11px] font-bold text-slate-600">رغبات الأعضاء (${list.length}/${c.turns.length})</p>
-      ${list.map(u => `<div class="p-2 bg-slate-50 rounded-xl text-[11px]"><b>${esc(dispName(state.members[u]))}</b> <span class="text-slate-400">(ترتيبه الحالي ${c.turns.indexOf(u) + 1})</span><div class="text-slate-600">${wishLine(j, state.wishes[u])}</div></div>`).join('') || '<p class="text-[11px] text-slate-400">لا توجد رغبات بعد.</p>'}
+    const list = c.uniq.filter(u => state.wishes[u]), missing = c.uniq.filter(u => !state.wishes[u]);
+    all = `<div class="pt-3 mt-3 border-t border-slate-100 space-y-1.5"><p class="text-[11px] font-bold text-slate-600">رغبات الأعضاء (${list.length}/${c.uniq.length})</p>
+      ${list.map(u => `<div class="p-2 bg-slate-50 rounded-xl text-[11px]"><b>${esc(dispName(state.members[u]))}</b> <span class="text-slate-400">(ترتيبه الحالي ${c.turns.map((x, k) => x === u ? k + 1 : 0).filter(Boolean).join('، ')})</span><div class="text-slate-600">${wishLine(j, state.wishes[u])}</div></div>`).join('') || '<p class="text-[11px] text-slate-400">لا توجد رغبات بعد.</p>'}
       ${missing.length && list.length ? `<p class="text-[10px] text-slate-400">لم يكتب بعد: ${missing.map(u => esc(dispName(state.members[u]))).join('، ')}</p>` : ''}
       ${c.isCreator && c.turns.length > 1 ? '<button class="btn b-sec w-full" data-act="order-modal"><i class="fa-solid fa-arrow-down-1-9"></i> تعديل ترتيب القبض</button>' : ''}</div>`;
   }
@@ -2317,6 +2323,149 @@ async function toggleChatOpen() {
   } catch (e) { toast('تعذر التنفيذ: ' + e.message, 'error'); }
 }
 function chatDelete(id) { if (state.j) jref().collection('chat').doc(id).delete().catch(e => toast('تعذر حذف الرسالة: ' + e.message, 'error')); }
+
+/* ============ أكثر من سهم + تبديل الأدوار + نسخ الآيبان ============ */
+async function copyText(txt, okMsg) {
+  try { await navigator.clipboard.writeText(txt); return toast(okMsg || 'تم النسخ'); } catch (e) {}
+  try {
+    const ta = document.createElement('textarea'); ta.value = txt; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;opacity:0';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, 999); const ok = document.execCommand('copy'); ta.remove();
+    toast(ok ? (okMsg || 'تم النسخ') : 'تعذر النسخ', ok ? 'success' : 'error');
+  } catch (e) { toast('تعذر النسخ', 'error'); }
+}
+
+/* --- طلبات الأسهم الإضافية: المشرف يرى الكل والعضو يرى طلبه --- */
+function syncShareReqs() {
+  const j = state.j; if (!j || !state.user) return;
+  const mode = j.creatorUid === state.user.uid ? 'all' : 'mine';
+  if (state.shareMode === mode) return;
+  if (state.shareUnsub) { state.shareUnsub(); state.shareUnsub = null; }
+  state.shareMode = mode; state.shareReqs = {};
+  const col = jref().collection('shareReqs'), uid = state.user.uid, redraw = () => { if (state.view === 'jamiya') render(); };
+  const onErr = e => { if (e.code !== 'permission-denied') toast('خطأ في طلبات الأسهم: ' + e.message, 'error'); };
+  state.shareUnsub = mode === 'all'
+    ? col.onSnapshot(s => { state.shareReqs = {}; s.docs.forEach(d => state.shareReqs[d.id] = d.data()); redraw(); }, onErr)
+    : col.doc(uid).onSnapshot(s => { state.shareReqs = s.exists ? { [uid]: s.data() } : {}; redraw(); }, onErr);
+}
+function sharesCard(c) {
+  const j = c.j, uid = state.user.uid; if (!j.memberUids.includes(uid)) return '';
+  const my = sharesOf(c.turns, uid), open = Math.max(0, j.count - c.turns.length), req = state.shareReqs[uid];
+  const nm = u => esc(dispName(state.members[u]));
+  const reqs = c.isCreator ? Object.values(state.shareReqs).filter(r => j.memberUids.includes(r.uid)) : [];
+  let mine = '';
+  if (req && !c.isCreator) mine = `<div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-2"><p>طلبك لـ <b>${req.extra}</b> ${req.extra === 1 ? 'سهم إضافي' : 'أسهم إضافية'} بانتظار موافقة المشرف.</p><button class="btn b-red" data-act="share-cancel"><i class="fa-solid fa-xmark"></i> إلغاء الطلب</button></div>`;
+  else if (!req && open > 0 && !c.finished) mine = `<button class="btn b-sec w-full" data-act="share-modal"><i class="fa-solid fa-layer-group"></i> طلب سهم إضافي</button>`;
+  else if (!req) mine = '<p class="text-[11px] text-slate-400">لا توجد أسهم شاغرة لطلبها حالياً.</p>';
+  const list = reqs.length ? `<div class="pt-3 mt-3 border-t border-slate-100 space-y-2"><p class="text-[11px] font-bold text-slate-600">طلبات الأسهم (${reqs.length})</p>${reqs.map(r => `<div class="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-2"><p><b>${nm(r.uid)}</b> يطلب ${r.extra} ${r.extra === 1 ? 'سهماً إضافياً' : 'أسهم إضافية'} <span class="text-slate-500">(لديه ${sharesOf(c.turns, r.uid)})</span></p>
+      <div class="flex gap-2"><button class="btn b-pri flex-1" data-act="share-yes" data-uid="${esc(r.uid)}">موافقة</button><button class="btn b-red flex-1" data-act="share-no" data-uid="${esc(r.uid)}">رفض</button></div></div>`).join('')}</div>` : '';
+  return `<div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-layer-group text-sky-600"></i> الأسهم</h4>
+    <div class="text-xs space-y-1.5 mb-3"><div class="flex justify-between"><span>أسهمك</span><b>${my}</b></div><div class="flex justify-between"><span>الأسهم الشاغرة في الجمعية</span><b>${open}</b></div></div>${mine}${list}</div>`;
+}
+function openShareModal() {
+  const c = ctx(); if (!c) return;
+  const open = c.j.count - c.turns.length; if (open <= 0) return toast('لا توجد أسهم شاغرة', 'error');
+  const opts = Array.from({ length: Math.min(open, 5) }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('');
+  showModal('طلب أسهم إضافية', `<form id="f-share" class="space-y-3"><p class="text-xs text-slate-600 leading-relaxed">لديك الآن <b>${sharesOf(c.turns, state.user.uid)}</b> سهم، والمتاح في الجمعية <b>${open}</b>. كل سهم إضافي يمنحك دور استلام إضافياً ويلزمك بقسط إضافي، ويحتاج موافقة المشرف.</p>
+    <div><label class="text-xs font-semibold block mb-1">عدد الأسهم الإضافية</label><select name="extra" class="inp">${opts}</select></div>
+    <button class="btn b-pri w-full py-3" type="submit">إرسال الطلب للمشرف</button></form>`);
+}
+async function submitShare(f) {
+  const c = ctx(); if (!c) return;
+  const extra = parseInt(f.extra.value, 10) || 0, open = c.j.count - c.turns.length;
+  if (extra < 1 || extra > open) return toast('العدد المطلوب أكبر من الأسهم الشاغرة', 'error');
+  const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+  try {
+    await jref().collection('shareReqs').doc(state.user.uid).set({ uid: state.user.uid, extra, createdAt: FV.serverTimestamp() });
+    closeModal(); toast('أُرسل طلبك للمشرف');
+    sendNotifs([c.j.creatorUid], 'طلب سهم إضافي', `${dispName(state.profile)} يطلب ${extra} ${extra === 1 ? 'سهماً' : 'أسهماً'} إضافية في جمعية «${c.j.name}»`, c.j.id, 'share');
+  } catch (e) { btn.disabled = false; toast(e.code === 'permission-denied' ? 'تعذر الإرسال: قواعد Firestore غير منشورة' : 'تعذر الإرسال: ' + e.message, 'error'); }
+}
+async function approveShare(uid) {
+  const c = ctx(); if (!c || !c.isCreator) return;
+  const r = state.shareReqs[uid]; if (!r) return;
+  const ref = jref(), del = () => ref.collection('shareReqs').doc(uid).delete().catch(() => {});
+  if (!c.j.memberUids.includes(uid)) { del(); return toast('لم يعد عضواً في الجمعية', 'error'); }
+  if (r.extra > c.j.count - c.turns.length) return toast('الأسهم الشاغرة لا تكفي لهذا الطلب. ارفض الطلب أو ارفع عدد الأعضاء من «تعديل»', 'error');
+  if (c.turns.length < lockedCount(c)) return toast('لا يمكن إضافة سهم الآن لأن دورات سابقة لم تُشغل. عدّل ترتيب القبض أولاً', 'error');
+  const batch = db.batch();
+  batch.update(ref, { turns: [...c.turns, ...Array(r.extra).fill(uid)] });
+  batch.delete(ref.collection('shareReqs').doc(uid));
+  try { await batch.commit(); toast('تمت الموافقة وأُضيفت الأسهم'); sendNotifs([uid], 'تمت الموافقة على طلبك', `أُضيف ${r.extra} ${r.extra === 1 ? 'سهم' : 'أسهم'} لك في جمعية «${c.j.name}»`, c.j.id, 'share'); }
+  catch (e) { toast('تعذر التنفيذ: ' + e.message, 'error'); }
+}
+async function rejectShare(uid) {
+  const c = ctx(); if (!c || !c.isCreator) return;
+  try { await jref().collection('shareReqs').doc(uid).delete(); toast('رُفض الطلب', 'info'); sendNotifs([uid], 'لم يُقبل طلب السهم', `اعتذر المشرف عن طلبك في جمعية «${c.j.name}»`, c.j.id, 'share'); }
+  catch (e) { toast('تعذر التنفيذ: ' + e.message, 'error'); }
+}
+function cancelShare() { if (state.j) jref().collection('shareReqs').doc(state.user.uid).delete().then(() => toast('أُلغي الطلب', 'info')).catch(e => toast(e.message, 'error')); }
+
+/* --- تبديل الأدوار بين عضوين: عند موافقة الطرف الآخر يتبدّل الترتيب تلقائياً --- */
+function listenSwaps(id) {
+  const me = state.user.uid, col = db.collection('jamiyat').doc(id).collection('swapReqs'); let A = [], B = [];
+  const merge = () => { const m = new Map(); [...A, ...B].forEach(r => m.set(r.id, r)); state.swapReqs = [...m.values()]; if (state.view === 'jamiya') render(); };
+  const err = () => {};
+  state.jUnsubs.push(
+    col.where('fromUid', '==', me).onSnapshot(s => { A = s.docs.map(d => ({ id: d.id, ...d.data() })); merge(); }, err),
+    col.where('toUid', '==', me).onSnapshot(s => { B = s.docs.map(d => ({ id: d.id, ...d.data() })); merge(); }, err));
+}
+function swapBtn(c, i) {
+  const me = state.user.uid, u = c.turns[i], lock = lockedCount(c);
+  if (c.finished || u === me || i < lock || !c.j.memberUids.includes(me) || !c.turns.some((x, k) => x === me && k >= lock)) return '';
+  if (state.swapReqs.some(r => r.fromUid === me && r.toIdx === i)) return '<span class="text-[10px] text-slate-400">طلب تبديل معلّق</span>';
+  return `<button class="px-2 py-1 bg-sky-50 text-sky-700 rounded-lg" data-act="swap-modal" data-i="${i}"><i class="fa-solid fa-right-left"></i> طلب تبديل</button>`;
+}
+function swapCard(c) {
+  const me = state.user.uid, reqs = state.swapReqs; if (!reqs.length || !c.j.memberUids.includes(me)) return '';
+  const nm = u => esc(dispName(state.members[u])), lbl = k => `رقم ${k + 1} (${periodLabel(c.j, k)})`;
+  const inc = reqs.filter(r => r.toUid === me).map(r => `<div class="p-2.5 bg-sky-50 border border-sky-200 rounded-xl text-xs space-y-2"><p><b>${nm(r.fromUid)}</b> يطلب أن تتبادلا الأدوار: دوره ${lbl(r.fromIdx)} مقابل دورك ${lbl(r.toIdx)}</p>
+    <div class="flex gap-2"><button class="btn b-pri flex-1" data-act="swap-yes" data-id="${esc(r.id)}">موافقة</button><button class="btn b-red flex-1" data-act="swap-no" data-id="${esc(r.id)}">رفض</button></div></div>`).join('');
+  const out = reqs.filter(r => r.fromUid === me).map(r => `<div class="p-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs space-y-2"><p>طلبت من <b>${nm(r.toUid)}</b> تبديل دورك ${lbl(r.fromIdx)} بدوره ${lbl(r.toIdx)} — بانتظار الرد</p>
+    <button class="btn b-red" data-act="swap-cancel" data-id="${esc(r.id)}">إلغاء الطلب</button></div>`).join('');
+  return `<div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-right-left text-sky-600"></i> تبديل الأدوار</h4><div class="space-y-2">${inc}${out}</div></div>`;
+}
+function openSwapModal(i) {
+  const c = ctx(); if (!c) return; const me = state.user.uid, lock = lockedCount(c), target = c.turns[i];
+  if (!target || target === me || i < lock) return toast('لا يمكن تبديل هذا الدور', 'error');
+  const mine = c.turns.map((u, k) => u === me && k >= lock ? k : -1).filter(k => k >= 0);
+  if (!mine.length) return toast('ليس لديك دور متاح للتبديل (الأدوار المنقضية أو الجارية مقفلة)', 'error');
+  showModal('طلب تبديل دور', `<form id="f-swap" class="space-y-3"><input type="hidden" name="to" value="${i}">
+    <div class="p-3 bg-slate-50 rounded-xl text-xs">تطلب من <b>${esc(dispName(state.members[target]))}</b> أن يتبادل معك دوره رقم <b>${i + 1}</b> (${periodLabel(c.j, i)}).</div>
+    <div><label class="text-xs font-semibold block mb-1">دورك الذي تعطيه له</label><select name="mine" class="inp">${mine.map(k => `<option value="${k}">رقم ${k + 1} — ${periodLabel(c.j, k)}</option>`).join('')}</select></div>
+    <p class="text-[11px] text-slate-500 leading-relaxed">عند موافقته يتبدّل الترتيب تلقائياً ويُبلَّغ المشرف.</p>
+    <button class="btn b-pri w-full py-3" type="submit"><i class="fa-solid fa-right-left"></i> إرسال الطلب</button></form>`);
+}
+async function submitSwap(f) {
+  const c = ctx(); if (!c) return; const me = state.user.uid, lock = lockedCount(c);
+  const a = parseInt(f.mine.value, 10), b = parseInt(f.to.value, 10), to = c.turns[b];
+  if (c.turns[a] !== me || !to || to === me || a < lock || b < lock) return toast('تغيّر الترتيب، أعد المحاولة', 'error');
+  const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+  try {
+    await jref().collection('swapReqs').add({ fromUid: me, toUid: to, fromIdx: a, toIdx: b, lo: Math.min(a, b), hi: Math.max(a, b), status: 'pending', createdAt: FV.serverTimestamp() });
+    closeModal(); toast('أُرسل طلب التبديل');
+    sendNotifs([to], 'طلب تبديل دور', `${dispName(state.profile)} يطلب تبديل دوره بدورك في جمعية «${c.j.name}»`, c.j.id, 'swap');
+  } catch (e) { btn.disabled = false; toast(e.code === 'permission-denied' ? 'تعذر الإرسال: قواعد Firestore غير منشورة' : 'تعذر الإرسال: ' + e.message, 'error'); }
+}
+async function approveSwap(id) {
+  const c = ctx(), me = state.user.uid, r = state.swapReqs.find(x => x.id === id); if (!c || !r || r.toUid !== me) return;
+  const ref = jref(), reqRef = ref.collection('swapReqs').doc(id), t = c.turns;
+  if (t[r.fromIdx] !== r.fromUid || t[r.toIdx] !== me || r.lo < lockedCount(c)) {
+    reqRef.delete().catch(() => {}); return toast('تغيّر الترتيب أو أُقفل أحد الدورين، أُلغي الطلب', 'error');
+  }
+  const n = [...t]; n[r.lo] = t[r.hi]; n[r.hi] = t[r.lo];
+  const batch = db.batch(); batch.update(ref, { turns: n, lastSwap: id }); batch.delete(reqRef);
+  try {
+    await batch.commit(); toast('تم تبديل الدورين');
+    sendNotifs([r.fromUid, c.j.creatorUid], 'تم تبديل الأدوار', `تبادل ${dispName(state.members[r.fromUid])} و${dispName(state.members[me])} دوريهما في جمعية «${c.j.name}»`, c.j.id, 'swap');
+  } catch (e) { toast(e.code === 'permission-denied' ? 'تعذر التبديل: قواعد Firestore غير منشورة' : 'تعذر التبديل: ' + e.message, 'error'); }
+}
+async function rejectSwap(id, cancel) {
+  const r = state.swapReqs.find(x => x.id === id); if (!r || !state.j) return;
+  try {
+    await jref().collection('swapReqs').doc(id).delete(); toast(cancel ? 'أُلغي الطلب' : 'رُفض الطلب', 'info');
+    if (!cancel) sendNotifs([r.fromUid], 'لم يُقبل طلب التبديل', `اعتذر ${dispName(state.profile)} عن تبديل الدور في جمعية «${state.j.name}»`, state.j.id, 'swap');
+  } catch (e) { toast('تعذر التنفيذ: ' + e.message, 'error'); }
+}
 
 /* ============ التوجيه والأحداث ============ */
 /* ============ تطبيق PWA: التثبيت والتحديث ============ */
@@ -2437,7 +2586,10 @@ const actions = {
   'pick-icon': (el) => { const fm = el.closest('form'); if (!fm) return; fm.icon.value = el.dataset.v; fm.querySelectorAll('.emo').forEach(b => b.classList.toggle('on', b === el)); },
   'vote-yes': () => voteMod(true), 'vote-no': () => voteMod(false), 'close-mod': closeMod,
   'wish-modal': openWishModal, 'wish-toggle': toggleWishOpen, 'wish-del': deleteWish,
-  'chat-open': openChat, 'chat-toggle': toggleChatOpen, 'chat-del': el => chatDelete(el.dataset.id)
+  'chat-open': openChat, 'chat-toggle': toggleChatOpen, 'chat-del': el => chatDelete(el.dataset.id),
+  'copy-iban': el => copyText(el.dataset.v, 'تم نسخ الآيبان'),
+  'share-modal': openShareModal, 'share-yes': el => approveShare(el.dataset.uid), 'share-no': el => rejectShare(el.dataset.uid), 'share-cancel': cancelShare,
+  'swap-modal': el => openSwapModal(+el.dataset.i), 'swap-yes': el => approveSwap(el.dataset.id), 'swap-no': el => rejectSwap(el.dataset.id, false), 'swap-cancel': el => rejectSwap(el.dataset.id, true)
 };
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
@@ -2461,7 +2613,7 @@ document.addEventListener('input', e => {
   if (e.target.name === 'icon') fm.querySelectorAll('.emo').forEach(b => b.classList.toggle('on', b.dataset.v === e.target.value.trim()));
 });
 const forms = { 'f-register': doRegister, 'f-login': doLogin, 'f-reset': doReset, 'f-complete': doCompleteProfile, 'f-create': handleCreate,
-  'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-notif': submitNotif, 'f-deputy': f => setDeputy(f.uid.value), 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete, 'f-wish': submitWish, 'f-chat': sendChat };
+  'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-notif': submitNotif, 'f-deputy': f => setDeputy(f.uid.value), 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete, 'f-wish': submitWish, 'f-chat': sendChat, 'f-share': submitShare, 'f-swap': submitSwap };
 Object.assign(forms, ADMIN_FORMS);
 document.addEventListener('submit', e => { const fn = forms[e.target.id]; if (fn) { e.preventDefault(); fn(e.target); } });
 
