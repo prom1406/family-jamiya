@@ -182,7 +182,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.1.7</footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.1.8</footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -397,7 +397,7 @@ auth.onAuthStateChanged(async user => {
   cleanup(state.unsubs); cleanup(state.jUnsubs); stopPayListeners(); state.pays = {}; stopBlockWatch(); stopHeartbeat(); state._tv = null;
   state.user = user; state.profile = null; state.isAdmin = false;
   state.jamiyat = []; state.invites = [];
-  if (!user) { state.view = 'auth'; return render(); }
+  if (!user) { unlock(); state.view = 'auth'; return render(); }
 
   const needsVerify = !user.emailVerified && user.providerData.every(p => p.providerId === 'password');
   if (needsVerify) { state.view = 'verify'; return render(); }
@@ -413,7 +413,7 @@ auth.onAuthStateChanged(async user => {
 
   if (!state.isAdmin && await isBlockedNow()) return;
   if (!state.profile) { state.view = 'complete'; return render(); }
-  watchBlocked(); trackSession(); renderBanner();
+  maybeLock(true); watchBlocked(); trackSession(); renderBanner();
   claimPhone(user.uid, state.profile.phone);
   startListeners();
   if (state.isAdmin) { state.view = 'admin'; render(); loadAdmin(); toast('مرحباً بك في لوحة المالك', 'info'); return; }
@@ -608,7 +608,7 @@ async function acceptInvite(inviteId) {
   batch.update(jRef, { memberUids: FV.arrayUnion(uid), turns: FV.arrayUnion(uid) });
   batch.update(db.collection('invites').doc(inviteId), { status: 'accepted' });
   batch.set(jRef.collection('members').doc(uid), memberDoc(uid, p));
-  try { await batch.commit(); toast('تم الانضمام للجمعية'); notifyJoin(inv); } catch (e) { toast(e.code === 'permission-denied' ? 'تعذر الانضمام: ربما اكتمل عدد أعضاء الجمعية أو أُلغيت الدعوة' : 'تعذر الانضمام: ' + e.message, 'error'); }
+  try { await batch.commit(); toast('تم الانضمام للجمعية'); notifyJoin(inv); logEvent(inv.jamiyaId, 'join', `${dispName(state.profile)} انضم إلى الجمعية بالدعوة`); } catch (e) { toast(e.code === 'permission-denied' ? 'تعذر الانضمام: ربما اكتمل عدد أعضاء الجمعية أو أُلغيت الدعوة' : 'تعذر الانضمام: ' + e.message, 'error'); }
 }
 async function removeMember(uid) {
   const c = ctx(); if (!c || !c.isCreator || uid === c.j.creatorUid) return;
@@ -620,7 +620,7 @@ async function removeMember(uid) {
   batch.update(ref, { memberUids: FV.arrayRemove(uid), turns: FV.arrayRemove(uid), ...(c.j.deputyUid === uid ? { deputyUid: '' } : {}) });
   batch.delete(ref.collection('members').doc(uid));
   batch.delete(ref.collection('wishes').doc(uid));
-  try { await batch.commit(); toast('تم حذف العضو'); } catch (e) { toast('تعذر الحذف: ' + e.message, 'error'); }
+  try { await batch.commit(); toast('تم حذف العضو'); logEvent(c.j.id, 'remove', `${dispName(state.profile)} أزال ${dispName(m)} من الجمعية`); } catch (e) { toast('تعذر الحذف: ' + e.message, 'error'); }
 }
 async function declineInvite(inviteId) {
   try { await db.collection('invites').doc(inviteId).update({ status: 'declined' }); toast('تم رفض الدعوة', 'info'); }
@@ -879,6 +879,7 @@ async function submitPayment(f) {
     });
     await batch.commit();
     sendNotifs([c.recUid, c.j.creatorUid], 'إيصال جديد بانتظار تأكيدك', `${dispName(state.profile)} — جمعية «${c.j.name}» — ${fmtNum(amount)} ريال`, c.j.id, 'pay', 'pp_' + pid);
+    logEvent(c.j.id, 'pay', `${dispName(state.profile)} رفع إيصال سداد ${fmtNum(amount)} ريال (${periodLabel(c.j, c.cur)})`);
     const rn = c.rec ? dispName(c.rec) : 'المستلم';
     showModal('تم إرسال الإيصال ✓', `<div class="space-y-3 text-center"><div class="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl space-y-1"><p class="text-3xl">⏳</p><p class="font-black text-emerald-800">بانتظار تأكيد ${esc(rn)}</p><p class="text-xs text-slate-600">وصله إشعار بإيصالك (${fmtNum(amount)} ريال). ستصلك رسالة عند التأكيد.</p></div>
       ${c.rec && c.rec.phone ? `<a class="btn b-sec w-full" target="_blank" rel="noopener" href="${waLink(c.rec.phone, `السلام عليكم ${rn}، سددت ${fmtNum(amount)} ريال لجمعية «${c.j.name}» ورفعت الإيصال في التطبيق، بانتظار تأكيدك 🙏`)}"><i class="fa-brands fa-whatsapp"></i> إبلاغ ${esc(rn)} عبر واتساب (اختياري)</a>` : ''}
@@ -926,6 +927,7 @@ async function confirmPayment(payId) {
     b.update(jr.collection('payments').doc(payId), { status: 'confirmed' });
     if (!state.j.hasConfirmed) b.update(jr, { hasConfirmed: true }); // علامة دائمة: بعد أول سداد مقبول لا يحذف المشرف الجمعية
     await b.commit();
+    if (pay) logEvent(state.j.id, 'confirm', `${dispName(state.profile)} أكّد استلام ${fmtNum(pay.amount)} ريال من ${pay.name || 'عضو'}`);
     if (pay) sendNotifs([pay.uid], 'تم تأكيد سدادك ✓', `جمعية «${state.j.name}» — ${fmtNum(pay.amount)} ريال`, state.j.id, 'pay', 'pc_' + payId);
     closeModal(); toast('تم تأكيد الاستلام'); }
   catch (e) { toast(e.message, 'error'); }
@@ -981,7 +983,7 @@ function orderShuffle() {
 async function orderSave() {
   const c = ctx();
   if (state.orderDraft.slice(0, lockedCount(c)).join() !== c.turns.slice(0, lockedCount(c)).join()) return toast('لا يمكن تغيير الدورات المقفلة', 'error');
-  try { await db.collection('jamiyat').doc(c.j.id).update({ turns: state.orderDraft }); closeModal(); toast('تم حفظ ترتيب القبض'); }
+  try { await db.collection('jamiyat').doc(c.j.id).update({ turns: state.orderDraft }); closeModal(); toast('تم حفظ ترتيب القبض'); logEvent(c.j.id, 'order', `${dispName(state.profile)} عدّل ترتيب القبض`); }
   catch (e) { toast(e.message, 'error'); }
 }
 
@@ -1029,7 +1031,7 @@ async function submitEdit(f) {
 async function saveEdit(upd) {
   const j = state.j, patch = { ...upd };
   if (upd.amount !== j.amount) patch.amountHistory = [...(j.amountHistory || []), { from: j.amount, to: upd.amount, at: Date.now(), by: dispName(state.profile) }];
-  try { await db.collection('jamiyat').doc(j.id).update(patch); state.pendingEdit = null; closeModal(); toast('تم حفظ التعديلات'); } catch (e) { toast(e.message, 'error'); }
+  try { await db.collection('jamiyat').doc(j.id).update(patch); state.pendingEdit = null; closeModal(); toast('تم حفظ التعديلات'); logEvent(j.id, 'edit', `${dispName(state.profile)} عدّل شروط الجمعية${upd.amount !== j.amount ? ` (القسط من ${fmtNum(j.amount)} إلى ${fmtNum(upd.amount)} ريال)` : ''}`); } catch (e) { toast(e.message, 'error'); }
 }
 // معاينة: كيف تُقسَّم مدفوعات كل عضو على القيمة الجديدة قبل الحفظ
 function showRepriceModal(c, upd) {
@@ -1079,6 +1081,7 @@ async function submitDelete(f) {
     await wipe(ref.collection('proofs'));
     await wipe(ref.collection('wishes'));
     await wipe(ref.collection('chat'));
+    await wipe(ref.collection('log'));
     await wipe(db.collection('invites').where('jamiyaId', '==', id).where('creatorUid', '==', uid));
     await wipe(ref.collection('members'));
     await ref.delete();
@@ -1701,7 +1704,7 @@ async function adminDeleteJam(id) {
   const ref = db.collection('jamiyat').doc(id), wipe = async q => { const snap = await q.get(); for (let i = 0; i < snap.docs.length; i += 400) { const b = db.batch(); snap.docs.slice(i, i + 400).forEach(d => b.delete(d.ref)); await b.commit(); } };
   toast('جارٍ الحذف…', 'info');
   try {
-    await wipe(ref.collection('payments')); await wipe(ref.collection('proofs')); await wipe(ref.collection('wishes')); await wipe(ref.collection('chat')); await wipe(db.collection('invites').where('jamiyaId', '==', id)); await wipe(ref.collection('members'));
+    await wipe(ref.collection('payments')); await wipe(ref.collection('proofs')); await wipe(ref.collection('wishes')); await wipe(ref.collection('chat')); await wipe(ref.collection('log')); await wipe(db.collection('invites').where('jamiyaId', '==', id)); await wipe(ref.collection('members'));
     await ref.delete(); await db.collection('admin_notes').doc('j_' + id).delete().catch(() => {});
     A.jamiyat = A.jamiyat.filter(x => x.id !== id); delete A.notes['j_' + id];
     logEvent('adm_jam_del', { target: id, targetName: j.name, info: 'المشرف: ' + (j.creatorName || '') });
@@ -2112,10 +2115,11 @@ function vJamiya() {
     const detail = c.started ? `مدفوع ${fmtNum(ac.paid)} من ${fmtNum(ac.owed)}${ac.credit > 0 ? ` • رصيد مقدّم ${fmtNum(ac.credit)}` : ac.remaining > 0 ? ` • متبقي ${fmtNum(ac.remaining)}` : ''}` : '';
     return `<div class="p-3 bg-slate-50 border border-slate-100 rounded-xl flex flex-wrap justify-between items-center gap-2 text-xs">
       <div class="flex items-center gap-3"><span class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center">${i + 1}</span>
-      <div><p class="font-bold">${esc(dispName(m))} ${u === j.creatorUid ? '<span class="text-[10px] text-indigo-600">(مشرف)</span>' : ''}${j.deputyUid && u === j.deputyUid ? '<span class="text-[10px] text-amber-600">(نائب المشرف)</span>' : ''}${nSh > 1 ? ' <span class="text-[10px] text-sky-600">(' + nSh + ' أسهم)</span>' : ''}</p><p class="text-[10px] text-slate-400">دوره: ${periodLabel(j, i)}</p>${contact}${detail ? `<p class="text-[10px] text-slate-500">${detail}</p>` : ''}</div></div>
+      <div><p class="font-bold">${esc(dispName(m))} ${u === j.creatorUid ? '<span class="text-[10px] text-indigo-600">(مشرف)</span>' : ''}${j.deputyUid && u === j.deputyUid ? '<span class="text-[10px] text-amber-600">(نائب المشرف)</span>' : ''}${nSh > 1 ? ' <span class="text-[10px] text-sky-600">(' + nSh + ' أسهم)</span>' : ''} ${c.canManage ? rateBadge(c, u) : ''}</p><p class="text-[10px] text-slate-400">دوره: ${periodLabel(j, i)}</p>${contact}${detail ? `<p class="text-[10px] text-slate-500">${detail}</p>` : ''}</div></div>
       <div class="flex items-center gap-2 flex-wrap">
         ${c.finished ? '' : `<span class="px-2 py-1 rounded-lg font-bold ${b[1]}">${b[0]}</span>`}
         ${swapBtn(c, i)}
+        ${c.canManage ? `<button class="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg" data-act="stmt" data-uid="${esc(u)}" aria-label="كشف"><i class="fa-solid fa-file-lines"></i></button>` : ''}
         ${c.isCreator && u !== j.creatorUid && !ac.mine.length && (!c.started || i > c.cur) ? `<button class="px-2 py-1 bg-rose-50 text-rose-600 rounded-lg" data-act="rm-member" data-uid="${esc(u)}" aria-label="حذف العضو"><i class="fa-solid fa-user-minus"></i> حذف</button>` : ''}
         ${ac.mine.length ? `<button class="${canReview ? 'btn bg-emerald-600 text-white' : 'px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg'}" data-act="member-pays" data-uid="${esc(u)}"><i class="fa-solid ${canReview ? 'fa-check' : 'fa-paperclip'}"></i> ${canReview ? 'مراجعة وتأكيد (' + nPending + ')' : 'المدفوعات (' + ac.mine.length + ')'}</button>` : ''}
       </div></div>`;
@@ -2156,7 +2160,7 @@ function vJamiya() {
         <div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-chart-pie text-indigo-600"></i> تحصيل هذه الدورة</h4>
           <div class="text-xs space-y-2"><div class="flex justify-between"><span>المستهدف</span><b>${money(target)}</b></div><div class="flex justify-between"><span>المؤكد</span><b class="text-emerald-600">${money(collected)}</b></div>
           <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden"><div class="bg-emerald-500 h-full" style="width:${pct}%"></div></div></div></div>
-        ${joinCard(c)}${sharesCard(c)}${swapCard(c)}${wishCard(c)}${chatCard(c)}
+        ${trustCard(c)}${joinCard(c)}${sharesCard(c)}${swapCard(c)}${wishCard(c)}${chatCard(c)}
         ${c.canManage ? `<div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-clock-rotate-left text-amber-500"></i> دعوات معلّقة</h4><div class="space-y-2">${pend || '<p class="text-xs text-slate-400">لا توجد دعوات معلّقة.</p>'}</div></div>` : ''}
         <div class="card p-5"><h4 class="font-bold text-sm mb-2"><i class="fa-solid fa-calendar-days text-teal-600"></i> الجدول الزمني</h4>${sched}</div>
       </div></div></div>`;
@@ -2172,6 +2176,9 @@ function vProfile() {
       <div class="flex flex-wrap gap-2">${notifOn() ? '<button class="btn b-sec" data-act="test-notif"><i class="fa-solid fa-paper-plane"></i> إشعار تجريبي</button><button class="btn b-sec" data-act="reg-push"><i class="fa-solid fa-rotate"></i> إعادة تسجيل الجهاز</button>' : '<button class="btn b-pri" data-act="enable-notif"><i class="fa-solid fa-bell"></i> تفعيل الإشعارات</button>'}</div></div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-brands fa-whatsapp text-emerald-600"></i> تنبيهات واتساب</h4>
       <label class="flex items-start gap-2 text-xs leading-relaxed"><input type="checkbox" data-wa-optin class="mt-0.5 w-4 h-4 accent-teal-600" ${p.waOptIn !== false ? 'checked' : ''}> <span>أوافق على استلام تذكيرات السداد والاستلام عبر واتساب على رقم جوالي المسجّل. يمكنك إيقافها في أي وقت.</span></label></div>
+    <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-lock text-slate-700"></i> قفل التطبيق</h4>
+      <p class="text-xs text-slate-500 leading-relaxed">${lockCfg() ? 'القفل مفعّل على هذا الجهاز ✓ يُطلب الرمز عند فتح التطبيق أو العودة إليه بعد دقيقة.' : 'احمِ بياناتك المالية برمز من 4 إلى 6 أرقام يُطلب عند فتح التطبيق على هذا الجهاز.'}</p>
+      <div class="flex flex-wrap gap-2">${lockCfg() ? '<button class="btn b-sec" data-act="lock-change">تغيير الرمز</button><button class="btn b-red" data-act="lock-off">إيقاف القفل</button>' : '<button class="btn b-pri" data-act="lock-on"><i class="fa-solid fa-lock"></i> تفعيل القفل</button>'}</div></div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-mobile-screen-button text-emerald-600"></i> التطبيق</h4>
       <p class="text-xs text-slate-500 leading-relaxed">${inst ? 'أنت تستخدم التطبيق المثبّت على جهازك ✓' : 'ثبّت الجمعية الذكية على شاشتك الرئيسية لتعمل كتطبيق كامل وبسرعة أكبر.'}</p>
       <div class="flex flex-wrap gap-2">${inst ? '' : '<button class="btn b-pri" data-act="install-app"><i class="fa-solid fa-download"></i> تثبيت التطبيق</button>'}<button class="btn b-sec" data-act="share-app"><i class="fa-solid fa-share-nodes"></i> مشاركة التطبيق</button></div></div>
@@ -2430,7 +2437,7 @@ async function approveShare(uid) {
   const batch = db.batch();
   batch.update(ref, { turns: [...c.turns, ...Array(r.extra).fill(uid)] });
   batch.delete(ref.collection('shareReqs').doc(uid));
-  try { await batch.commit(); toast('تمت الموافقة وأُضيفت الأسهم'); sendNotifs([uid], 'تمت الموافقة على طلبك', `أُضيف ${r.extra} ${r.extra === 1 ? 'سهم' : 'أسهم'} لك في جمعية «${c.j.name}»`, c.j.id, 'share'); }
+  try { await batch.commit(); toast('تمت الموافقة وأُضيفت الأسهم'); logEvent(c.j.id, 'share', `${dispName(state.profile)} وافق على إضافة ${r.extra} ${r.extra === 1 ? 'سهم' : 'أسهم'} لـ ${dispName(state.members[uid])}`); sendNotifs([uid], 'تمت الموافقة على طلبك', `أُضيف ${r.extra} ${r.extra === 1 ? 'سهم' : 'أسهم'} لك في جمعية «${c.j.name}»`, c.j.id, 'share'); }
   catch (e) { toast('تعذر التنفيذ: ' + e.message, 'error'); }
 }
 async function rejectShare(uid) {
@@ -2496,6 +2503,7 @@ async function approveSwap(id) {
   const batch = db.batch(); batch.update(ref, { turns: n, lastSwap: id }); batch.delete(reqRef);
   try {
     await batch.commit(); toast('تم تبديل الدورين');
+    logEvent(c.j.id, 'swap', `تبادل ${dispName(state.members[r.fromUid])} و${dispName(state.members[me])} دوريهما (رقم ${r.fromIdx + 1} ورقم ${r.toIdx + 1})`);
     sendNotifs([r.fromUid, c.j.creatorUid], 'تم تبديل الأدوار', `تبادل ${dispName(state.members[r.fromUid])} و${dispName(state.members[me])} دوريهما في جمعية «${c.j.name}»`, c.j.id, 'swap');
   } catch (e) { toast(e.code === 'permission-denied' ? 'تعذر التبديل: لم تقبل قواعد Firestore العملية. انشر أحدث نسخة من firestore.rules ثم أعد المحاولة' : 'تعذر التبديل: ' + e.message, 'error'); }
 }
@@ -2567,8 +2575,152 @@ async function joinFromLink() {
   b.set(db.collection('joins').doc(`${l.jid}__${uid}__${l.code}`), { jid: l.jid, uid, code: l.code, createdAt: FV.serverTimestamp() });
   b.update(ref, { memberUids: FV.arrayUnion(uid), turns: FV.arrayUnion(uid) });
   b.set(ref.collection('members').doc(uid), memberDoc(uid, state.profile));
-  try { await b.commit(); closeModal(); toast('تم الانضمام للجمعية 🎉'); notifyJoin({ jamiyaId: l.jid }); state.joinLink = null; openJamiya(l.jid); }
+  try { await b.commit(); closeModal(); toast('تم الانضمام للجمعية 🎉'); notifyJoin({ jamiyaId: l.jid }); logEvent(l.jid, 'join', `${dispName(state.profile)} انضم إلى الجمعية عبر الرابط`); state.joinLink = null; openJamiya(l.jid); }
   catch (e) { toast(e.code === 'permission-denied' ? 'تعذر الانضمام: اكتمل عدد الأعضاء أو أُوقف الرابط أو لم يُوثَّق بريدك بعد' : 'تعذر الانضمام: ' + e.message, 'error'); }
+}
+
+/* ============ الثقة: سجل النشاط + كشف العضو + نسبة الالتزام + قفل التطبيق ============ */
+const LOG_ICO = { pay: '💸', confirm: '✅', swap: '🔁', share: '🧩', join: '👋', edit: '✏️', order: '🔢', remove: '🚪' };
+function logEvent(jid, type, text) {
+  if (!state.user || !jid) return;
+  db.collection('jamiyat').doc(jid).collection('log').add({ uid: state.user.uid, type, text: String(text).slice(0, 200), createdAt: FV.serverTimestamp() }).catch(() => {});
+}
+function trustCard(c) {
+  if (!c.j.memberUids.includes(state.user.uid)) return '';
+  return `<div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-shield-halved text-teal-600"></i> الشفافية والكشوف</h4><div class="grid grid-cols-2 gap-2">
+    <button class="btn b-sec" data-act="log-open"><i class="fa-solid fa-clock-rotate-left"></i> سجل النشاط</button><button class="btn b-sec" data-act="stmt-me"><i class="fa-solid fa-file-lines"></i> كشف حسابي</button></div></div>`;
+}
+async function openLog() {
+  const j = state.j; if (!j) return;
+  showModal('سجل النشاط', '<div id="log-box" class="space-y-2 max-h-[60vh] overflow-y-auto"><p class="text-center text-xs text-slate-400 py-6">جارٍ التحميل…</p></div><p class="text-[10px] text-slate-400 mt-3">سجل للقراءة فقط لا يمكن تعديله، ويظهر لجميع أعضاء الجمعية.</p>');
+  try {
+    const sn = await jref().collection('log').orderBy('createdAt', 'desc').limit(80).get(), box = $('log-box'); if (!box) return;
+    box.innerHTML = sn.empty ? '<p class="text-center text-xs text-slate-400 py-6">لا توجد أحداث مسجّلة بعد.</p>' : sn.docs.map(d => { const e = d.data(), t = tsd(e.createdAt);
+      return `<div class="flex gap-2 p-2.5 bg-slate-50 rounded-xl text-xs"><span class="text-base">${LOG_ICO[e.type] || '•'}</span><div class="min-w-0"><p class="leading-relaxed">${esc(e.text)}</p><p class="text-[10px] text-slate-400">${t ? fmtDT(t) : 'الآن'}</p></div></div>`; }).join('');
+  } catch (e) { const box = $('log-box'); if (box) box.innerHTML = '<p class="text-center text-xs text-rose-500 py-6">تعذر تحميل السجل' + (e.code === 'permission-denied' ? ' (انشر أحدث قواعد Firestore)' : '') + '</p>'; }
+}
+
+// نسبة الالتزام: الدورات التي سدّد فيها العضو كامل المطلوب في موعدها ÷ الدورات التي حان موعدها
+function commitRate(c, u) {
+  if (!c.started) return null;
+  const j = c.j, sh = sharesOf(c.turns, u), now = Date.now(); let on = 0, tot = 0;
+  for (let k = 0; k <= c.cur && k < j.count; k++) {
+    const req = r2(j.amount * (sh - (c.turns[k] === u ? 1 : 0))); if (req <= 0) continue;
+    const dueEnd = dayIn(j, k, j.lastDay).getTime() + 864e5;
+    const paid = r2(state.payments.filter(p => p.uid === u && p.month === k && tsd(p.createdAt) && tsd(p.createdAt).getTime() <= dueEnd).reduce((t, p) => t + (Number(p.amount) || 0), 0));
+    const done = paid >= req - 0.005;
+    if (!done && dueEnd > now) continue; // لم يحن موعدها بعد
+    tot++; if (done) on++;
+  }
+  return tot ? { pct: Math.round(on / tot * 100), on, tot } : null;
+}
+function rateBadge(c, u) {
+  const r = commitRate(c, u); if (!r) return '<span class="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500">جديد</span>';
+  const cl = r.pct >= 90 ? 'bg-emerald-100 text-emerald-700' : r.pct >= 70 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700';
+  return `<span class="text-[10px] px-1.5 py-0.5 rounded-md ${cl}" title="${r.on} من ${r.tot} دورات في الموعد">التزام ${r.pct}%</span>`;
+}
+
+function memberStatement(c, uid) {
+  const a = c.acct[uid] || {};
+  return { name: dispName(state.members[uid]), a, rate: commitRate(c, uid), sh: sharesOf(c.turns, uid),
+    turnsOf: c.turns.map((u, k) => u === uid ? k : -1).filter(k => k >= 0),
+    pays: state.payments.filter(p => p.uid === uid).sort((x, y) => (x.month - y.month) || String(x.id).localeCompare(String(y.id))) };
+}
+const turnState = (c, k) => !c.started ? 'قادم' : k < c.cur ? 'حلّ دورك' : k === c.cur ? 'الدور الحالي' : 'قادم';
+function openMemberStatement(uid) {
+  const c = ctx(); if (!c) return; uid = uid || state.user.uid;
+  if (uid !== state.user.uid && !c.canManage) return;
+  if (!state.members[uid]) return toast('العضو غير موجود', 'error');
+  const d = memberStatement(c, uid), j = c.j, stl = p => p.status === 'confirmed' ? '<span class="text-emerald-600">مؤكدة</span>' : '<span class="text-amber-600">بانتظار التأكيد</span>';
+  showModal('كشف حساب ' + esc(d.name), `<div class="space-y-3 text-xs">
+    <div class="grid grid-cols-2 gap-2">${[['المستحق حتى الآن', d.a.owed], ['المؤكد', d.a.confirmed], ['بانتظار التأكيد', d.a.pending], ['المتبقي', d.a.remaining]].map(([t, v]) => `<div class="p-2.5 bg-slate-50 rounded-xl"><p class="text-[10px] text-slate-500">${t}</p><b class="text-sm">${fmtNum(v || 0)}</b> <span class="text-[10px] text-slate-400">ريال</span></div>`).join('')}</div>
+    <div class="p-2.5 bg-slate-50 rounded-xl flex justify-between"><span>الأسهم: <b>${d.sh}</b></span><span>الالتزام بالمواعيد: <b>${d.rate ? d.rate.pct + '%' : '—'}</b></span></div>
+    <div><p class="font-bold mb-1">أدوار القبض</p>${d.turnsOf.map(k => `<div class="p-2 bg-slate-50 rounded-lg flex justify-between mb-1"><span>رقم ${k + 1} — ${periodLabel(j, k)}</span><b>${turnState(c, k)}</b></div>`).join('') || '<p class="text-slate-400">—</p>'}</div>
+    <div><p class="font-bold mb-1">الدفعات (${d.pays.length})</p>${d.pays.map(p => `<div class="p-2 bg-slate-50 rounded-lg flex justify-between gap-2 mb-1"><span>${periodLabel(j, p.month)}${p.ref ? ' • ' + esc(p.ref) : ''}<br><span class="text-[10px] text-slate-400">${tsd(p.createdAt) ? fmtDate(tsd(p.createdAt)) : ''}</span></span><span class="text-left"><b>${fmtNum(p.amount)}</b><br>${stl(p)}</span></div>`).join('') || '<p class="text-slate-400">لا توجد دفعات.</p>'}</div>
+    <div class="flex gap-2"><button class="btn b-sec flex-1" data-act="close">إغلاق</button><button class="btn b-pri flex-1" data-act="stmt-print" data-uid="${esc(uid)}"><i class="fa-solid fa-print"></i> طباعة / PDF</button></div></div>`);
+}
+function printMemberStatement(uid) {
+  const c = ctx(); if (!c) return; uid = uid || state.user.uid;
+  if (uid !== state.user.uid && !c.canManage) return;
+  const d = memberStatement(c, uid), j = c.j, th = 'border:1px solid #cbd5e1;background:#f1f5f9;padding:6px;font-size:12px;text-align:right', td = 'border:1px solid #cbd5e1;padding:6px;font-size:12px;text-align:right';
+  const tbl = (head, rows) => `<table style="width:100%;border-collapse:collapse;margin:8px 0 16px"><thead><tr>${head.map(h => `<th style="${th}">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr style="page-break-inside:avoid">${r.map(x => `<td style="${td}">${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  document.getElementById('print-root').innerHTML = `<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;color:#0f172a;padding:8px">
+    <h1 style="font-size:22px;margin:0">كشف حساب ${esc(d.name)}</h1>
+    <p style="font-size:12px;color:#475569;margin:6px 0 12px">جمعية «${esc(j.name)}» • ${freqOf(j).label} • القسط ${fmtNum(j.amount)} ريال • الأسهم ${d.sh} • تاريخ الكشف ${fmtDate(new Date())}</p>
+    ${tbl(['المستحق', 'المؤكد', 'بانتظار التأكيد', 'المتبقي', 'الالتزام بالمواعيد'], [[fmtNum(d.a.owed || 0), fmtNum(d.a.confirmed || 0), fmtNum(d.a.pending || 0), fmtNum(d.a.remaining || 0), d.rate ? d.rate.pct + '%' : '—']])}
+    <h2 style="font-size:15px;margin:0">أدوار القبض</h2>${tbl(['الدور', 'الفترة', 'الحالة'], d.turnsOf.map(k => [k + 1, periodLabel(j, k), turnState(c, k)]))}
+    <h2 style="font-size:15px;margin:0">الدفعات</h2>${d.pays.length ? tbl(['الدورة', 'المبلغ', 'الحالة', 'المرجع', 'التاريخ'], d.pays.map(p => [periodLabel(j, p.month), fmtNum(p.amount), p.status === 'confirmed' ? 'مؤكدة' : 'بانتظار التأكيد', p.ref || '', tsd(p.createdAt) ? fmtDate(tsd(p.createdAt)) : ''])) : '<p style="font-size:12px;color:#64748b">لا توجد دفعات.</p>'}
+    <p style="font-size:10px;color:#94a3b8;margin-top:16px">صدر من تطبيق الجمعية الذكية. لا يتضمن الكشف أرقام الحسابات أو الجوالات.</p></div>`;
+  closeModal(); setTimeout(() => window.print(), 200);
+}
+
+/* --- قفل التطبيق برمز --- */
+const lockKey = () => 'jm_lock_' + (state.user ? state.user.uid : '');
+const lockCfg = () => { try { return JSON.parse(lsGet(lockKey()) || 'null'); } catch (e) { return null; } };
+async function pinHash(pin, salt) {
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+  const b = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: new TextEncoder().encode(salt), iterations: 100000, hash: 'SHA-256' }, k, 256);
+  return Array.from(new Uint8Array(b), x => x.toString(16).padStart(2, '0')).join('');
+}
+let lockBuf = '', lockTries = 0;
+function unlock() { const e = document.getElementById('lock-screen'); if (e) e.remove(); lockBuf = ''; lockTries = 0; }
+function paintDots() {
+  const cfg = lockCfg(), box = $('lock-dots'); if (!cfg || !box) return;
+  box.innerHTML = Array.from({ length: cfg.len }, (_, i) => `<span style="width:14px;height:14px;border-radius:50%;border:2px solid #94a3b8;background:${i < lockBuf.length ? '#fff' : 'transparent'}"></span>`).join('');
+}
+function showLock() {
+  if (document.getElementById('lock-screen') || !lockCfg()) return;
+  lockBuf = '';
+  const d = document.createElement('div'); d.id = 'lock-screen';
+  d.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0f172a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;direction:rtl';
+  d.innerHTML = `<img src="icon-192.png" style="width:64px;height:64px;border-radius:16px" alt=""><p style="font-weight:900;font-size:18px">أدخل رمز القفل</p><div id="lock-dots" style="display:flex;gap:12px;height:16px"></div><p id="lock-msg" style="font-size:12px;color:#fda4af;height:16px"></p>
+    <div style="display:grid;grid-template-columns:repeat(3,72px);gap:12px;direction:ltr">${[1, 2, 3, 4, 5, 6, 7, 8, 9, '', 0, '⌫'].map(k => k === '' ? '<span></span>' : `<button type="button" data-k="${k}" style="height:56px;border-radius:16px;background:#1e293b;color:#fff;font-size:22px;font-weight:700">${k}</button>`).join('')}</div>
+    <button type="button" data-forgot style="font-size:12px;color:#94a3b8;text-decoration:underline">نسيت الرمز؟ تسجيل الخروج</button>`;
+  document.body.appendChild(d); paintDots(); d.addEventListener('click', onLockClick);
+}
+function onLockClick(e) {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.hasAttribute('data-forgot')) return lockForgot();
+  const k = b.dataset.k, cfg = lockCfg(); if (k === undefined) return; if (!cfg) return unlock();
+  if (k === '⌫') lockBuf = lockBuf.slice(0, -1); else if (lockBuf.length < cfg.len) lockBuf += k;
+  paintDots(); if (lockBuf.length === cfg.len) verifyLock(cfg);
+}
+async function verifyLock(cfg) {
+  const ok = (await pinHash(lockBuf, cfg.salt)) === cfg.hash, msg = $('lock-msg');
+  if (ok) return unlock();
+  lockBuf = ''; lockTries++; paintDots();
+  if (lockTries >= 5) return lockForgot(true);
+  if (msg) msg.textContent = `رمز غير صحيح (متبقٍ ${5 - lockTries} محاولات)`;
+}
+function lockForgot(auto) {
+  if (!auto && !confirm('سيتم تسجيل خروجك وإلغاء القفل على هذا الجهاز، ثم تدخل بكلمة المرور وتفعّل قفلاً جديداً. متابعة؟')) return;
+  try { localStorage.removeItem(lockKey()); } catch (e) {}
+  unlock(); auth.signOut(); if (auto) toast('تجاوزت عدد المحاولات، سجّل دخولك من جديد', 'error');
+}
+function maybeLock(force) { if (state.user && lockCfg() && (force || (state.lockHiddenAt && Date.now() - state.lockHiddenAt > 60000))) showLock(); state.lockHiddenAt = 0; }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') state.lockHiddenAt = Date.now(); else if (state.lockHiddenAt) maybeLock(false); });
+function openLockForm(mode) {
+  const cfg = lockCfg(), need = mode !== 'on' && cfg;
+  showModal(mode === 'off' ? 'إيقاف قفل التطبيق' : mode === 'change' ? 'تغيير رمز القفل' : 'تفعيل قفل التطبيق', `<form id="${mode === 'off' ? 'f-lockoff' : 'f-lock'}" class="space-y-3">
+    ${need ? '<div><label class="text-xs font-semibold block mb-1">الرمز الحالي</label><input name="cur" type="password" inputmode="numeric" maxlength="6" class="inp" required autocomplete="off"></div>' : ''}
+    ${mode === 'off' ? '' : '<div><label class="text-xs font-semibold block mb-1">الرمز الجديد (4 إلى 6 أرقام)</label><input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4,6}" maxlength="6" class="inp" required autocomplete="off"></div><div><label class="text-xs font-semibold block mb-1">أعد كتابة الرمز</label><input name="pin2" type="password" inputmode="numeric" maxlength="6" class="inp" required autocomplete="off"></div><p class="text-[11px] text-slate-500 leading-relaxed">القفل يحمي التطبيق على هذا الجهاز فقط، وهو حماية من الفضول وليس بديلاً عن قفل الجوال.</p>'}
+    <button class="btn ${mode === 'off' ? 'b-red' : 'b-pri'} w-full py-3" type="submit">${mode === 'off' ? 'إيقاف القفل' : 'حفظ الرمز'}</button></form>`);
+}
+async function submitLock(f) {
+  const cfg = lockCfg();
+  if (cfg && f.cur && (await pinHash(f.cur.value.trim(), cfg.salt)) !== cfg.hash) return toast('الرمز الحالي غير صحيح', 'error');
+  const pin = f.pin.value.trim();
+  if (!/^\d{4,6}$/.test(pin)) return toast('الرمز من 4 إلى 6 أرقام فقط', 'error');
+  if (pin !== f.pin2.value.trim()) return toast('الرمزان غير متطابقين', 'error');
+  const salt = Array.from(crypto.getRandomValues(new Uint8Array(12)), x => x.toString(16).padStart(2, '0')).join('');
+  lsSet(lockKey(), JSON.stringify({ salt, hash: await pinHash(pin, salt), len: pin.length }));
+  closeModal(); toast('تم تفعيل القفل'); if (state.view === 'profile') render();
+}
+async function submitLockOff(f) {
+  const cfg = lockCfg(); if (!cfg) return closeModal();
+  if ((await pinHash(f.cur.value.trim(), cfg.salt)) !== cfg.hash) return toast('الرمز غير صحيح', 'error');
+  try { localStorage.removeItem(lockKey()); } catch (e) {}
+  closeModal(); toast('أُوقف القفل', 'info'); if (state.view === 'profile') render();
 }
 
 /* ============ التوجيه والأحداث ============ */
@@ -2702,6 +2854,8 @@ const actions = {
   'chat-open': openChat, 'chat-toggle': toggleChatOpen, 'chat-del': el => chatDelete(el.dataset.id),
   'copy-iban': el => copyText(el.dataset.v, 'تم نسخ الآيبان'),
   'share-modal': openShareModal, 'share-yes': el => approveShare(el.dataset.uid), 'share-no': el => rejectShare(el.dataset.uid), 'share-cancel': cancelShare,
+  'log-open': openLog, 'stmt-me': () => openMemberStatement(), 'stmt': el => openMemberStatement(el.dataset.uid), 'stmt-print': el => printMemberStatement(el.dataset.uid),
+  'lock-on': () => openLockForm('on'), 'lock-change': () => openLockForm('change'), 'lock-off': () => openLockForm('off'),
   'join-create': () => createJoinLink(false), 'join-regen': () => createJoinLink(true), 'join-toggle': toggleJoin, 'join-copy': copyJoinLink, 'join-do': joinFromLink,
   'pay-fill': el => { const i = document.querySelector('#f-pay [name=amount]'); if (i) i.value = el.dataset.v; },
   'swap-modal': el => openSwapModal(+el.dataset.i), 'swap-yes': el => approveSwap(el.dataset.id), 'swap-no': el => rejectSwap(el.dataset.id, false), 'swap-cancel': el => rejectSwap(el.dataset.id, true)
@@ -2728,7 +2882,7 @@ document.addEventListener('input', e => {
   if (e.target.name === 'icon') fm.querySelectorAll('.emo').forEach(b => b.classList.toggle('on', b.dataset.v === e.target.value.trim()));
 });
 const forms = { 'f-register': doRegister, 'f-login': doLogin, 'f-reset': doReset, 'f-complete': doCompleteProfile, 'f-create': handleCreate,
-  'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-notif': submitNotif, 'f-deputy': f => setDeputy(f.uid.value), 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete, 'f-wish': submitWish, 'f-chat': sendChat, 'f-share': submitShare, 'f-swap': submitSwap };
+  'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-notif': submitNotif, 'f-deputy': f => setDeputy(f.uid.value), 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete, 'f-wish': submitWish, 'f-chat': sendChat, 'f-share': submitShare, 'f-swap': submitSwap, 'f-lock': submitLock, 'f-lockoff': submitLockOff };
 Object.assign(forms, ADMIN_FORMS);
 document.addEventListener('submit', e => { const fn = forms[e.target.id]; if (fn) { e.preventDefault(); fn(e.target); } });
 
