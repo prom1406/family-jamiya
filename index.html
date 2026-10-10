@@ -182,7 +182,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.1.5</footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.1.6</footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -2478,7 +2478,7 @@ async function approveSwap(id) {
   try {
     await batch.commit(); toast('تم تبديل الدورين');
     sendNotifs([r.fromUid, c.j.creatorUid], 'تم تبديل الأدوار', `تبادل ${dispName(state.members[r.fromUid])} و${dispName(state.members[me])} دوريهما في جمعية «${c.j.name}»`, c.j.id, 'swap');
-  } catch (e) { toast(e.code === 'permission-denied' ? 'تعذر التبديل: قواعد Firestore غير منشورة' : 'تعذر التبديل: ' + e.message, 'error'); }
+  } catch (e) { toast(e.code === 'permission-denied' ? 'تعذر التبديل: لم تقبل قواعد Firestore العملية. انشر أحدث نسخة من firestore.rules ثم أعد المحاولة' : 'تعذر التبديل: ' + e.message, 'error'); }
 }
 async function rejectSwap(id, cancel) {
   const r = state.swapReqs.find(x => x.id === id); if (!r || !state.j) return;
