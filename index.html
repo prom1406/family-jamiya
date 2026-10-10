@@ -182,7 +182,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.4</footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.1.5</footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -1744,6 +1744,12 @@ document.addEventListener('input', e => {
   if (t.matches('[data-wa-text]')) state.admin.waText = t.value;
   if (t.matches('[data-wa-q]')) { state.admin.waQ = t.value; paintWa(); }
 });
+document.addEventListener('change', e => {
+  const t = e.target; if (!t.matches || !t.matches('[data-wa-optin]') || !state.user) return;
+  const v = t.checked;
+  db.collection('users').doc(state.user.uid).update({ waOptIn: v }).then(() => { if (state.profile) state.profile.waOptIn = v; toast(v ? 'فُعّلت تنبيهات واتساب' : 'أُوقفت تنبيهات واتساب', v ? 'success' : 'info'); })
+    .catch(err => { t.checked = !v; toast('تعذر الحفظ: ' + err.message, 'error'); });
+});
 document.addEventListener('change', e => { const t = e.target; if (t.matches && t.matches('[data-wa-opt]')) { state.admin.waOnlyOpt = t.checked; paintWa(); } });
 const ADMIN_ACTIONS = {
   'wa-bc-send': el => waBcSend(el.dataset.id), 'wa-bc-reset': waBcReset,
@@ -1788,14 +1794,15 @@ async function showSysNotif(title, body, tag, jid) {
   try { new Notification(title, opts); } catch (e) {}
 }
 // تُعرض فقط والتطبيق في الخلفية (داخل التطبيق تكفي الرسائل)، ولا تتكرر لنفس الحدث
+const seenKey = () => 'jm_nseen_' + (state.user ? state.user.uid : '');
 function pushLocal(title, body, tag, jid) {
   if (!notifOn()) return;
-  let seen = []; try { seen = JSON.parse(lsGet('jm_nseen') || '[]'); } catch (e) {}
+  let seen = []; try { seen = JSON.parse(lsGet(seenKey()) || '[]'); } catch (e) {}
   if (seen.includes(tag)) return;
   if (document.visibilityState === 'hidden') { showSysNotif(title, body, tag, jid); }
   else if (document.visibilityState === 'visible' && !String(tag).startsWith('al_')) { /* مرئي: نسجله كمُشاهَد */ }
   else return; // تنبيهات المواعيد تنتظر حتى يصبح التطبيق في الخلفية
-  seen.push(tag); lsSet('jm_nseen', JSON.stringify(seen.slice(-300)));
+  seen.push(tag); lsSet(seenKey(), JSON.stringify(seen.slice(-300)));
 }
 async function enableNotifs() {
   if (!notifSupported()) return toast('هذا المتصفح لا يدعم الإشعارات' + (isIOS() ? ' — على الآيفون ثبّت التطبيق على الشاشة الرئيسية أولاً' : ''), 'error');
@@ -1821,14 +1828,26 @@ function notifyAlerts() {
 /* ============ دفع الإشعارات للجوال المغلق (FCM) ============
    الصق هنا مفتاح الويب (Web Push certificate / VAPID) من: Firebase ← إعدادات المشروع ← Cloud Messaging */
 const VAPID_KEY = 'BG6l6SR11DQISd1WtcgOLJSS6rVbTN5uudknpGyt8yZBhYqCnjQpaJ9QKC6QQuILPbvtUWVpWnSroZFrSCJsYPM';
-async function registerPush() {
+async function registerPush(force) {
   try {
-    if (!VAPID_KEY || !state.user || !notifOn() || !firebase.messaging || !(await firebase.messaging.isSupported())) return;
+    if (!VAPID_KEY || !state.user || !notifOn() || !firebase.messaging || !(await firebase.messaging.isSupported())) return { ok: false, err: 'unsupported' };
     const reg = await navigator.serviceWorker.ready;
     const tok = await firebase.messaging().getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
-    const mark = state.user.uid + ':' + tok;
-    if (tok && lsGet('jm_fcm') !== mark) { await db.collection('users').doc(state.user.uid).set({ fcmTokens: FV.arrayUnion(tok) }, { merge: true }); lsSet('jm_fcm', mark); }
-  } catch (e) { console.warn('push', e.code || e.message); }
+    if (!tok) return { ok: false, err: 'no-token' };
+    const key = state.user.uid + ':' + tok;
+    if (force || state._pushReg !== key) { await db.collection('users').doc(state.user.uid).set({ fcmTokens: FV.arrayUnion(tok) }, { merge: true }); state._pushReg = key; }
+    return { ok: true };
+  } catch (e) { console.warn('push', e.code || e.message); return { ok: false, err: e.code || e.message }; }
+}
+// عند تسجيل الخروج: نفكّ ارتباط هذا الجهاز بالحساب ونُلغي رمزه، فيبدأ الحساب التالي برمز جديد نظيف
+async function unregisterPush() {
+  try {
+    if (!state.user || !VAPID_KEY || !notifSupported() || Notification.permission !== 'granted' || !firebase.messaging || !(await firebase.messaging.isSupported())) return;
+    const m = firebase.messaging(), reg = await navigator.serviceWorker.ready;
+    const tok = await m.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+    if (tok) await db.collection('users').doc(state.user.uid).update({ fcmTokens: FV.arrayRemove(tok) });
+    await m.deleteToken(); state._pushReg = '';
+  } catch (e) { console.warn('unpush', e.code || e.message); }
 }
 /* ============ مركز الإشعارات: مستند لكل إشعار يصل للمستلم (يُسلَّم فور فتح التطبيق أو وهو في الخلفية) ============ */
 async function sendNotifs(uids, title, body, jid, kind, tag) {
@@ -1865,14 +1884,14 @@ function flushNotifs() {
   const hidden = document.visibilityState === 'hidden';
   if (hidden && !notifOn()) return; // تبقى بانتظار فتح التطبيق
   state.nq = [];
-  let seen = []; try { seen = JSON.parse(lsGet('jm_nseen') || '[]'); } catch (e) {}
+  let seen = []; try { seen = JSON.parse(lsGet(seenKey()) || '[]'); } catch (e) {}
   const tg = n => n.tag || ('n_' + n.id);
   const fresh = q.filter(n => !seen.includes(tg(n)));
   fresh.sort((a, b) => nSecs(a) - nSecs(b));
   const show = (title, body, tag, jid) => hidden ? showSysNotif(title, body, tag, jid) : toast(title + ' — ' + body, 'info');
   fresh.slice(0, 3).forEach(n => show(n.title, n.body, tg(n), n.jid));
   if (fresh.length > 3) show('الجمعية الذكية', 'لديك ' + nf(fresh.length - 3) + ' إشعارات أخرى جديدة', 'more_' + Date.now(), '');
-  fresh.forEach(n => seen.push(tg(n))); lsSet('jm_nseen', JSON.stringify(seen.slice(-300)));
+  fresh.forEach(n => seen.push(tg(n))); lsSet(seenKey(), JSON.stringify(seen.slice(-300)));
   q.forEach(n => db.collection('notifs').doc(n.id).update({ pushed: true, delivered: true }).catch(() => {}));
 }
 async function markInboxRead() {
@@ -2132,7 +2151,9 @@ function vProfile() {
     <button class="btn b-pri w-full py-3" type="submit">حفظ التعديلات</button></form></div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-bell text-amber-500"></i> إشعارات الجوال</h4>
       <p class="text-xs text-slate-500 leading-relaxed">${!notifSupported() ? 'هذا المتصفح لا يدعم الإشعارات.' : Notification.permission === 'denied' ? 'الإشعارات محظورة لهذا الموقع، فعّلها من إعدادات المتصفح.' : notifOn() ? 'الإشعارات مفعّلة ✓ ستصلك تنبيهات الدعوات والإيصالات والأعضاء الجدد وطلبات التعديل ورسائل الإدارة ومواعيد السداد.' : 'فعّلها لتصلك تنبيهات الدعوات والإيصالات ومواعيد السداد خارج التطبيق.'}${isIOS() && !isStandalone() ? ' على الآيفون يلزم تثبيت التطبيق أولاً.' : ''}</p>
-      <div class="flex flex-wrap gap-2">${notifOn() ? '<button class="btn b-sec" data-act="test-notif"><i class="fa-solid fa-paper-plane"></i> إشعار تجريبي</button>' : '<button class="btn b-pri" data-act="enable-notif"><i class="fa-solid fa-bell"></i> تفعيل الإشعارات</button>'}</div></div>
+      <div class="flex flex-wrap gap-2">${notifOn() ? '<button class="btn b-sec" data-act="test-notif"><i class="fa-solid fa-paper-plane"></i> إشعار تجريبي</button><button class="btn b-sec" data-act="reg-push"><i class="fa-solid fa-rotate"></i> إعادة تسجيل الجهاز</button>' : '<button class="btn b-pri" data-act="enable-notif"><i class="fa-solid fa-bell"></i> تفعيل الإشعارات</button>'}</div></div>
+    <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-brands fa-whatsapp text-emerald-600"></i> تنبيهات واتساب</h4>
+      <label class="flex items-start gap-2 text-xs leading-relaxed"><input type="checkbox" data-wa-optin class="mt-0.5 w-4 h-4 accent-teal-600" ${p.waOptIn !== false ? 'checked' : ''}> <span>أوافق على استلام تذكيرات السداد والاستلام عبر واتساب على رقم جوالي المسجّل. يمكنك إيقافها في أي وقت.</span></label></div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-mobile-screen-button text-emerald-600"></i> التطبيق</h4>
       <p class="text-xs text-slate-500 leading-relaxed">${inst ? 'أنت تستخدم التطبيق المثبّت على جهازك ✓' : 'ثبّت الجمعية الذكية على شاشتك الرئيسية لتعمل كتطبيق كامل وبسرعة أكبر.'}</p>
       <div class="flex flex-wrap gap-2">${inst ? '' : '<button class="btn b-pri" data-act="install-app"><i class="fa-solid fa-download"></i> تثبيت التطبيق</button>'}<button class="btn b-sec" data-act="share-app"><i class="fa-solid fa-share-nodes"></i> مشاركة التطبيق</button></div></div>
@@ -2543,7 +2564,8 @@ const actions = {
   'go-create': () => { state.view = 'create'; render(); },
   'go-profile': () => { state.view = 'profile'; render(); },
   'go-admin': () => { state.view = 'admin'; render(); loadAdmin(); },
-  'logout': () => { if (state.user) ssDel('jm_sess_' + state.user.uid); stopHeartbeat(); auth.signOut(); },
+  'logout': async () => { if (state.user) ssDel('jm_sess_' + state.user.uid); stopHeartbeat(); await Promise.race([unregisterPush(), new Promise(r => setTimeout(r, 3000))]); auth.signOut(); },
+  'reg-push': async () => { const r = await registerPush(true); toast(r.ok ? 'سُجّل هذا الجهاز لإشعارات حسابك ✓' : 'تعذر تسجيل الجهاز: ' + r.err, r.ok ? 'success' : 'error'); },
   'google': doGoogle,
   'auth-register': () => { state.authMode = 'register'; render(); },
   'auth-login': () => { state.authMode = 'login'; render(); },
