@@ -182,7 +182,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.1.6</footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.1.7</footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -418,6 +418,7 @@ auth.onAuthStateChanged(async user => {
   startListeners();
   if (state.isAdmin) { state.view = 'admin'; render(); loadAdmin(); toast('مرحباً بك في لوحة المالك', 'info'); return; }
   state.view = launchAction() || 'home'; render();
+  checkPendingJoin();
 });
 
 /* حجز رقم الجوال: مستند في phones/{الرقم} يحمل uid صاحبه، فلا يمكن لحسابين استخدام نفس الرقم */
@@ -878,7 +879,10 @@ async function submitPayment(f) {
     });
     await batch.commit();
     sendNotifs([c.recUid, c.j.creatorUid], 'إيصال جديد بانتظار تأكيدك', `${dispName(state.profile)} — جمعية «${c.j.name}» — ${fmtNum(amount)} ريال`, c.j.id, 'pay', 'pp_' + pid);
-    closeModal(); toast('أُرسل الإيصال للمستلم للتأكيد');
+    const rn = c.rec ? dispName(c.rec) : 'المستلم';
+    showModal('تم إرسال الإيصال ✓', `<div class="space-y-3 text-center"><div class="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl space-y-1"><p class="text-3xl">⏳</p><p class="font-black text-emerald-800">بانتظار تأكيد ${esc(rn)}</p><p class="text-xs text-slate-600">وصله إشعار بإيصالك (${fmtNum(amount)} ريال). ستصلك رسالة عند التأكيد.</p></div>
+      ${c.rec && c.rec.phone ? `<a class="btn b-sec w-full" target="_blank" rel="noopener" href="${waLink(c.rec.phone, `السلام عليكم ${rn}، سددت ${fmtNum(amount)} ريال لجمعية «${c.j.name}» ورفعت الإيصال في التطبيق، بانتظار تأكيدك 🙏`)}"><i class="fa-brands fa-whatsapp"></i> إبلاغ ${esc(rn)} عبر واتساب (اختياري)</a>` : ''}
+      <button class="btn b-pri w-full" data-act="close">تم</button></div>`);
     if (c.rec && c.rec.email) sendMail(c.rec.email, c.rec.name, `إيصال سداد جديد - ${c.j.name}`, `رفع ${dispName(state.profile)} إيصال سداد بقيمة ${amount} ريال لجمعية "${c.j.name}". افتح التطبيق للمراجعة والتأكيد:${mailLink()}`).catch(() => {});
   } catch (e) { toast('تعذر الرفع: ' + e.message, 'error'); btn.disabled = false; btn.textContent = 'إرسال الإيصال'; }
 }
@@ -917,7 +921,11 @@ async function viewProof(payId) {
 }
 async function confirmPayment(payId) {
   const pay = (state.payments || []).find(x => x.id === payId);
-  try { await db.collection('jamiyat').doc(state.j.id).collection('payments').doc(payId).update({ status: 'confirmed' });
+  try {
+    const jr = db.collection('jamiyat').doc(state.j.id), b = db.batch();
+    b.update(jr.collection('payments').doc(payId), { status: 'confirmed' });
+    if (!state.j.hasConfirmed) b.update(jr, { hasConfirmed: true }); // علامة دائمة: بعد أول سداد مقبول لا يحذف المشرف الجمعية
+    await b.commit();
     if (pay) sendNotifs([pay.uid], 'تم تأكيد سدادك ✓', `جمعية «${state.j.name}» — ${fmtNum(pay.amount)} ريال`, state.j.id, 'pay', 'pc_' + payId);
     closeModal(); toast('تم تأكيد الاستلام'); }
   catch (e) { toast(e.message, 'error'); }
@@ -1043,8 +1051,15 @@ function showRepriceModal(c, upd) {
 }
 
 /* ============ حذف الجمعية (للمشرف فقط) ============ */
-function openDeleteModal() {
+const DEL_LOCK_MSG = 'لا يمكن حذف الجمعية بعد أول سداد مقبول حفاظاً على حقوق الأعضاء وسجلاتهم. إن لزم حذفها فتواصل مع إدارة التطبيق.';
+async function openDeleteModal() {
   const c = ctx(); if (!c || !c.isCreator) return;
+  let locked = !!c.j.hasConfirmed || (state.payments || []).some(p => p.status === 'confirmed');
+  if (!locked) { try { locked = !(await db.collection('jamiyat').doc(c.j.id).collection('payments').where('status', '==', 'confirmed').limit(1).get()).empty; } catch (e) {} }
+  if (locked) {
+    if (!c.j.hasConfirmed) db.collection('jamiyat').doc(c.j.id).update({ hasConfirmed: true }).catch(() => {}); // تثبيت العلامة للجمعيات القديمة
+    return showModal('الحذف غير متاح', `<div class="space-y-3"><div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 leading-relaxed"><i class="fa-solid fa-lock"></i> ${DEL_LOCK_MSG}</div><button class="btn b-sec w-full" data-act="close">حسناً</button></div>`);
+  }
   const hasPays = state.payments.length > 0;
   showModal('حذف الجمعية', `<form id="f-delete" class="space-y-3">
     <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 leading-relaxed"><b>تحذير:</b> سيتم حذف الجمعية نهائياً مع الأعضاء والمدفوعات والإيصالات والدعوات لجميع المشاركين، ولا يمكن التراجع.${hasPays ? `<br>يوجد ${state.payments.length} دفعة مسجّلة سيُحذف سجلها.` : ''}</div>
@@ -1053,6 +1068,7 @@ function openDeleteModal() {
 }
 async function submitDelete(f) {
   const c = ctx(); if (!c || !c.isCreator) return toast('الحذف متاح لمشرف الجمعية فقط', 'error');
+  if (c.j.hasConfirmed) return toast(DEL_LOCK_MSG, 'error');
   if (f.confirm.value.trim() !== c.j.name.trim()) return toast('اكتب اسم الجمعية كما هو تماماً للتأكيد', 'error');
   const btn = f.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'جارٍ الحذف...';
   const id = c.j.id, ref = db.collection('jamiyat').doc(id), uid = state.user.uid;
@@ -1745,7 +1761,9 @@ document.addEventListener('input', e => {
   if (t.matches('[data-wa-q]')) { state.admin.waQ = t.value; paintWa(); }
 });
 document.addEventListener('change', e => {
-  const t = e.target; if (!t.matches || !t.matches('[data-wa-optin]') || !state.user) return;
+  const t = e.target;
+  if (t && t.matches && t.matches('#f-pay [name=file]')) { const im = $('pay-prev'), f = t.files && t.files[0]; if (im && f) { im.src = URL.createObjectURL(f); im.classList.remove('hide'); } return; }
+  if (!t.matches || !t.matches('[data-wa-optin]') || !state.user) return;
   const v = t.checked;
   db.collection('users').doc(state.user.uid).update({ waOptIn: v }).then(() => { if (state.profile) state.profile.waOptIn = v; toast(v ? 'فُعّلت تنبيهات واتساب' : 'أُوقفت تنبيهات واتساب', v ? 'success' : 'info'); })
     .catch(err => { t.checked = !v; toast('تعذر الحفظ: ' + err.message, 'error'); });
@@ -2138,7 +2156,7 @@ function vJamiya() {
         <div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-chart-pie text-indigo-600"></i> تحصيل هذه الدورة</h4>
           <div class="text-xs space-y-2"><div class="flex justify-between"><span>المستهدف</span><b>${money(target)}</b></div><div class="flex justify-between"><span>المؤكد</span><b class="text-emerald-600">${money(collected)}</b></div>
           <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden"><div class="bg-emerald-500 h-full" style="width:${pct}%"></div></div></div></div>
-        ${sharesCard(c)}${swapCard(c)}${wishCard(c)}${chatCard(c)}
+        ${joinCard(c)}${sharesCard(c)}${swapCard(c)}${wishCard(c)}${chatCard(c)}
         ${c.canManage ? `<div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-clock-rotate-left text-amber-500"></i> دعوات معلّقة</h4><div class="space-y-2">${pend || '<p class="text-xs text-slate-400">لا توجد دعوات معلّقة.</p>'}</div></div>` : ''}
         <div class="card p-5"><h4 class="font-bold text-sm mb-2"><i class="fa-solid fa-calendar-days text-teal-600"></i> الجدول الزمني</h4>${sched}</div>
       </div></div></div>`;
@@ -2178,8 +2196,9 @@ function openModal(kind) {
     <button class="btn b-pri w-full py-3" type="submit"><i class="fa-brands fa-whatsapp"></i> إنشاء الدعوة</button></form>`);
   if (kind === 'pay') showModal('إثبات سداد القسط', `<form id="f-pay" class="space-y-3"><p class="text-xs text-slate-500">حوّل إلى: <b>${esc(c.rec ? dispName(c.rec) : '')}</b> — ${esc(c.rec?.bank)} <span dir="ltr">${esc(c.rec?.iban || '')}</span></p>${c.rec?.iban ? `<button type="button" class="btn b-sec w-full" data-act="copy-iban" data-v="${esc(fixIban(c.rec.iban))}"><i class="fa-regular fa-copy"></i> نسخ الآيبان</button>` : ''}
     <div class="p-2.5 bg-slate-50 rounded-xl text-[11px] text-slate-600">القسط ${fmtNum(c.j.amount)} ريال ${c.f.every} • المستحق عليك حتى الآن ${fmtNum(c.me?.owed || 0)} • المتبقي <b>${fmtNum(c.me?.remaining || 0)}</b> ريال</div>
-    <div><label class="text-xs font-semibold block mb-1">المبلغ المحوّل (ريال) — يمكنك دفع جزء أو أكثر من قسط</label><input name="amount" type="number" step="0.01" min="1" class="inp" value="${c.me && c.me.remaining > 0 ? c.me.remaining : c.j.amount}" required></div>
-    <div><label class="text-xs font-semibold block mb-1">صورة الإيصال (لقطة شاشة أو صورة)</label><input name="file" type="file" accept="image/*" class="inp" required></div>
+    <div><label class="text-xs font-semibold block mb-1">المبلغ المحوّل (ريال) — يمكنك دفع جزء أو أكثر من قسط</label><input name="amount" type="number" step="0.01" min="1" class="inp" value="${c.me && c.me.remaining > 0 ? c.me.remaining : c.j.amount}" required>
+      <div class="flex gap-2 flex-wrap mt-2">${c.me && c.me.remaining > 0 ? `<button type="button" class="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold" data-act="pay-fill" data-v="${c.me.remaining}">المتبقي كاملاً ${fmtNum(c.me.remaining)}</button>` : ''}${!(c.me && c.me.remaining === c.j.amount) ? `<button type="button" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold" data-act="pay-fill" data-v="${c.j.amount}">قسط واحد ${fmtNum(c.j.amount)}</button>` : ''}</div></div>
+    <div><label class="text-xs font-semibold block mb-1">صورة الإيصال (لقطة شاشة أو صورة)</label><input name="file" type="file" accept="image/*" class="inp" required><img id="pay-prev" class="hide mt-2 rounded-xl border max-h-44 mx-auto" alt="معاينة الإيصال"></div>
     <div><label class="text-xs font-semibold block mb-1">رقم مرجع الحوالة (اختياري)</label><input name="ref" class="inp" dir="ltr"></div>
     <button class="btn b-pri w-full py-3" type="submit">إرسال الإيصال</button></form>`);
   if (kind === 'mod') showModal('اقتراح تعديل على الشروط', `<form id="f-mod" class="space-y-3"><textarea name="text" rows="3" class="inp" required placeholder="اكتب التعديل المقترح بوضوح..."></textarea>
@@ -2488,6 +2507,70 @@ async function rejectSwap(id, cancel) {
   } catch (e) { toast('تعذر التنفيذ: ' + e.message, 'error'); }
 }
 
+/* ============ دعوة برابط واحد ============ */
+const joinUrl = code => appUrl() + (appUrl().includes('?') ? '&' : '?') + 'join=' + code;
+const joinText = j => `دعوة للانضمام إلى جمعية «${j.name}» — القسط ${fmtNum(j.amount)} ريال ${freqOf(j).every}، عدد الأعضاء ${j.count}.\nانضم من الرابط:\n${joinUrl(j.joinCode)}`;
+const newJoinCode = () => { const a = new Uint8Array(10); crypto.getRandomValues(a); return Array.from(a, b => 'abcdefghjkmnpqrstuvwxyz23456789'[b % 31]).join(''); };
+const linkDoc = (j, open) => ({ jid: j.id, creatorUid: j.creatorUid, creatorName: dispName(state.profile), name: j.name, amount: j.amount, count: j.count, frequency: j.frequency || 'monthly', open, updatedAt: FV.serverTimestamp() });
+function joinCard(c) {
+  const j = c.j; if (!c.canManage) return '';
+  if (!j.joinCode) return c.isCreator ? `<div class="card p-5"><h4 class="font-bold text-sm mb-2"><i class="fa-solid fa-link text-teal-600"></i> رابط الانضمام</h4>
+    <p class="text-[11px] text-slate-500 leading-relaxed mb-3">أنشئ رابطاً واحداً وأرسله في قروب الجمعية، وكل عضو يضغطه وينضم مباشرة دون دعوة فردية.</p>
+    <button class="btn b-pri w-full" data-act="join-create"><i class="fa-solid fa-link"></i> إنشاء رابط الانضمام</button></div>` : '';
+  const open = !!j.joinOpen, free = Math.max(0, j.count - filledOf(j));
+  return `<div class="card p-5"><div class="flex justify-between items-center mb-2"><h4 class="font-bold text-sm"><i class="fa-solid fa-link text-teal-600"></i> رابط الانضمام</h4>${openPill(open && free > 0)}</div>
+    <p class="text-[11px] text-slate-500 leading-relaxed mb-2">${free ? `الأسهم الشاغرة: <b>${free}</b>. ` : 'اكتمل العدد فلن يقبل الرابط أعضاء جدداً. '}كل من يفتح الرابط ويسجّل دخوله ينضم مباشرة.</p>
+    <div class="p-2 bg-slate-50 rounded-xl text-[10px] text-slate-500 break-all" dir="ltr">${esc(joinUrl(j.joinCode))}</div>
+    <div class="flex gap-2 mt-3"><button class="btn b-sec flex-1" data-act="join-copy"><i class="fa-regular fa-copy"></i> نسخ</button><a class="btn b-pri flex-1" target="_blank" rel="noopener" href="${waLink('', joinText(j))}"><i class="fa-brands fa-whatsapp"></i> واتساب</a></div>
+    ${c.isCreator ? `<div class="flex gap-2 mt-2"><button class="btn ${open ? 'b-red' : 'b-sec'} flex-1" data-act="join-toggle">${open ? 'إيقاف الرابط' : 'تفعيل الرابط'}</button><button class="btn b-sec flex-1" data-act="join-regen">رابط جديد</button></div>` : ''}</div>`;
+}
+async function createJoinLink(regen) {
+  const j = state.j; if (!j || j.creatorUid !== state.user.uid) return;
+  if (regen && !confirm('سيتوقف الرابط القديم عن العمل ويُنشأ رابط جديد. متابعة؟')) return;
+  const code = newJoinCode(), b = db.batch();
+  b.update(jref(), { joinCode: code, joinOpen: true });
+  b.set(db.collection('joinLinks').doc(code), linkDoc(j, true));
+  if (j.joinCode) b.delete(db.collection('joinLinks').doc(j.joinCode));
+  try { await b.commit(); toast(regen ? 'أُنشئ رابط جديد' : 'أُنشئ رابط الانضمام'); }
+  catch (e) { toast(e.code === 'permission-denied' ? 'تعذر الإنشاء: انشر أحدث نسخة من قواعد Firestore' : 'تعذر الإنشاء: ' + e.message, 'error'); }
+}
+async function toggleJoin() {
+  const j = state.j; if (!j || j.creatorUid !== state.user.uid || !j.joinCode) return;
+  const open = !j.joinOpen, b = db.batch();
+  b.update(jref(), { joinOpen: open });
+  b.update(db.collection('joinLinks').doc(j.joinCode), { open, updatedAt: FV.serverTimestamp() });
+  try { await b.commit(); toast(open ? 'فُعّل رابط الانضمام' : 'أُوقف رابط الانضمام', open ? 'success' : 'info'); } catch (e) { toast('تعذر التنفيذ: ' + e.message, 'error'); }
+}
+function copyJoinLink() {
+  const j = state.j; if (!j || !j.joinCode) return;
+  if (j.creatorUid === state.user.uid) db.collection('joinLinks').doc(j.joinCode).update(linkDoc(j, !!j.joinOpen)).catch(() => {}); // نحدّث بيانات المعاينة
+  copyText(joinUrl(j.joinCode), 'تم نسخ رابط الانضمام');
+}
+async function checkPendingJoin() {
+  const code = lsGet('jm_join'); if (!code || !state.user || !state.profile || state.isAdmin) return;
+  try { localStorage.removeItem('jm_join'); } catch (e) {}
+  try {
+    const sn = await db.collection('joinLinks').doc(code).get();
+    if (!sn.exists) return toast('رابط الانضمام غير صالح أو أُلغي', 'error');
+    const l = sn.data();
+    if (state.jamiyat.some(j => j.id === l.jid)) { toast('أنت عضو في هذه الجمعية بالفعل', 'info'); return openJamiya(l.jid); }
+    state.joinLink = { code, ...l };
+    showModal('دعوة للانضمام', `<div class="space-y-3"><div class="p-4 bg-teal-50 border border-teal-100 rounded-2xl text-center space-y-1"><p class="text-[11px] text-teal-700">دعاك ${esc(l.creatorName || 'المشرف')} للانضمام إلى</p><p class="text-lg font-black text-teal-900">${esc(l.name)}</p>
+      <p class="text-xs text-slate-600">القسط <b>${fmtNum(l.amount)}</b> ريال ${(FREQS[l.frequency] || FREQS.monthly).every} • ${l.count} أعضاء</p></div>
+      ${l.open ? '' : '<p class="p-3 bg-amber-50 rounded-xl text-xs text-amber-800">هذا الرابط متوقف حالياً، تواصل مع المشرف.</p>'}
+      <div class="flex gap-2"><button class="btn b-sec flex-1" data-act="close">لاحقاً</button>${l.open ? '<button class="btn b-pri flex-1" data-act="join-do"><i class="fa-solid fa-user-plus"></i> انضم الآن</button>' : ''}</div></div>`);
+  } catch (e) { toast('تعذر فتح رابط الانضمام: ' + e.message, 'error'); }
+}
+async function joinFromLink() {
+  const l = state.joinLink; if (!l || !state.user) return;
+  const uid = state.user.uid, ref = db.collection('jamiyat').doc(l.jid), b = db.batch();
+  b.set(db.collection('joins').doc(`${l.jid}__${uid}__${l.code}`), { jid: l.jid, uid, code: l.code, createdAt: FV.serverTimestamp() });
+  b.update(ref, { memberUids: FV.arrayUnion(uid), turns: FV.arrayUnion(uid) });
+  b.set(ref.collection('members').doc(uid), memberDoc(uid, state.profile));
+  try { await b.commit(); closeModal(); toast('تم الانضمام للجمعية 🎉'); notifyJoin({ jamiyaId: l.jid }); state.joinLink = null; openJamiya(l.jid); }
+  catch (e) { toast(e.code === 'permission-denied' ? 'تعذر الانضمام: اكتمل عدد الأعضاء أو أُوقف الرابط أو لم يُوثَّق بريدك بعد' : 'تعذر الانضمام: ' + e.message, 'error'); }
+}
+
 /* ============ التوجيه والأحداث ============ */
 /* ============ تطبيق PWA: التثبيت والتحديث ============ */
 let deferredPrompt = null;
@@ -2495,6 +2578,14 @@ const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: stan
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const ibKey = 'jm_ib_dismiss';
 function ibDismissed() { try { return Date.now() - Number(localStorage.getItem(ibKey) || 0) < 3 * 86400000; } catch (e) { return false; } }
+// رابط الانضمام: نحفظ الرمز عند فتح الرابط (حتى لو احتاج المستخدم للتسجيل أولاً) ثم نعالجه بعد الدخول
+(function () {
+  try {
+    const q = new URLSearchParams(location.search), c = q.get('join');
+    if (c && /^[a-z0-9]{8,20}$/i.test(c)) localStorage.setItem('jm_join', c);
+    if (q.has('join')) { q.delete('join'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '')); }
+  } catch (e) {}
+})();
 function launchAction() {
   try { const a = new URLSearchParams(location.search).get('action'); if (a) history.replaceState(null, '', location.pathname); return a === 'create' ? 'create' : null; } catch (e) { return null; }
 }
@@ -2611,6 +2702,8 @@ const actions = {
   'chat-open': openChat, 'chat-toggle': toggleChatOpen, 'chat-del': el => chatDelete(el.dataset.id),
   'copy-iban': el => copyText(el.dataset.v, 'تم نسخ الآيبان'),
   'share-modal': openShareModal, 'share-yes': el => approveShare(el.dataset.uid), 'share-no': el => rejectShare(el.dataset.uid), 'share-cancel': cancelShare,
+  'join-create': () => createJoinLink(false), 'join-regen': () => createJoinLink(true), 'join-toggle': toggleJoin, 'join-copy': copyJoinLink, 'join-do': joinFromLink,
+  'pay-fill': el => { const i = document.querySelector('#f-pay [name=amount]'); if (i) i.value = el.dataset.v; },
   'swap-modal': el => openSwapModal(+el.dataset.i), 'swap-yes': el => approveSwap(el.dataset.id), 'swap-no': el => rejectSwap(el.dataset.id, false), 'swap-cancel': el => rejectSwap(el.dataset.id, true)
 };
 document.addEventListener('click', e => {
