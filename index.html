@@ -182,7 +182,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2.4<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2.5<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -2802,7 +2802,9 @@ async function handleCreateFamily(f) {
 const famEnd = j => j.endAt && j.endAt.toDate ? j.endAt.toDate() : new Date((j.endDate || '') + 'T23:59:59');
 function famCycle(j) { const [y, m] = String(j.famStart || '').split('-').map(Number); if (!y) return 0; const n = new Date(); return Math.max(0, (n.getFullYear() - y) * 12 + n.getMonth() - (m - 1)); }
 const famCycle1 = j => j.mode === 'monthly' ? famCycle(j) : 0;
-const famOwed = (j, pl) => { if (!pl) return 0; const a = Number(pl.amount) || 0; return j.mode === 'monthly' ? r2(a * Math.max(0, famCycle(j) - (Number(pl.from) || 0) + 1)) : a; };
+// المبلغ الشهري الساري في الشهر k: يتغير حسب سجل pl.hist (كل عنصر {c: الشهر الذي يبدأ منه، a: المبلغ})
+function famAmtAt(pl, k) { const h = Array.isArray(pl.hist) ? pl.hist : null; if (!h || !h.length) return Number(pl.amount) || 0; let a = Number(h[0].a) || 0; h.forEach(x => { if (Number(x.c) <= k) a = Number(x.a) || 0; }); return a; }
+const famOwed = (j, pl) => { if (!pl) return 0; if (j.mode !== 'monthly') return Number(pl.amount) || 0; const from = Number(pl.from) || 0, cur = famCycle(j); let t = 0; for (let k = from; k <= cur; k++) t += famAmtAt(pl, k); return r2(t); };
 function famState(j) {
   if (j.mode === 'monthly') return { monthly: true, end: null, ended: false, open: !j.closed, left: 0, cycle: famCycle(j), reached: !!j.reached };
   const end = famEnd(j), now = Date.now(), ended = now > end.getTime(); return { monthly: false, end, ended, open: !j.closed && !ended, left: Math.max(0, Math.ceil((end.getTime() - now) / DAY_MS)) };
@@ -2855,11 +2857,12 @@ function vFamily(c) {
       const lab = mo ? (fixed ? 'انضم بـ ' + fmtNum(fixed) + ' ريال شهرياً' : 'حدّد قيمتي الشهرية') : 'حدّد مساهمتي';
       return card(ttl, `<p class="text-xs text-slate-500 leading-relaxed">${intro}</p>${fs.open ? `<div class="grid ${mgr ? 'grid-cols-2' : 'grid-cols-1'} gap-2"><button class="btn b-sec ${mgr ? '' : '!bg-violet-600 !text-white py-3'}" data-act="pledge-modal"><i class="fa-solid fa-hand-holding-heart"></i> ${lab}</button>${mgr ? payBtn : ''}</div>` : ''}`);
     }
-    const canEdit = fs.open && !(mo && (fixed || sm.conf + sm.pend > 0));
+    const canEdit = fs.open && !(mo && fixed), cyc = famCycle(j), review = mo && !mgr && !fixed && fs.open && cyc >= (Number(pl.from) || 0) && pl.chk !== cyc;
     return card(ttl, `<div class="grid grid-cols-4 gap-1.5 text-center text-[11px]"><div class="p-2 bg-violet-50 rounded-xl"><b class="block text-sm">${fmtNum(amt)}</b>${mo ? 'شهرياً' : 'تعهدت'}</div><div class="p-2 bg-emerald-50 rounded-xl"><b class="block text-sm">${fmtNum(sm.conf)}</b>مسدد</div><div class="p-2 bg-sky-50 rounded-xl"><b class="block text-sm">${fmtNum(sm.pend)}</b>بانتظار</div><div class="p-2 bg-amber-50 rounded-xl"><b class="block text-sm">${fmtNum(left)}</b>المتبقي</div></div>
       ${mo ? `<p class="text-[11px] text-slate-500">المستحق حتى الآن <b>${fmtNum(owed)}</b> ريال عن ${months} ${months === 1 ? 'شهر' : 'أشهر'} • يوم السداد ${j.monthlyDay} من كل شهر</p>` : ''}
       <div class="bar"><i style="width:${mp}%"></i></div>
-      ${fs.open ? `<div class="grid ${canEdit ? 'grid-cols-2' : 'grid-cols-1'} gap-2">${canEdit ? '<button class="btn b-sec" data-act="pledge-modal"><i class="fa-solid fa-pen"></i> تعديل المبلغ</button>' : ''}${payBtn}</div>${mgr || mo ? '' : '<p class="text-[10px] text-slate-400 leading-relaxed">«تعديل المبلغ» لتغيير قيمة مساهمتك، و«تأكيد السداد» بعد التحويل لرفع الإيصال.</p>'}` : ''}`);
+      ${review ? `<div class="p-3 bg-amber-50 border border-amber-100 rounded-2xl space-y-2"><p class="text-xs font-bold text-amber-900">🗓 شهر جديد: مساهمتك الشهرية <b>${fmtNum(amt)}</b> ريال. هل تبقيها كما هي أم تعدّلها؟</p><div class="grid grid-cols-2 gap-2"><button class="btn b-sec" data-act="pledge-keep"><i class="fa-solid fa-check"></i> أبقِها كما هي</button><button class="btn b-sec" data-act="pledge-modal"><i class="fa-solid fa-pen"></i> عدّل المبلغ</button></div></div>` : ''}
+      ${fs.open ? `<div class="grid ${canEdit ? 'grid-cols-2' : 'grid-cols-1'} gap-2">${canEdit ? '<button class="btn b-sec" data-act="pledge-modal"><i class="fa-solid fa-pen"></i> ' + (mo ? 'تعديل مبلغ هذا الشهر' : 'تعديل المبلغ') + '</button>' : ''}${payBtn}</div>${mgr || mo ? (mo && !mgr && !fixed ? '<p class="text-[10px] text-slate-400 leading-relaxed">يحق لك كل شهر إبقاء مبلغك أو تعديله؛ يسري التعديل من الشهر الحالي وتبقى الأشهر السابقة بمبلغها.</p>' : '') : '<p class="text-[10px] text-slate-400 leading-relaxed">«تعديل المبلغ» لتغيير قيمة مساهمتك، و«تأكيد السداد» بعد التحويل لرفع الإيصال.</p>'}` : ''}`);
   })() : '';
   const acct = !mgr && isMember ? card('<i class="fa-solid fa-building-columns text-violet-600"></i> حساب المستفيد', `<div class="flex items-center justify-between gap-3"><div class="min-w-0 text-xs"><p class="text-slate-500">${esc(j.creatorName)} • ${esc(j.benBank || '')}</p><p class="font-black text-sm break-all" dir="ltr">${esc(j.benIban || '')}</p></div><button class="btn b-sec flex-none" data-act="copy-iban" data-v="${esc(fixIban(j.benIban))}"><i class="fa-regular fa-copy"></i> نسخ</button></div>`) : '';
   const rs = j.reasons || '';
@@ -2937,13 +2940,13 @@ function openPledgeModal() {
   const c = ctx(); if (!c || !c.family) return; const j = c.j, fs = famState(j), uid = state.user.uid, mo = fs.monthly, fixed = Number(j.monthlyAmount) || 0;
   if (!fs.open) return toast('باب المساهمة مغلق', 'error');
   const pl = state.pledges[uid], sm = famSums(uid), paid = r2(sm.conf + sm.pend);
-  if (mo && pl && (fixed || paid > 0)) return toast(fixed ? 'القيمة الشهرية ثابتة ومحددة من المشرف' : 'القيمة الشهرية ثابتة ولا تتغير بعد بدء السداد', 'info');
+  if (mo && pl && fixed) return toast('القيمة الشهرية ثابتة ومحددة من المشرف', 'info');
   if (mo && fixed) return showModal('الانضمام بالاشتراك الشهري', `<form id="f-pledge" class="space-y-3"><div class="p-4 bg-violet-50 border border-violet-100 rounded-2xl text-center space-y-1"><p class="text-[11px] text-violet-700">الاشتراك الشهري الثابت</p><p class="text-2xl font-black text-violet-900">${fmtNum(fixed)} <span class="text-sm">ريال</span></p></div>
     <p class="text-xs text-slate-600 leading-relaxed">يصلك تذكير في يوم ${j.monthlyDay} من كل شهر، ويكتمل التعاون عند بلوغ المبلغ المستهدف.</p><input type="hidden" name="amount" value="${fixed}"><button class="btn b-pri w-full py-3" type="submit">أؤكد الانضمام</button></form>`);
-  showModal(mo ? 'قيمتي الشهرية الثابتة' : 'تحديد مساهمتي', `<form id="f-pledge" class="space-y-3"><p class="text-xs text-slate-600 leading-relaxed">${mo ? `اختر المبلغ الذي ستساهم به كل شهر، وهو ثابت طوال مدة التعاون. سيصلك تذكير في يوم ${j.monthlyDay} من كل شهر، ويكتمل التعاون عند بلوغ المبلغ المستهدف.` : `حدّد المبلغ الذي تنوي المساهمة به. ليس عليك التحويل الآن: سدّد متى تيسّر قبل ${fmtDate(fs.end)} ثم ارفع الإيصال من زر «تأكيد السداد».`}</p>
+  showModal(mo ? (pl ? 'تعديل مبلغي الشهري' : 'قيمتي الشهرية') : 'تحديد مساهمتي', `<form id="f-pledge" class="space-y-3"><p class="text-xs text-slate-600 leading-relaxed">${mo ? `اختر المبلغ الذي ستساهم به كل شهر. ${pl ? 'يسري التعديل من هذا الشهر، وتبقى الأشهر السابقة بمبلغها، ويمكنك تعديله في أي شهر لاحق. ' : 'يمكنك إبقاؤه أو تعديله في أي شهر. '}سيصلك تذكير في يوم ${j.monthlyDay} من كل شهر، ويكتمل التعاون عند بلوغ المبلغ المستهدف.` : `حدّد المبلغ الذي تنوي المساهمة به. ليس عليك التحويل الآن: سدّد متى تيسّر قبل ${fmtDate(fs.end)} ثم ارفع الإيصال من زر «تأكيد السداد».`}</p>
     <div class="grid grid-cols-4 gap-2">${[500, 1000, 2000, 3000].map(v => `<button type="button" class="py-2.5 rounded-xl bg-violet-50 text-violet-700 text-xs font-black border border-violet-100" data-act="pledge-fill" data-v="${v}">${fmtNum(v)}</button>`).join('')}</div>
     <div><label class="text-xs font-semibold block mb-1">أو اكتب مبلغاً آخر (ريال${mo ? ' شهرياً' : ''})</label><input name="amount" type="number" min="1" step="1" class="inp" required value="${pl ? pl.amount : ''}"></div>
-    <button class="btn b-pri w-full py-3" type="submit">${pl ? 'تحديث' : (mo ? 'تثبيت قيمتي الشهرية' : 'تحديد مساهمتي')}</button>
+    <button class="btn b-pri w-full py-3" type="submit">${pl ? 'تحديث' : (mo ? 'حفظ قيمتي الشهرية' : 'تحديد مساهمتي')}</button>
     ${pl && !paid ? '<button type="button" class="btn b-red w-full" data-act="pledge-del">إلغاء تعهدي</button>' : ''}</form>`);
 }
 async function submitPledge(f) {
@@ -2953,9 +2956,16 @@ async function submitPledge(f) {
   if (!(amount >= 1)) return toast('المبلغ غير صحيح', 'error');
   if (mo && fixed && amount !== fixed) return toast('الاشتراك الشهري ثابت ومحدد من المشرف', 'error');
   const sm = famSums(uid), paid = r2(sm.conf + sm.pend);
-  if (mo && old && paid > 0 && amount !== Number(old.amount)) return toast('القيمة الشهرية ثابتة ولا تتغير بعد بدء السداد', 'error');
   if (!mo && amount < paid) return toast(`لا يقل المبلغ عما سددته (${fmtNum(paid)} ريال)`, 'error');
-  const doc = { uid, amount, updatedAt: FV.serverTimestamp() }; if (mo) doc.from = old ? (Number(old.from) || 0) : famCycle(j);
+  const doc = { uid, amount, updatedAt: FV.serverTimestamp() };
+  if (mo) {
+    const cyc = famCycle(j); doc.from = old ? (Number(old.from) || 0) : cyc; doc.chk = cyc;
+    if (old) { // تعديل: يسري من الشهر الحالي ويحفظ ما سبق
+      const h = (Array.isArray(old.hist) && old.hist.length ? old.hist : [{ c: Number(old.from) || 0, a: Number(old.amount) || 0 }]).map(x => ({ c: Number(x.c), a: Number(x.a) })).filter(x => x.c < cyc);
+      if (!h.length || h[h.length - 1].a !== amount) h.push({ c: Math.max(cyc, h.length ? 0 : doc.from), a: amount });
+      if (h.length > 1) doc.hist = h; // مقطع واحد = مبلغ ثابت، فلا حاجة للسجل
+    }
+  }
   const first = !old, w = mo ? 'قيمته الشهرية' : 'مساهمته';
   try {
     await jref().collection('pledges').doc(uid).set(doc);
@@ -2963,6 +2973,11 @@ async function submitPledge(f) {
     logEvent(j.id, 'pledge', `${dispName(state.profile)} ${first ? 'حدد' : 'عدّل'} ${w} بمبلغ ${fmtNum(amount)} ريال`);
     sendNotifs([j.creatorUid], first ? 'تعهد جديد بمساهمة' : 'تعديل مبلغ مساهمة', `${dispName(state.profile)} ${first ? 'حدد' : 'عدّل'} ${w} في «${j.name}»: ${fmtNum(amount)} ريال${mo ? ' شهرياً' : ''}`, j.id, 'pledge');
   } catch (e) { toast(e.code === 'permission-denied' ? 'تعذر الحفظ: التعاون مغلق أو لم تُنشر قواعد Firestore المحدّثة' : 'تعذر الحفظ: ' + e.message, 'error'); }
+}
+async function keepPledge() { // «أبقِها كما هي»: تأكيد المبلغ الحالي لهذا الشهر
+  const c = ctx(); if (!c || !c.family) return; const j = c.j, uid = state.user.uid, pl = state.pledges[uid]; if (!pl) return;
+  try { await jref().collection('pledges').doc(uid).update({ chk: famCycle(j), updatedAt: FV.serverTimestamp() }); toast('أُبقي مبلغك الشهري كما هو'); logEvent(j.id, 'pledge', `${dispName(state.profile)} أبقى قيمته الشهرية ${fmtNum(pl.amount)} ريال`); }
+  catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
 }
 async function deletePledge() {
   const c = ctx(); if (!c || !c.family) return;
@@ -3140,7 +3155,7 @@ const actions = {
   'go-create': () => { state.createType = 'jamiya'; state.view = 'create'; render(); },
   'ctype': el => { state.createType = el.dataset.v; render(); },
   'fam-pay': openFamilyPay, 'fam-self': openSelfContrib, 'fam-remind': famRemind, 'jam-tab': el => { state.jamTab = el.dataset.v; render(); window.scrollTo({ top: 0 }); },
-  'fam-tab': el => { state.famTab = el.dataset.v; render(); window.scrollTo({ top: 0 }); }, 'pledge-modal': openPledgeModal, 'pledge-del': deletePledge, 'pledge-fill': el => { const i = document.querySelector('#f-pledge [name=amount]'); if (i) i.value = el.dataset.v; }, 'fam-reject': el => rejectFamilyPay(el.dataset.id), 'fam-edit': openFamilyEdit, 'fam-toggle': toggleFamClosed,
+  'fam-tab': el => { state.famTab = el.dataset.v; render(); window.scrollTo({ top: 0 }); }, 'pledge-modal': openPledgeModal, 'pledge-del': deletePledge, 'pledge-keep': keepPledge, 'pledge-fill': el => { const i = document.querySelector('#f-pledge [name=amount]'); if (i) i.value = el.dataset.v; }, 'fam-reject': el => rejectFamilyPay(el.dataset.id), 'fam-edit': openFamilyEdit, 'fam-toggle': toggleFamClosed,
   'go-profile': () => { state.view = 'profile'; render(); },
   'go-admin': () => { state.view = 'admin'; render(); loadAdmin(); },
   'logout': async () => { if (state.user) ssDel('jm_sess_' + state.user.uid); stopHeartbeat(); await Promise.race([unregisterPush(), new Promise(r => setTimeout(r, 3000))]); auth.signOut(); },
