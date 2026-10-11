@@ -932,7 +932,7 @@ async function confirmPayment(payId) {
     const jr = db.collection('jamiyat').doc(state.j.id), b = db.batch();
     b.update(jr.collection('payments').doc(payId), { status: 'confirmed' });
     const jj = state.j, upd = {}; if (!jj.hasConfirmed) upd.hasConfirmed = true; // علامة دائمة: بعد أول سداد مقبول لا يحذف المشرف الجمعية
-    const reached = jj.type === 'family' && jj.mode === 'monthly' && !jj.closed && Number(jj.targetAmount) > 0 && !!pay && r2(famStats().confirmed + Number(pay.amount)) >= Number(jj.targetAmount);
+    const reached = !!pay && famAutoClose(jj, payId, pay.amount);
     if (reached) { upd.closed = true; upd.reached = true; }
     if (Object.keys(upd).length) b.update(jr, upd);
     await b.commit();
@@ -2809,6 +2809,11 @@ function famState(j) {
   if (j.mode === 'monthly') return { monthly: true, end: null, ended: false, open: !j.closed, left: 0, cycle: famCycle(j), reached: !!j.reached };
   const end = famEnd(j), now = Date.now(), ended = now > end.getTime(); return { monthly: false, end, ended, open: !j.closed && !ended, left: Math.max(0, Math.ceil((end.getTime() - now) / DAY_MS)) };
 }
+// إجمالي المؤكد دون دفعة بعينها: يمنع عدّها مرتين إن كانت لقطة Firestore قد حدّثت state.payments قبل الفحص
+const famConfirmedExcept = id => r2(state.payments.filter(p => p.status === 'confirmed' && p.id !== id).reduce((t, p) => t + (Number(p.amount) || 0), 0));
+// يُغلق التعاون الشهري تلقائياً فقط عند بلوغ المؤكد للهدف ولا يبقى أي إيصال معلّق (exceptId: الدفعة الجارية، add: مبلغها إن صارت مؤكدة)
+const famAutoClose = (j, exceptId, add) => j.type === 'family' && j.mode === 'monthly' && !j.closed && Number(j.targetAmount) > 0
+  && r2(famConfirmedExcept(exceptId) + (Number(add) || 0)) >= Number(j.targetAmount) && !state.payments.some(p => p.status === 'pending' && p.id !== exceptId);
 function famStats() {
   const ps = state.payments, sum = a => r2(a.reduce((t, p) => t + (Number(p.amount) || 0), 0));
   const conf = ps.filter(p => p.status === 'confirmed'), pend = ps.filter(p => p.status === 'pending');
@@ -2909,7 +2914,7 @@ async function submitSelfContrib(f) {
     await pr.set({ month: famCycle1(j), uid, name: dispName(state.profile), amount, ref: f.ref.value.trim(), hasProof: false, status: 'pending', recipientUid: j.creatorUid, createdAt: FV.serverTimestamp() });
     await pr.update({ status: 'confirmed' });
     const upd = {}; if (!j.hasConfirmed) upd.hasConfirmed = true;
-    if (j.mode === 'monthly' && !j.closed && Number(j.targetAmount) > 0 && r2(famStats().confirmed + amount) >= Number(j.targetAmount)) { upd.closed = true; upd.reached = true; }
+    if (famAutoClose(j, pr.id, amount)) { upd.closed = true; upd.reached = true; }
     if (Object.keys(upd).length) await ref.update(upd).catch(() => {});
     closeModal(); toast('سُجّلت مساهمتك'); logEvent(j.id, 'pay', `${dispName(state.profile)} سجّل مساهمة شخصية بمبلغ ${fmtNum(amount)} ريال`);
   } catch (e) { btn.disabled = false; toast('تعذر التسجيل: ' + e.message, 'error'); }
@@ -3025,6 +3030,7 @@ async function rejectFamilyPay(payId) {
   const ref = jref(), b = db.batch(); b.delete(ref.collection('payments').doc(payId)); b.delete(ref.collection('proofs').doc(payId));
   try {
     await b.commit(); toast('رُفض الإيصال', 'info');
+    if (famAutoClose(c.j, payId, 0)) { await ref.update({ closed: true, reached: true }).catch(() => {}); sendNotifs(c.j.memberUids, 'اكتمل الهدف 🎉', `بلغ تعاون «${c.j.name}» مبلغه المستهدف، جزاكم الله خيراً`, c.j.id, 'family'); logEvent(c.j.id, 'family', 'اكتمل المبلغ المستهدف وأُغلق التعاون تلقائياً'); }
     sendNotifs([p.uid], 'لم يُقبل إيصالك', `تعاون «${c.j.name}»: لم يُقبل إيصال ${fmtNum(p.amount)} ريال، تواصل مع المستفيد وارفع إيصالاً صحيحاً`, c.j.id, 'pay');
     logEvent(c.j.id, 'pay', `${dispName(state.profile)} رفض إيصالاً بقيمة ${fmtNum(p.amount)} ريال من ${p.name || 'عضو'}`);
   } catch (e) { toast('تعذر التنفيذ: ' + e.message, 'error'); }
