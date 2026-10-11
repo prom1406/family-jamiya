@@ -182,7 +182,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2.2</footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2.2<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -514,6 +514,7 @@ async function doGoogle() {
   catch (e) { toast(authErr(e), 'error'); }
 }
 async function doCompleteProfile(f) {
+  if (f.terms && !f.terms.checked) return toast('يجب الموافقة على الشروط وسياسة الخصوصية', 'error');
   if (state.settings.regClosed && !state.isAdmin) return toast(state.settings.regMsg || 'التسجيل الجديد متوقف مؤقتاً', 'error');
   const phone = normPhone(f.phone.value), bank = resolveBank(f), iban = fixIban(f.iban.value);
   if (bank === null) return;
@@ -2018,7 +2019,7 @@ function vAuth() {
       ${m === 'register' ? '<div><label class="text-xs font-semibold block mb-1">الاسم الثلاثي</label><input name="name" class="inp" required></div>' : ''}
       <div><label class="text-xs font-semibold block mb-1">البريد الإلكتروني</label><input name="email" type="email" dir="ltr" class="inp" required></div>
       ${m !== 'reset' ? '<div><label class="text-xs font-semibold block mb-1">كلمة المرور</label><input name="password" type="password" class="inp" required minlength="6"></div>' : ''}
-      ${m === 'register' ? bankFields() + '<label class="flex items-center gap-2 text-xs"><input type="checkbox" name="terms"> أوافق على الشروط والأحكام وسياسة الخصوصية</label>' : ''}
+      ${m === 'register' ? bankFields() + '<label class="flex items-center gap-2 text-xs"><input type="checkbox" name="terms"> أوافق على <a href=\"privacy.html#terms\" target=\"_blank\" rel=\"noopener\" class=\"underline text-emerald-700\">الشروط والأحكام</a> و<a href=\"privacy.html#privacy\" target=\"_blank\" rel=\"noopener\" class=\"underline text-emerald-700\">سياسة الخصوصية</a></label>' : ''}
       <button class="btn b-pri w-full py-3 text-sm" type="submit">${m === 'login' ? 'دخول' : m === 'register' ? 'إنشاء الحساب' : 'إرسال رابط الاستعادة'}</button>
     </form>
     <div class="text-center mt-5 space-y-1">
@@ -2038,7 +2039,7 @@ function vVerify() {
 function vComplete() {
   return `<div class="max-w-md mx-auto card p-8"><h3 class="text-xl font-bold text-center mb-1">أكمل بيانات حسابك</h3>
     <p class="text-xs text-slate-500 text-center mb-5">مرحباً ${esc(state.user.displayName || '')}، نحتاج بيانات الجوال والتحويل البنكي لتستلم دورك.</p>
-    <form id="f-complete" class="space-y-3">${bankFields()}<button class="btn b-pri w-full py-3" type="submit">حفظ ومتابعة</button></form></div>`;
+    <form id="f-complete" class="space-y-3">${bankFields()}<label class="flex items-start gap-2 text-xs"><input type="checkbox" name="terms" class="mt-0.5"> <span>أوافق على <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline text-emerald-700">الشروط والأحكام</a> و<a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline text-emerald-700">سياسة الخصوصية</a></span></label><button class="btn b-pri w-full py-3" type="submit">حفظ ومتابعة</button></form></div>`;
 }
 
 function vHome() {
