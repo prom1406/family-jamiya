@@ -182,7 +182,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2.2<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2.3<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -843,7 +843,7 @@ function openExportModal() {
 function openJamiya(id) {
   cleanup(state.jUnsubs); state.jInviteSub = false; state.gotM = state.gotP = false;
   if (state.afterOpen && state.afterOpen.id !== id) state.afterOpen = null;
-  state.activeId = id; state.j = null; state.members = {}; state.payments = []; state.jInvites = []; state.wishes = {}; state.wishMode = null; state.shareReqs = {}; state.shareMode = null; state.swapReqs = []; state.pledges = {}; state.famTab = 'overview';
+  state.activeId = id; state.j = null; state.members = {}; state.payments = []; state.jInvites = []; state.wishes = {}; state.wishMode = null; state.shareReqs = {}; state.shareMode = null; state.swapReqs = []; state.pledges = {}; state.famTab = 'overview'; state.jamTab = 'overview';
   state.view = 'jamiya'; render();
   const ref = db.collection('jamiyat').doc(id);
   state.jUnsubs.push(stopChat, () => { if (state.wishUnsub) { state.wishUnsub(); state.wishUnsub = null; } if (state.shareUnsub) { state.shareUnsub(); state.shareUnsub = null; } if (state.pledgeUnsub) { state.pledgeUnsub(); state.pledgeUnsub = null; } });
@@ -2101,16 +2101,19 @@ function vJamiya() {
   const badge = { recipient: ['المستلم', 'bg-amber-100 text-amber-800'], confirmed: ['تم السداد', 'bg-emerald-100 text-emerald-700'], pending: ['بانتظار التأكيد', 'bg-sky-100 text-sky-700'], partial: ['سداد جزئي', 'bg-orange-100 text-orange-700'], unpaid: ['لم يسدد', 'bg-rose-100 text-rose-700'], wait: ['لم تبدأ', 'bg-slate-100 text-slate-500'] };
   const canReorder = c.isCreator && !c.started;
 
-  const recBox = c.finished ? `<div class="bg-slate-800 text-white p-6 rounded-3xl"><h3 class="text-lg font-black">اكتملت الجمعية 🎉</h3><p class="text-xs text-slate-300 mt-1">استلم جميع الأعضاء أدوارهم.</p></div>`
-    : `<div class="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-6 rounded-3xl shadow-lg"><div class="flex flex-wrap justify-between items-center gap-4">
-      <div><p class="text-xs font-bold text-yellow-100">${c.started ? 'مستلم دفعة ' + periodLabel(j, c.cur) : 'أول مستلم (لم تبدأ الجمعية بعد)'}</p>
-      <h3 class="text-xl font-black">${c.rec ? esc(dispName(c.rec)) : 'لم يكتمل ترتيب الأعضاء'}</h3>
-      ${c.rec ? `<p class="text-xs text-amber-100 mt-1">${esc(c.rec.bank)} ${c.rec.iban ? '• <span dir="ltr">' + esc(c.rec.iban) + '</span> <button class="mr-1 px-2 py-0.5 bg-white/25 rounded-lg text-[11px] font-bold" data-act="copy-iban" data-v="' + esc(fixIban(c.rec.iban)) + '"><i class="fa-regular fa-copy"></i> نسخ الآيبان</button>' : ''}</p>` : ''}
-      <p class="text-xs text-amber-100 mt-1">آخر موعد للسداد: ${fmtDate(due)} • الاستلام: ${fmtDate(payout)}</p></div>
-      <div>${c.isRec ? '<span class="px-3 py-1 bg-yellow-300 text-slate-900 text-xs font-bold rounded-xl">أنت مستلم هذه الدورة</span>'
-        : !c.started || !j.memberUids.includes(uid) ? ''
-        : me && ['unpaid', 'partial'].includes(me.status) ? `<div class="text-center space-y-1.5"><div class="text-[11px] text-amber-50">المتبقي عليك <b>${fmtNum(me.remaining)}</b> ريال</div><button class="btn bg-white text-orange-600" data-act="pay-modal"><i class="fa-solid fa-file-arrow-up"></i> رفع إثبات السداد</button></div>`
-        : me ? `<div class="text-center space-y-1.5"><span class="px-3 py-1.5 bg-white/20 rounded-xl text-xs font-bold inline-block">${me.status === 'confirmed' ? 'تم تأكيد سدادك ✓' : 'إيصالك بانتظار تأكيد المستلم'}</span>${me.credit > 0 ? `<div class="text-[11px] text-amber-50">رصيد مقدّم ${fmtNum(me.credit)} ريال</div>` : ''}<button class="text-[11px] underline text-amber-50" data-act="pay-modal">دفعة مقدّمة</button></div>` : ''}</div></div></div>`;
+  const action = c.isRec ? '<div class="text-center"><span class="px-3 py-1.5 bg-yellow-300 text-slate-900 text-xs font-bold rounded-xl">أنت مستلم هذه الدورة</span></div>'
+    : !c.started || !j.memberUids.includes(uid) ? ''
+    : me && ['unpaid', 'partial'].includes(me.status) ? `<div class="rounded-2xl bg-white p-3 text-slate-800 flex items-center justify-between gap-3"><div class="text-xs"><span class="text-slate-500">المتبقي عليك</span><b class="block text-base text-rose-600">${fmtNum(me.remaining)} ريال</b></div><button class="btn b-pri" data-act="pay-modal"><i class="fa-solid fa-file-arrow-up"></i> رفع إثبات السداد</button></div>`
+    : me ? `<div class="rounded-2xl bg-white/20 p-3 text-center space-y-1.5"><b class="text-xs">${me.status === 'confirmed' ? 'تم تأكيد سدادك ✓' : 'إيصالك بانتظار تأكيد المستلم'}</b>${me.credit > 0 ? `<div class="text-[11px] text-emerald-50">رصيد مقدّم ${fmtNum(me.credit)} ريال</div>` : ''}<button class="text-[11px] underline" data-act="pay-modal">دفعة مقدّمة</button></div>` : '';
+  const recBox = c.finished ? `<div class="rounded-3xl p-6 text-white shadow-lg" style="background:linear-gradient(135deg,#1e293b,#334155)"><h3 class="text-lg font-black">اكتملت الجمعية 🎉</h3><p class="text-xs text-slate-300 mt-1">استلم جميع الأعضاء أدوارهم.</p></div>`
+    : `<div class="rounded-3xl p-5 text-white shadow-lg space-y-4" style="background:linear-gradient(135deg,#047857,#059669 55%,#34d399)">
+      <div class="flex justify-between items-start gap-3"><div class="min-w-0"><p class="text-[11px] text-emerald-100 font-bold">${c.started ? 'مستلم دفعة ' + periodLabel(j, c.cur) : 'أول مستلم (لم تبدأ الجمعية بعد)'}</p>
+        <h3 class="text-xl font-black leading-snug">${c.rec ? esc(dispName(c.rec)) : 'لم يكتمل ترتيب الأعضاء'}</h3></div>
+        <span class="flex-none px-2.5 py-1 rounded-full text-[10px] font-black bg-white/25">${c.started ? 'الدورة ' + (c.cur + 1) + ' من ' + j.count : 'لم تبدأ'}</span></div>
+      ${c.rec && c.rec.iban ? `<div class="rounded-2xl bg-white/15 p-3 flex items-center justify-between gap-2"><div class="min-w-0 text-xs"><p class="text-emerald-100">${esc(c.rec.bank || '')}</p><p class="font-black break-all" dir="ltr">${esc(c.rec.iban)}</p></div><button class="flex-none px-3 py-1.5 bg-white/25 rounded-xl text-[11px] font-bold" data-act="copy-iban" data-v="${esc(fixIban(c.rec.iban))}"><i class="fa-regular fa-copy"></i> نسخ</button></div>` : ''}
+      <div class="grid grid-cols-2 gap-2 text-center"><div class="rounded-2xl bg-white/15 py-2"><span class="text-[10px] text-emerald-100 block">آخر موعد للسداد</span><b class="text-xs">${fmtDate(due)}</b></div><div class="rounded-2xl bg-white/15 py-2"><span class="text-[10px] text-emerald-100 block">موعد الاستلام</span><b class="text-xs">${fmtDate(payout)}</b></div></div>
+      <div><div class="flex justify-between text-[11px] text-emerald-100 mb-1"><span>المؤكد ${money(collected)}</span><span>من ${money(target)} • ${pct}%</span></div><div class="h-2.5 rounded-full bg-white/25 overflow-hidden"><div class="h-full rounded-full bg-white" style="width:${pct}%"></div></div></div>
+      ${action}</div>`;
 
   const rows = c.turns.map((u, i) => {
     const nSh = sharesOf(c.turns, u);
@@ -2152,29 +2155,31 @@ function vJamiya() {
     return `<div class="flex justify-between text-xs py-1.5 border-b border-slate-100 ${i === c.cur && c.started && !c.finished ? 'font-bold text-emerald-700' : ''}"><span>${i + 1}. ${periodLabel(j, i)}</span><span>${m ? esc(dispName(m)) : '— شاغر —'}</span></div>`;
   }).join('');
 
-  return `<div class="space-y-5">
-    <div class="card p-6 flex flex-wrap justify-between items-center gap-4">
-      <div><button class="text-xs text-slate-400 mb-1" data-act="go-home">← رجوع</button><h2 class="text-2xl font-black">${j.icon ? esc(j.icon) + ' ' : ''}${esc(j.name)}</h2>
-      <p class="text-xs text-slate-500 mt-1">${freqOf(j).label} • القسط ${money(j.amount)} • السداد حتى يوم ${j.lastDay}${freqOf(j).days ? ' من الدورة' : ''} • الاستلام يوم ${j.payDay}${freqOf(j).days ? ' من الدورة' : ''} • تبدأ ${fmtDate(new Date(j.startDate + 'T00:00:00'))}</p></div>
-      <div class="chips w-full md:w-auto md:flex-wrap">
-        ${c.canManage ? `${filledOf(j) >= j.count ? '<button class="btn b-sec" data-act="full-note"><i class="fa-solid fa-user-check"></i> اكتمل العدد</button>' : '<button class="btn b-pri" data-act="invite-modal"><i class="fa-solid fa-user-plus"></i> دعوة عضو</button>'}<button class="btn b-sec" data-act="remind"><i class="fa-solid fa-bell"></i> تذكير بالبريد</button><button class="btn bg-emerald-50 text-emerald-700" data-act="wa-remind"><i class="fa-brands fa-whatsapp"></i> تذكير واتساب</button>` : ''}${c.isCreator ? `<button class="btn b-sec" data-act="notif-modal"><i class="fa-solid fa-bullhorn"></i> إشعار للأعضاء</button><button class="btn b-sec" data-act="deputy-modal"><i class="fa-solid fa-user-shield"></i> نائب المشرف</button><button class="btn b-sec" data-act="edit-modal"><i class="fa-solid fa-gear"></i> تعديل</button><button class="btn b-red" data-act="delete-modal"><i class="fa-solid fa-trash"></i> حذف</button>` : ''}
-        <button class="btn b-sec" data-act="export-modal"><i class="fa-solid fa-file-export"></i> تصدير الكشف</button>
-        <button class="btn b-sec" data-act="add-cal"><i class="fa-solid fa-calendar-plus"></i> أضف للتقويم</button>
-        <button class="btn b-sec" data-act="mod-modal"><i class="fa-solid fa-pen-to-square"></i> اقتراح تعديل</button></div></div>
-    ${modBox}${recBox}
-    <div class="grid md:grid-cols-3 gap-5">
-      <div class="card p-5 md:col-span-2"><div class="flex justify-between items-center mb-3"><h4 class="font-bold text-sm"><i class="fa-solid fa-users text-emerald-600"></i> الأعضاء وترتيب القبض</h4>
-        <span class="text-xs bg-slate-100 px-2 py-1 rounded-lg font-semibold">${c.turns.length}/${j.count}</span></div>
-        ${c.isCreator && c.turns.length > 1 ? '<button class="btn b-sec mb-3" data-act="order-modal"><i class="fa-solid fa-arrow-down-1-9"></i> تعديل ترتيب القبض</button>' : ''}
-        <div class="space-y-2">${rows}</div></div>
-      <div class="space-y-5">
-        <div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-chart-pie text-indigo-600"></i> تحصيل هذه الدورة</h4>
-          <div class="text-xs space-y-2"><div class="flex justify-between"><span>المستهدف</span><b>${money(target)}</b></div><div class="flex justify-between"><span>المؤكد</span><b class="text-emerald-600">${money(collected)}</b></div>
-          <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden"><div class="bg-emerald-500 h-full" style="width:${pct}%"></div></div></div></div>
-        ${trustCard(c)}${joinCard(c)}${sharesCard(c)}${swapCard(c)}${wishCard(c)}${chatCard(c)}
-        ${c.canManage ? `<div class="card p-5"><h4 class="font-bold text-sm mb-3"><i class="fa-solid fa-clock-rotate-left text-amber-500"></i> دعوات معلّقة</h4><div class="space-y-2">${pend || '<p class="text-xs text-slate-400">لا توجد دعوات معلّقة.</p>'}</div></div>` : ''}
-        <div class="card p-5"><h4 class="font-bold text-sm mb-2"><i class="fa-solid fa-calendar-days text-teal-600"></i> الجدول الزمني</h4>${sched}</div>
-      </div></div></div>`;
+  const tab = state.jamTab || 'overview', card = (ttl, body) => `<div class="card p-5 space-y-3">${ttl ? `<h4 class="font-black text-sm">${ttl}</h4>` : ''}${body}</div>`;
+  const fq = freqOf(j), per = fq.days ? ' من الدورة' : '';
+  const info = [['التكرار', fq.label], ['القسط', money(j.amount)], ['آخر موعد للسداد', 'يوم ' + j.lastDay + per], ['موعد الاستلام', 'يوم ' + j.payDay + per], ['البداية', fmtDate(new Date(j.startDate + 'T00:00:00'))], ['الأعضاء', c.turns.length + ' من ' + j.count]];
+  const details = card('<i class="fa-solid fa-circle-info text-emerald-600"></i> تفاصيل الجمعية', `<div class="grid grid-cols-2 gap-2">${info.map(([t, v]) => `<div class="p-2.5 bg-slate-50 rounded-xl"><p class="text-[10px] text-slate-500">${t}</p><b class="text-xs">${v}</b></div>`).join('')}</div>`);
+
+  const overview = recBox + swapCard(c) + modBox + details;
+  const people = card(`<div class="flex justify-between items-center"><span><i class="fa-solid fa-users text-emerald-600"></i> الأعضاء وترتيب القبض</span><span class="text-xs bg-slate-100 px-2 py-1 rounded-lg font-semibold">${c.turns.length}/${j.count}</span></div>`,
+      `${c.isCreator && c.turns.length > 1 ? '<button class="btn b-sec w-full" data-act="order-modal"><i class="fa-solid fa-arrow-down-1-9"></i> تعديل ترتيب القبض</button>' : ''}<div class="space-y-2">${rows}</div>`)
+    + (c.canManage ? card('<i class="fa-solid fa-clock-rotate-left text-amber-500"></i> دعوات معلّقة', `<div class="space-y-2">${pend || '<p class="text-xs text-slate-400 text-center py-2">لا توجد دعوات معلّقة.</p>'}</div>`) : '');
+  const schedTab = card('<i class="fa-solid fa-calendar-days text-teal-600"></i> الجدول الزمني', `<div>${sched}</div><button class="btn b-sec w-full" data-act="add-cal"><i class="fa-solid fa-calendar-plus"></i> أضف المواعيد للتقويم</button>`);
+  const tools = card('<i class="fa-solid fa-toolbox text-slate-500"></i> أدوات', `<div class="grid grid-cols-2 gap-2"><button class="btn b-sec" data-act="export-modal"><i class="fa-solid fa-file-export"></i> تصدير الكشف</button><button class="btn b-sec" data-act="mod-modal"><i class="fa-solid fa-pen-to-square"></i> اقتراح تعديل</button></div>`);
+  const mgr = c.canManage ? card('<i class="fa-solid fa-user-gear text-indigo-600"></i> أدوات المشرف', `<div class="grid grid-cols-2 gap-2">
+      ${filledOf(j) >= j.count ? '<button class="btn b-sec" data-act="full-note"><i class="fa-solid fa-user-check"></i> اكتمل العدد</button>' : '<button class="btn b-pri" data-act="invite-modal"><i class="fa-solid fa-user-plus"></i> دعوة عضو</button>'}
+      <button class="btn b-sec" data-act="remind"><i class="fa-solid fa-bell"></i> تذكير بالبريد</button><button class="btn bg-emerald-50 text-emerald-700" data-act="wa-remind"><i class="fa-brands fa-whatsapp"></i> تذكير واتساب</button>
+      ${c.isCreator ? `<button class="btn b-sec" data-act="notif-modal"><i class="fa-solid fa-bullhorn"></i> إشعار للأعضاء</button><button class="btn b-sec" data-act="deputy-modal"><i class="fa-solid fa-user-shield"></i> نائب المشرف</button><button class="btn b-sec" data-act="edit-modal"><i class="fa-solid fa-gear"></i> تعديل</button><button class="btn b-red col-span-2" data-act="delete-modal"><i class="fa-solid fa-trash"></i> حذف الجمعية</button>` : ''}</div>`) : '';
+  const more = trustCard(c) + joinCard(c) + sharesCard(c) + wishCard(c) + chatCard(c) + tools + mgr;
+
+  const pendRev = state.payments.filter(p => p.status === 'pending' && (c.isCreator || p.recipientUid === uid)).length, moreN = c.isCreator ? Object.keys(state.shareReqs || {}).length : 0;
+  const tabs = [['overview', 'fa-house', 'الرئيسية', 0], ['people', 'fa-users', 'الأعضاء', pendRev], ['sched', 'fa-calendar-days', 'الجدول', 0], ['more', 'fa-ellipsis', 'المزيد', moreN]];
+  const bar = `<div class="grid grid-cols-4 gap-1.5 p-1.5 bg-white/95 backdrop-blur rounded-2xl border border-slate-100 shadow-sm sticky top-2 z-10">${tabs.map(([k, ic, lb, n]) => `<button class="relative py-2 rounded-xl text-[11px] font-bold flex flex-col items-center gap-0.5 ${tab === k ? 'bg-emerald-600 text-white' : 'text-slate-500'}" data-act="jam-tab" data-v="${k}"><i class="fa-solid ${ic}"></i>${lb}${n ? `<span class="absolute -top-1 -left-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center">${n}</span>` : ''}</button>`).join('')}</div>`;
+  const body = tab === 'people' ? people : tab === 'sched' ? schedTab : tab === 'more' ? more : overview;
+  return `<div class="space-y-4 max-w-2xl mx-auto">
+    <div class="flex items-center gap-3"><button class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex-none" data-act="go-home" aria-label="رجوع"><i class="fa-solid fa-arrow-right"></i></button>
+      <div class="jicon">${iconHtml(j)}</div><div class="min-w-0"><h2 class="font-black text-lg truncate">${esc(j.name)}</h2><p class="text-[11px] text-slate-500 truncate">${fq.label} • القسط ${money(j.amount)} • ${c.turns.length}/${j.count} أعضاء</p></div></div>
+    ${bar}${body}</div>`;
 }
 
 function vProfile() {
@@ -3078,7 +3083,8 @@ const actions = {
   'go-home': () => { cleanup(state.jUnsubs); state.view = state.user && state.profile ? 'home' : state.view; render(); },
   'go-create': () => { state.createType = 'jamiya'; state.view = 'create'; render(); },
   'ctype': el => { state.createType = el.dataset.v; render(); },
-  'fam-pay': openFamilyPay, 'fam-self': openSelfContrib, 'fam-tab': el => { state.famTab = el.dataset.v; render(); window.scrollTo({ top: 0 }); }, 'pledge-modal': openPledgeModal, 'pledge-del': deletePledge, 'pledge-fill': el => { const i = document.querySelector('#f-pledge [name=amount]'); if (i) i.value = el.dataset.v; }, 'fam-reject': el => rejectFamilyPay(el.dataset.id), 'fam-edit': openFamilyEdit, 'fam-toggle': toggleFamClosed,
+  'fam-pay': openFamilyPay, 'fam-self': openSelfContrib, 'jam-tab': el => { state.jamTab = el.dataset.v; render(); window.scrollTo({ top: 0 }); },
+  'fam-tab': el => { state.famTab = el.dataset.v; render(); window.scrollTo({ top: 0 }); }, 'pledge-modal': openPledgeModal, 'pledge-del': deletePledge, 'pledge-fill': el => { const i = document.querySelector('#f-pledge [name=amount]'); if (i) i.value = el.dataset.v; }, 'fam-reject': el => rejectFamilyPay(el.dataset.id), 'fam-edit': openFamilyEdit, 'fam-toggle': toggleFamClosed,
   'go-profile': () => { state.view = 'profile'; render(); },
   'go-admin': () => { state.view = 'admin'; render(); loadAdmin(); },
   'logout': async () => { if (state.user) ssDel('jm_sess_' + state.user.uid); stopHeartbeat(); await Promise.race([unregisterPush(), new Promise(r => setTimeout(r, 3000))]); auth.signOut(); },
