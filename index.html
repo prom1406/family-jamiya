@@ -182,7 +182,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2.0</footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2.1</footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -842,16 +842,16 @@ function openExportModal() {
 function openJamiya(id) {
   cleanup(state.jUnsubs); state.jInviteSub = false; state.gotM = state.gotP = false;
   if (state.afterOpen && state.afterOpen.id !== id) state.afterOpen = null;
-  state.activeId = id; state.j = null; state.members = {}; state.payments = []; state.jInvites = []; state.wishes = {}; state.wishMode = null; state.shareReqs = {}; state.shareMode = null; state.swapReqs = [];
+  state.activeId = id; state.j = null; state.members = {}; state.payments = []; state.jInvites = []; state.wishes = {}; state.wishMode = null; state.shareReqs = {}; state.shareMode = null; state.swapReqs = []; state.pledges = {};
   state.view = 'jamiya'; render();
   const ref = db.collection('jamiyat').doc(id);
-  state.jUnsubs.push(stopChat, () => { if (state.wishUnsub) { state.wishUnsub(); state.wishUnsub = null; } if (state.shareUnsub) { state.shareUnsub(); state.shareUnsub = null; } });
+  state.jUnsubs.push(stopChat, () => { if (state.wishUnsub) { state.wishUnsub(); state.wishUnsub = null; } if (state.shareUnsub) { state.shareUnsub(); state.shareUnsub = null; } if (state.pledgeUnsub) { state.pledgeUnsub(); state.pledgeUnsub = null; } });
   listenSwaps(id);
   state.jUnsubs.push(
     ref.onSnapshot(s => { if (!s.exists) { toast('الجمعية غير متاحة', 'error'); state.view = 'home'; return render(); }
       state.j = { id: s.id, ...s.data() };
       if ((state.j.creatorUid === state.user.uid || (state.j.deputyUid && state.j.deputyUid === state.user.uid)) && !state.jInviteSub) subscribeInvites(id);
-      syncWishes(); syncShareReqs(); if (state.chatUnsub) paintChat();
+      syncWishes(); syncShareReqs(); syncPledges(); if (state.chatUnsub) paintChat();
       render(); }, e => toast(e.message, 'error')),
     ref.collection('members').onSnapshot(s => { state.members = {}; s.docs.forEach(d => state.members[d.id] = d.data()); state.gotM = true; if (state.view === 'jamiya') render(); runAfterOpen(); }),
     ref.collection('payments').onSnapshot(s => { state.payments = s.docs.map(d => ({ id: d.id, ...d.data() })); state.gotP = true; state.pays[id] = state.payments; if (state.view === 'jamiya') render(); runAfterOpen(); })
@@ -1087,6 +1087,7 @@ async function submitDelete(f) {
     await wipe(ref.collection('wishes'));
     await wipe(ref.collection('chat'));
     await wipe(ref.collection('log'));
+    await wipe(ref.collection('pledges'));
     await wipe(db.collection('invites').where('jamiyaId', '==', id).where('creatorUid', '==', uid));
     await wipe(ref.collection('members'));
     await ref.delete();
@@ -1709,7 +1710,7 @@ async function adminDeleteJam(id) {
   const ref = db.collection('jamiyat').doc(id), wipe = async q => { const snap = await q.get(); for (let i = 0; i < snap.docs.length; i += 400) { const b = db.batch(); snap.docs.slice(i, i + 400).forEach(d => b.delete(d.ref)); await b.commit(); } };
   toast('جارٍ الحذف…', 'info');
   try {
-    await wipe(ref.collection('payments')); await wipe(ref.collection('proofs')); await wipe(ref.collection('wishes')); await wipe(ref.collection('chat')); await wipe(ref.collection('log')); await wipe(db.collection('invites').where('jamiyaId', '==', id)); await wipe(ref.collection('members'));
+    await wipe(ref.collection('payments')); await wipe(ref.collection('proofs')); await wipe(ref.collection('wishes')); await wipe(ref.collection('chat')); await wipe(ref.collection('log')); await wipe(ref.collection('pledges')); await wipe(db.collection('invites').where('jamiyaId', '==', id)); await wipe(ref.collection('members'));
     await ref.delete(); await db.collection('admin_notes').doc('j_' + id).delete().catch(() => {});
     A.jamiyat = A.jamiyat.filter(x => x.id !== id); delete A.notes['j_' + id];
     logEvent('adm_jam_del', { target: id, targetName: j.name, info: 'المشرف: ' + (j.creatorName || '') });
@@ -2589,7 +2590,7 @@ async function joinFromLink() {
 }
 
 /* ============ الثقة: سجل النشاط + كشف العضو + نسبة الالتزام + قفل التطبيق ============ */
-const LOG_ICO = { family: '🤝', pay: '💸', confirm: '✅', swap: '🔁', share: '🧩', join: '👋', edit: '✏️', order: '🔢', remove: '🚪' };
+const LOG_ICO = { pledge: '📝', family: '🤝', pay: '💸', confirm: '✅', swap: '🔁', share: '🧩', join: '👋', edit: '✏️', order: '🔢', remove: '🚪' };
 function logEvent(jid, type, text) {
   if (!state.user || !jid) return;
   db.collection('jamiyat').doc(jid).collection('log').add({ uid: state.user.uid, type, text: String(text).slice(0, 200), createdAt: FV.serverTimestamp() }).catch(() => {});
@@ -2777,7 +2778,7 @@ function famState(j) { const end = famEnd(j), now = Date.now(), ended = now > en
 function famStats() {
   const ps = state.payments, sum = a => r2(a.reduce((t, p) => t + (Number(p.amount) || 0), 0));
   const conf = ps.filter(p => p.status === 'confirmed'), pend = ps.filter(p => p.status === 'pending');
-  return { confirmed: sum(conf), pending: sum(pend), nPend: pend.length, donors: new Set(conf.map(p => p.uid)).size };
+  return { confirmed: sum(conf), pending: sum(pend), nPend: pend.length, donors: new Set(conf.map(p => p.uid)).size, pledged: r2(Object.values(state.pledges || {}).reduce((t, x) => t + (Number(x.amount) || 0), 0)) };
 }
 function famCard(j) {
   const mine = j.creatorUid === state.user.uid, fs = famState(j);
@@ -2803,16 +2804,19 @@ function vFamily(c) {
   const sect = (ttl, body) => `<div class="card p-5 space-y-2"><h4 class="font-bold text-sm">${ttl}</h4>${body}</div>`;
   const banner = fs.open ? `<div class="p-3 rounded-2xl bg-emerald-50 border border-emerald-100 text-xs text-emerald-800 font-bold"><i class="fa-solid fa-lock-open"></i> المساهمة مفتوحة — متبقٍ ${fs.left} ${fs.left === 1 ? 'يوم' : 'أيام'} (حتى ${fmtDate(fs.end)})</div>`
     : `<div class="p-3 rounded-2xl bg-slate-100 text-xs text-slate-600 font-bold"><i class="fa-solid fa-lock"></i> ${j.closed ? 'أغلق المشرف باب المساهمة' : 'انتهت مدة التعاون في ' + fmtDate(fs.end)}</div>`;
-  const action = isMember && !c.isCreator ? (fs.open ? '<button class="btn b-pri w-full py-3" data-act="fam-pay"><i class="fa-solid fa-hand-holding-heart"></i> ساهم في التعاون</button>' : '') : '';
+  const myCard = isMember && !c.isCreator ? (() => {
+    const pl = state.pledges[uid], sm = famSums(uid), amt = pl ? Number(pl.amount) : 0, left = Math.max(0, r2(amt - sm.conf - sm.pend)), mp = amt ? Math.min(100, Math.round(sm.conf / amt * 100)) : 0;
+    if (!pl) return sect('<i class="fa-solid fa-hand-holding-heart text-rose-500"></i> مساهمتي', `<p class="text-xs text-slate-500 leading-relaxed">لم تحدد مساهمتك بعد. اختر المبلغ الذي تنوي المساهمة به، ثم سدّد متى تيسّر قبل ${fmtDate(fs.end)}.</p>${fs.open ? '<button class="btn b-pri w-full py-3" data-act="pledge-modal"><i class="fa-solid fa-hand-holding-heart"></i> حدّد مساهمتي</button>' : ''}`);
+    return sect('<i class="fa-solid fa-hand-holding-heart text-rose-500"></i> مساهمتي', `<div class="grid grid-cols-4 gap-1.5 text-center text-[11px]"><div class="p-2 bg-violet-50 rounded-xl"><b class="block text-sm">${fmtNum(amt)}</b>تعهدت</div><div class="p-2 bg-emerald-50 rounded-xl"><b class="block text-sm">${fmtNum(sm.conf)}</b>مسدد</div><div class="p-2 bg-sky-50 rounded-xl"><b class="block text-sm">${fmtNum(sm.pend)}</b>بانتظار</div><div class="p-2 bg-amber-50 rounded-xl"><b class="block text-sm">${fmtNum(left)}</b>المتبقي</div></div>
+      <div class="bar"><i style="width:${mp}%"></i></div>
+      ${fs.open ? `<div class="grid grid-cols-2 gap-2 pt-1"><button class="btn b-sec" data-act="pledge-modal"><i class="fa-solid fa-pen"></i> تعديل المبلغ</button><button class="btn b-pri" data-act="fam-pay"><i class="fa-solid fa-file-arrow-up"></i> تأكيد السداد</button></div><p class="text-[10px] text-slate-400">«تعديل المبلغ» لتغيير قيمة مساهمتك، و«تأكيد السداد» بعد التحويل لرفع الإيصال.</p>` : ''}`);
+  })() : '';
   const acct = sect('<i class="fa-solid fa-building-columns text-violet-600"></i> حساب المستفيد للتحويل', `<p class="text-xs text-slate-600">${esc(j.creatorName)} • ${esc(j.benBank || '')}</p>
     <p class="text-sm font-bold" dir="ltr">${esc(j.benIban || '')}</p><button class="btn b-sec w-full" data-act="copy-iban" data-v="${esc(fixIban(j.benIban))}"><i class="fa-regular fa-copy"></i> نسخ الآيبان</button>`);
   let staff = '';
   if (c.isCreator) {
-    const rows = j.memberUids.filter(u => u !== uid).map(u => { const t = state.payments.filter(p => p.uid === u), cf = r2(t.filter(p => p.status === 'confirmed').reduce((a, p) => a + (Number(p.amount) || 0), 0)), np = t.filter(p => p.status === 'pending').length;
-      return `<div class="p-2.5 bg-slate-50 rounded-xl text-xs flex justify-between"><span class="font-bold">${esc(dispName(state.members[u]))}</span><span>${cf ? fmtNum(cf) + ' ريال' : '—'}${np ? ` <span class="text-sky-600">(${np} بانتظار)</span>` : ''}</span></div>`; }).join('');
     staff = sect(`<i class="fa-solid fa-inbox text-sky-600"></i> إيصالات بانتظار مراجعتك (${pendingList.length})`, pendingList.map(p => famPayRow(p, true)).join('') || '<p class="text-xs text-slate-400">لا توجد إيصالات معلّقة.</p>')
       + sect(`المساهمات المؤكدة (${doneList.length})`, doneList.map(p => famPayRow(p, true)).join('') || '<p class="text-xs text-slate-400">لا توجد مساهمات مؤكدة بعد.</p>')
-      + sect('الأعضاء ومساهماتهم', rows || '<p class="text-xs text-slate-400">لم ينضم أعضاء بعد، ادعهم من الأدوات أدناه.</p>')
       + sect('إدارة التعاون', `<div class="grid grid-cols-2 gap-2"><button class="btn b-sec" data-act="invite-modal"><i class="fa-solid fa-user-plus"></i> دعوة عضو</button><button class="btn b-sec" data-act="fam-edit"><i class="fa-solid fa-pen"></i> تعديل</button>
         <button class="btn ${j.closed ? 'b-pri' : 'b-red'}" data-act="fam-toggle">${j.closed ? 'إعادة فتح المساهمة' : 'إغلاق المساهمة'}</button><button class="btn b-red" data-act="delete-modal"><i class="fa-solid fa-trash"></i> حذف</button></div>`);
   }
@@ -2825,21 +2829,74 @@ function vFamily(c) {
       <div class="grid grid-cols-2 gap-2 text-xs"><div class="p-2.5 bg-slate-50 rounded-xl"><p class="text-[10px] text-slate-500">المستفيد</p><b>${esc(j.creatorName)}</b></div><div class="p-2.5 bg-slate-50 rounded-xl"><p class="text-[10px] text-slate-500">المدة</p><b>${created ? fmtDate(created) + ' ← ' : 'حتى '}${fmtDate(fs.end)}</b></div></div></div>
     <div class="card p-5"><div class="flex justify-between items-end mb-2"><div><p class="text-[11px] text-slate-500">المبلغ المحصّل (المؤكد)</p><b class="text-2xl">${fmtNum(st.confirmed)}</b> <span class="text-xs text-slate-400">ريال</span></div>${target ? `<div class="text-left"><p class="text-[11px] text-slate-500">المستهدف</p><b>${fmtNum(target)}</b></div>` : ''}</div>
       ${target ? `<div class="bar"><i style="width:${pct}%"></i></div><p class="text-[11px] text-slate-500 mt-1">${pct}% من الهدف${st.confirmed >= target ? ' 🎉' : ''}</p>` : '<p class="text-[11px] text-slate-400">لا يوجد مبلغ مستهدف محدد، والمساهمة بقدر الاستطاعة.</p>'}
-      <div class="grid grid-cols-3 gap-2 mt-3 text-center text-[11px]"><div class="p-2 bg-slate-50 rounded-xl"><b class="block text-sm">${st.donors}</b>مساهم</div><div class="p-2 bg-slate-50 rounded-xl"><b class="block text-sm">${fmtNum(st.pending)}</b>بانتظار التأكيد</div><div class="p-2 bg-slate-50 rounded-xl"><b class="block text-sm">${fs.ended ? 'انتهت' : fs.left + ' يوم'}</b>المتبقي</div></div></div>
-    ${isMember ? acct : ''}${action}
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 text-center text-[11px]"><div class="p-2 bg-slate-50 rounded-xl"><b class="block text-sm">${fmtNum(st.pledged)}</b>إجمالي التعهدات</div><div class="p-2 bg-slate-50 rounded-xl"><b class="block text-sm">${st.donors}</b>مساهم (مؤكد)</div><div class="p-2 bg-slate-50 rounded-xl"><b class="block text-sm">${fmtNum(st.pending)}</b>بانتظار التأكيد</div><div class="p-2 bg-slate-50 rounded-xl"><b class="block text-sm">${fs.ended ? 'انتهت' : fs.left + ' يوم'}</b>المتبقي</div></div></div>
+    ${isMember ? acct : ''}${myCard}${isMember ? famMembersSect(c) : ''}
     ${!c.isCreator && isMember ? sect('مساهماتك', mine.map(p => famPayRow(p, false)).join('') || '<p class="text-xs text-slate-400">لم تساهم بعد.</p>') : ''}
     ${staff}
     ${joinCard(c)}${chatCard(c)}
     ${isMember ? `<div class="card p-5"><button class="btn b-sec w-full" data-act="log-open"><i class="fa-solid fa-clock-rotate-left"></i> سجل النشاط</button></div>` : ''}</div>`;
 }
-function openFamilyPay() {
-  const c = ctx(); if (!c || !c.family) return; const j = c.j;
+/* --- تعهدات التعاون: يحدد العضو مبلغه أولاً ثم يسدد لاحقاً ويرفع إيصاله --- */
+const famSum = a => r2(a.reduce((t, p) => t + (Number(p.amount) || 0), 0));
+const famSums = u => { const t = state.payments.filter(p => p.uid === u); return { conf: famSum(t.filter(p => p.status === 'confirmed')), pend: famSum(t.filter(p => p.status === 'pending')) }; };
+function syncPledges() {
+  const j = state.j; if (!j || !state.user || j.type !== 'family' || state.pledgeUnsub) return;
+  state.pledgeUnsub = jref().collection('pledges').onSnapshot(sn => { state.pledges = {}; sn.docs.forEach(d => state.pledges[d.id] = d.data()); if (state.view === 'jamiya') render(); },
+    e => { if (e.code !== 'permission-denied') toast('خطأ في تحميل التعهدات: ' + e.message, 'error'); });
+}
+function famMembersSect(c) {
+  const j = c.j, me = state.user.uid;
+  const list = j.memberUids.filter(u => u !== j.creatorUid).map(u => ({ u, pl: Number((state.pledges[u] || {}).amount) || 0, ...famSums(u) })).sort((a, b) => (b.pl - a.pl) || (b.conf - a.conf));
+  const tPl = r2(list.reduce((t, x) => t + x.pl, 0)), tConf = r2(list.reduce((t, x) => t + x.conf, 0));
+  const rows = list.map(x => {
+    const left = Math.max(0, r2(x.pl - x.conf - x.pend)), done = x.pl > 0 && x.conf >= x.pl - 0.005;
+    const bd = !x.pl ? ['لم يحدد بعد', 'bg-slate-100 text-slate-500'] : done ? ['سدّد كاملاً ✓', 'bg-emerald-100 text-emerald-700'] : (x.conf || x.pend) ? ['سدّد جزءاً', 'bg-sky-100 text-sky-700'] : ['بانتظار السداد', 'bg-amber-100 text-amber-700'];
+    return `<div class="p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs space-y-1.5"><div class="flex justify-between items-center gap-2"><b>${esc(dispName(state.members[x.u]))}${x.u === me ? ' <span class="text-teal-600">(أنت)</span>' : ''}</b><span class="px-2 py-0.5 rounded-md font-bold text-[10px] ${bd[1]}">${bd[0]}</span></div>
+      <div class="grid grid-cols-4 gap-1 text-center text-[11px]"><div><span class="text-slate-500">التعهد</span><b class="block">${x.pl ? fmtNum(x.pl) : '—'}</b></div><div><span class="text-slate-500">المسدد</span><b class="block">${fmtNum(x.conf)}</b></div><div><span class="text-slate-500">بانتظار</span><b class="block">${fmtNum(x.pend)}</b></div><div><span class="text-slate-500">المتبقي</span><b class="block">${x.pl ? fmtNum(left) : '—'}</b></div></div></div>`;
+  }).join('');
+  return `<div class="card p-5 space-y-2"><h4 class="font-bold text-sm"><i class="fa-solid fa-users text-violet-600"></i> المشاركون (${list.length})</h4>
+    <p class="text-[11px] text-slate-500">إجمالي التعهدات <b>${fmtNum(tPl)}</b> ريال • المسدد المؤكد <b>${fmtNum(tConf)}</b> ريال</p>${rows || '<p class="text-xs text-slate-400">لم ينضم أعضاء بعد.</p>'}</div>`;
+}
+function openPledgeModal() {
+  const c = ctx(); if (!c || !c.family || c.isCreator) return; const j = c.j, fs = famState(j), uid = state.user.uid;
+  if (!fs.open) return toast('باب المساهمة مغلق', 'error');
+  const pl = state.pledges[uid], sm = famSums(uid);
+  showModal('تحديد مساهمتي', `<form id="f-pledge" class="space-y-3"><p class="text-xs text-slate-600 leading-relaxed">حدّد المبلغ الذي تنوي المساهمة به. ليس عليك التحويل الآن: سدّد متى تيسّر قبل ${fmtDate(fs.end)} ثم ارفع الإيصال من زر «تأكيد السداد».</p>
+    <div class="grid grid-cols-4 gap-2">${[500, 1000, 2000, 3000].map(v => `<button type="button" class="py-2.5 rounded-xl bg-violet-50 text-violet-700 text-xs font-black border border-violet-100" data-act="pledge-fill" data-v="${v}">${fmtNum(v)}</button>`).join('')}</div>
+    <div><label class="text-xs font-semibold block mb-1">أو اكتب مبلغاً آخر (ريال)</label><input name="amount" type="number" min="1" step="1" class="inp" required value="${pl ? pl.amount : ''}"></div>
+    <button class="btn b-pri w-full py-3" type="submit">${pl ? 'تحديث مساهمتي' : 'تحديد مساهمتي'}</button>
+    ${pl && !(sm.conf + sm.pend) ? '<button type="button" class="btn b-red w-full" data-act="pledge-del">إلغاء تعهدي</button>' : ''}</form>`);
+}
+async function submitPledge(f) {
+  const c = ctx(); if (!c || !c.family || c.isCreator) return; const j = c.j, uid = state.user.uid, amount = Math.round(parseFloat(f.amount.value) * 100) / 100;
   if (!famState(j).open) return toast('باب المساهمة مغلق', 'error');
-  showModal('المساهمة في التعاون', `<form id="f-fampay" class="space-y-3">
+  if (!(amount >= 1)) return toast('المبلغ غير صحيح', 'error');
+  const sm = famSums(uid), paid = r2(sm.conf + sm.pend);
+  if (amount < paid) return toast(`لا يقل المبلغ عما سددته (${fmtNum(paid)} ريال)`, 'error');
+  const first = !state.pledges[uid];
+  try {
+    await jref().collection('pledges').doc(uid).set({ uid, amount, updatedAt: FV.serverTimestamp() });
+    closeModal(); toast(first ? 'تم تحديد مساهمتك' : 'تم تحديث مساهمتك');
+    logEvent(j.id, 'pledge', `${dispName(state.profile)} ${first ? 'حدد' : 'عدّل'} مساهمته بمبلغ ${fmtNum(amount)} ريال`);
+    sendNotifs([j.creatorUid], first ? 'تعهد جديد بمساهمة' : 'تعديل مبلغ مساهمة', `${dispName(state.profile)} ${first ? 'حدد' : 'عدّل'} مساهمته في «${j.name}»: ${fmtNum(amount)} ريال`, j.id, 'pledge');
+  } catch (e) { toast(e.code === 'permission-denied' ? 'تعذر الحفظ: انتهت المدة أو لم تُنشر قواعد Firestore المحدّثة' : 'تعذر الحفظ: ' + e.message, 'error'); }
+}
+async function deletePledge() {
+  const c = ctx(); if (!c || !c.family) return;
+  try { await jref().collection('pledges').doc(state.user.uid).delete(); closeModal(); toast('أُلغي تعهدك', 'info'); logEvent(c.j.id, 'pledge', `${dispName(state.profile)} ألغى تعهده بالمساهمة`); }
+  catch (e) { toast('تعذر الإلغاء: ' + e.message, 'error'); }
+}
+
+function openFamilyPay() {
+  const c = ctx(); if (!c || !c.family) return; const j = c.j, uid = state.user.uid;
+  if (!famState(j).open) return toast('باب المساهمة مغلق', 'error');
+  const pl = state.pledges[uid]; if (!pl) { toast('حدّد مبلغ مساهمتك أولاً', 'info'); return openPledgeModal(); }
+  const sm = famSums(uid), left = Math.max(0, r2(Number(pl.amount) - sm.conf - sm.pend));
+  showModal('تأكيد السداد', `<form id="f-fampay" class="space-y-3">
     <div class="p-3 bg-violet-50 rounded-xl text-xs space-y-1.5"><p>حوّل إلى المستفيد: <b>${esc(j.creatorName)}</b></p><p>${esc(j.benBank || '')} <span dir="ltr">${esc(j.benIban || '')}</span></p>
       <button type="button" class="btn b-sec w-full" data-act="copy-iban" data-v="${esc(fixIban(j.benIban))}"><i class="fa-regular fa-copy"></i> نسخ الآيبان</button></div>
-    <div><label class="text-xs font-semibold block mb-1">المبلغ الذي تساهم به (ريال)</label><input name="amount" type="number" step="0.01" min="1" class="inp" required placeholder="اكتب المبلغ الذي تريده">
-      <div class="flex gap-2 flex-wrap mt-2">${[50, 100, 200, 500].map(v => `<button type="button" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold" data-act="pay-fill" data-v="${v}">${v}</button>`).join('')}</div></div>
+    <div><label class="text-xs font-semibold block mb-1">مبلغ هذا التحويل (ريال)</label><input name="amount" type="number" step="0.01" min="1" class="inp" required value="${left || ''}" placeholder="المبلغ الذي حوّلته">
+      <p class="text-[11px] text-slate-500 mt-1">تعهدك ${fmtNum(pl.amount)} • المتبقي ${fmtNum(left)} ريال. يمكنك سداده دفعة واحدة أو على دفعات.</p></div>
     <div><label class="text-xs font-semibold block mb-1">رقم المرجع (اختياري)</label><input name="ref" class="inp" maxlength="40"></div>
     <div><label class="text-xs font-semibold block mb-1">صورة الإيصال</label><input name="file" type="file" accept="image/*" class="inp" required><img id="pay-prev" class="hide mt-2 rounded-xl border max-h-44 mx-auto" alt="معاينة الإيصال"></div>
     <button class="btn b-pri w-full py-3" type="submit">إرسال الإيصال</button></form>`);
@@ -2986,7 +3043,7 @@ const actions = {
   'go-home': () => { cleanup(state.jUnsubs); state.view = state.user && state.profile ? 'home' : state.view; render(); },
   'go-create': () => { state.createType = 'jamiya'; state.view = 'create'; render(); },
   'ctype': el => { state.createType = el.dataset.v; render(); },
-  'fam-pay': openFamilyPay, 'fam-reject': el => rejectFamilyPay(el.dataset.id), 'fam-edit': openFamilyEdit, 'fam-toggle': toggleFamClosed,
+  'fam-pay': openFamilyPay, 'pledge-modal': openPledgeModal, 'pledge-del': deletePledge, 'pledge-fill': el => { const i = document.querySelector('#f-pledge [name=amount]'); if (i) i.value = el.dataset.v; }, 'fam-reject': el => rejectFamilyPay(el.dataset.id), 'fam-edit': openFamilyEdit, 'fam-toggle': toggleFamClosed,
   'go-profile': () => { state.view = 'profile'; render(); },
   'go-admin': () => { state.view = 'admin'; render(); loadAdmin(); },
   'logout': async () => { if (state.user) ssDel('jm_sess_' + state.user.uid); stopHeartbeat(); await Promise.race([unregisterPush(), new Promise(r => setTimeout(r, 3000))]); auth.signOut(); },
@@ -3064,7 +3121,7 @@ document.addEventListener('input', e => {
   if (e.target.name === 'icon') fm.querySelectorAll('.emo').forEach(b => b.classList.toggle('on', b.dataset.v === e.target.value.trim()));
 });
 const forms = { 'f-register': doRegister, 'f-login': doLogin, 'f-reset': doReset, 'f-complete': doCompleteProfile, 'f-create': handleCreate,
-  'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-notif': submitNotif, 'f-deputy': f => setDeputy(f.uid.value), 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete, 'f-wish': submitWish, 'f-chat': sendChat, 'f-create-family': handleCreateFamily, 'f-fampay': submitFamilyPay, 'f-famedit': submitFamilyEdit, 'f-share': submitShare, 'f-swap': submitSwap, 'f-lock': submitLock, 'f-lockoff': submitLockOff };
+  'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-notif': submitNotif, 'f-deputy': f => setDeputy(f.uid.value), 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete, 'f-wish': submitWish, 'f-chat': sendChat, 'f-create-family': handleCreateFamily, 'f-fampay': submitFamilyPay, 'f-pledge': submitPledge, 'f-famedit': submitFamilyEdit, 'f-share': submitShare, 'f-swap': submitSwap, 'f-lock': submitLock, 'f-lockoff': submitLockOff };
 Object.assign(forms, ADMIN_FORMS);
 document.addEventListener('submit', e => { const fn = forms[e.target.id]; if (fn) { e.preventDefault(); fn(e.target); } });
 
