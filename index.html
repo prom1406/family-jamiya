@@ -182,7 +182,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2.5<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2.6<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -225,7 +225,7 @@ const state = {
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const lc = s => String(s || '').trim().toLowerCase();
-const money = n => Number(n || 0).toLocaleString('ar-SA') + ' ريال';
+const money = n => Number(n || 0).toLocaleString('ar-SA-u-nu-latn') + ' ريال';
 const bankOpts = sel => BANKS.map(b => `<option ${b === sel ? 'selected' : ''}>${b}</option>`).join('');
 const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 const fixIban = s => String(s || '').replace(/\s+/g, '').toUpperCase();
@@ -261,8 +261,8 @@ const normPhone = s => {
   return d;
 };
 const validPhone = s => /^05\d{8}$/.test(String(s || '').trim());
-const fmtDate = d => d.toLocaleDateString('ar-SA-u-ca-gregory', { year: 'numeric', month: 'long', day: 'numeric' });
-const fmtMonth = d => d.toLocaleDateString('ar-SA-u-ca-gregory', { year: 'numeric', month: 'long' });
+const fmtDate = d => d.toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' });
+const fmtMonth = d => d.toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { year: 'numeric', month: 'long' });
 
 function toast(msg, type = 'success') {
   const t = document.createElement('div');
@@ -349,10 +349,10 @@ function periodLabel(j, idx) {
   if (!f.days) return fmtMonth(periodStart(j, idx));
   const a = periodStart(j, idx), b = new Date(a.getFullYear(), a.getMonth(), a.getDate() + f.days - 1);
   const o = { day: 'numeric', month: 'long' };
-  return `${a.toLocaleDateString('ar-SA-u-ca-gregory', o)} – ${b.toLocaleDateString('ar-SA-u-ca-gregory', o)}`;
+  return `${a.toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', o)} – ${b.toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', o)}`;
 }
 const r2 = n => Math.round(n * 100) / 100;
-const fmtNum = n => Number(r2(n)).toLocaleString('ar-SA', { maximumFractionDigits: 2 });
+const fmtNum = n => Number(r2(n)).toLocaleString('ar-SA-u-nu-latn', { maximumFractionDigits: 2 });
 
 // حساب العضو التراكمي: كل ما دفعه يُقسَّم على قيمة القسط الحالية.
 // المستحق = (عدد الدورات حتى الآن ما عدا دور استلامه) × القسط. الزائد رصيد مقدّم يغطي الدفعات القادمة.
@@ -484,7 +484,7 @@ async function doRegister(f) {
     const cred = await auth.createUserWithEmailAndPassword(email, pass);
     try {
       await cred.user.updateProfile({ displayName: name });
-      await saveProfileWithPhone(cred.user.uid, { name, email, phone, bank, iban: bank.startsWith('كاش') ? '' : iban, waOptIn: f.waOptIn.checked, ...idn, avatar: '', createdAt: FV.serverTimestamp() }, 'set', null);
+      await saveProfileWithPhone(cred.user.uid, { name, email, phone, bank, iban: bank.startsWith('كاش') ? '' : iban, waOptIn: f.waOptIn.checked, ...idn, avatar: '', ownerNotified: false, createdAt: FV.serverTimestamp() }, 'set', null);
       incStat({ regs: 1 }); logEvent('register', { name });
     } catch (e) {
       await cred.user.delete().catch(() => {}); // نتراجع عن إنشاء الحساب ليعيد المحاولة برقم آخر
@@ -522,7 +522,7 @@ async function doCompleteProfile(f) {
   if (!validPhone(phone)) return toast('رقم الجوال غير صحيح', 'error');
   if (!bank.startsWith('كاش') && !validIban(iban)) return toast('الآيبان غير صحيح', 'error');
   const u = state.user;
-  const profile = { name: u.displayName || 'عضو', email: lc(u.email), phone, bank, iban: bank.startsWith('كاش') ? '' : iban, waOptIn: f.waOptIn.checked, ...idn, avatar: u.photoURL || '', createdAt: FV.serverTimestamp() };
+  const profile = { name: u.displayName || 'عضو', email: lc(u.email), phone, bank, iban: bank.startsWith('كاش') ? '' : iban, waOptIn: f.waOptIn.checked, ...idn, avatar: u.photoURL || '', ownerNotified: false, createdAt: FV.serverTimestamp() };
   try {
     await saveProfileWithPhone(u.uid, profile, 'set', null);
     if (!state.isAdmin) incStat({ regs: 1 }); logEvent('register', { name: profile.name });
@@ -714,7 +714,7 @@ function homeAlerts() {
 }
 const ALERT_ST = [['bg-rose-50 border-rose-200', 'fa-triangle-exclamation text-rose-500'], ['bg-amber-50 border-amber-200', 'fa-clock text-amber-500'], ['bg-indigo-50 border-indigo-200', 'fa-gift text-indigo-500']];
 const alertCount = () => { try { return state.user && state.profile ? homeAlerts().length : 0; } catch (e) { return 0; } };
-const KIND_IC = { pay: 'fa-coins text-emerald-600', member: 'fa-user-plus text-sky-600', mod: 'fa-pen-to-square text-indigo-600', custom: 'fa-bullhorn text-teal-600', remind: 'fa-bell text-amber-500' };
+const KIND_IC = { pay: 'fa-coins text-emerald-600', member: 'fa-user-plus text-sky-600', mod: 'fa-pen-to-square text-indigo-600', custom: 'fa-bullhorn text-teal-600', remind: 'fa-bell text-amber-500' , admin: 'fa-user-shield text-emerald-600', invite: 'fa-envelope-open-text text-sky-600' };
 const bellCount = () => alertCount() + unreadCount();
 function showAlertsModal(tab) {
   const A = homeAlerts(), N = state.inbox || [], un = unreadCount();
@@ -1161,8 +1161,8 @@ state.settings = {}; state._tv = null;
 /* --- أدوات --- */
 const dayKey = (t = Date.now()) => new Date(t + 3 * 3600000).toISOString().slice(0, 10); // بتوقيت الرياض
 const tsd = v => !v ? null : (v.toDate ? v.toDate() : new Date(v));
-const nf = n => Number(n || 0).toLocaleString('ar-SA');
-const fmtDT = d => d ? fmtDate(d) + ' ' + d.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : '—';
+const nf = n => Number(n || 0).toLocaleString('ar-SA-u-nu-latn');
+const fmtDT = d => d ? fmtDate(d) + ' ' + d.toLocaleTimeString('ar-SA-u-nu-latn', { hour: '2-digit', minute: '2-digit' }) : '—';
 const ssGet = k => { try { return sessionStorage.getItem(k); } catch (e) { return null; } };
 const ssSet = (k, v) => { try { sessionStorage.setItem(k, v); } catch (e) {} };
 const ssDel = k => { try { sessionStorage.removeItem(k); } catch (e) {} };
@@ -1370,8 +1370,8 @@ function tabOverview() {
   const evL = A.events.slice(0, 8).map(e => { const m = EV_L[e.type] || [e.type, 'fa-circle', 'text-slate-500'], d = tsd(e.ts); return `<div class="flex gap-2 items-start text-xs p-2 bg-slate-50 rounded-xl"><i class="fa-solid ${m[1]} ${m[2]} mt-0.5"></i><div class="min-w-0"><b>${m[0]}</b> — ${esc(e.targetName || e.name || e.email || '')}<p class="text-[11px] text-slate-400">${ago(d)}</p></div></div>`; }).join('') || '<p class="text-xs text-slate-400">لا توجد أحداث بعد.</p>';
   return `${A.errors.length ? `<div class="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-900 leading-relaxed"><b><i class="fa-solid fa-triangle-exclamation"></i> بعض البيانات لم تُحمَّل بسبب صلاحيات Firestore:</b> <span dir="ltr">${esc(A.errors.join(' • '))}</span><br>افتح تبويب «التحكم» وانسخ القواعد المطلوبة، ثم انشرها في Firebase Console ← Firestore ← Rules.</div>` : ''}
   <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-    ${kpi('المستخدمون', nf(U.length), 'fa-users', 'text-slate-900', `<span class="text-emerald-600 font-bold">+${nf(new7)}</span> <span class="text-slate-400">آخر ٧ أيام</span>`)}
-    ${kpi('متصلون الآن', nf(online), 'fa-signal', 'text-emerald-600', `<span class="text-slate-400">نشطون ٧ أيام: ${nf(act7)}</span>`)}
+    ${kpi('المستخدمون', nf(U.length), 'fa-users', 'text-slate-900', `<span class="text-emerald-600 font-bold">+${nf(new7)}</span> <span class="text-slate-400">آخر 7 أيام</span>`)}
+    ${kpi('متصلون الآن', nf(online), 'fa-signal', 'text-emerald-600', `<span class="text-slate-400">نشطون 7 أيام: ${nf(act7)}</span>`)}
     ${kpi('إجمالي مرات الدخول', nf(totalLogins), 'fa-right-to-bracket', 'text-teal-700', `<span class="text-slate-400">اليوم: ${nf(td.logins || 0)}</span>`)}
     ${kpi('زيارات اليوم', nf(td.visits || 0), 'fa-eye', 'text-sky-700', `<span class="text-slate-400">مستخدمون فريدون: ${nf(td.dau || 0)}</span>`)}
     ${kpi('الجمعيات', nf(jam.length), 'fa-people-roof')}
@@ -1379,8 +1379,8 @@ function tabOverview() {
     ${kpi('إجمالي الدورات', money(total), 'fa-sack-dollar', 'text-emerald-600')}
     ${kpi('محظورون / لم يدخلوا', nf(blocked) + ' / ' + nf(never), 'fa-user-slash', blocked ? 'text-rose-600' : 'text-slate-900')}
   </div>
-  <div class="grid md:grid-cols-2 gap-4"><div class="card p-5"><h4 class="font-black text-sm mb-3"><i class="fa-solid fa-eye text-sky-600"></i> الزيارات — آخر ١٤ يوماً</h4>${barChart(k14.map(dayLbl), k14.map(k => (A.stats[k] || {}).visits || 0), 2, k14)}</div>
-  <div class="card p-5"><h4 class="font-black text-sm mb-3"><i class="fa-solid fa-right-to-bracket text-teal-600"></i> مرات الدخول — آخر ١٤ يوماً</h4>${barChart(k14.map(dayLbl), k14.map(k => (A.stats[k] || {}).logins || 0), 2, k14)}</div></div>
+  <div class="grid md:grid-cols-2 gap-4"><div class="card p-5"><h4 class="font-black text-sm mb-3"><i class="fa-solid fa-eye text-sky-600"></i> الزيارات — آخر 14 يوماً</h4>${barChart(k14.map(dayLbl), k14.map(k => (A.stats[k] || {}).visits || 0), 2, k14)}</div>
+  <div class="card p-5"><h4 class="font-black text-sm mb-3"><i class="fa-solid fa-right-to-bracket text-teal-600"></i> مرات الدخول — آخر 14 يوماً</h4>${barChart(k14.map(dayLbl), k14.map(k => (A.stats[k] || {}).logins || 0), 2, k14)}</div></div>
   <div class="grid md:grid-cols-2 gap-4">
    <div class="card p-5"><h4 class="font-black text-sm mb-3"><i class="fa-solid fa-trophy text-amber-500"></i> الأكثر دخولاً</h4><div class="space-y-1.5">${[...U].sort((a, b) => b.logins - a.logins).filter(x => x.logins).slice(0, 5).map(x => miniUser(x, nf(x.logins) + ' مرة • ' + ago(x.lastAct))).join('') || '<p class="text-xs text-slate-400">لا توجد بيانات دخول بعد.</p>'}</div></div>
    <div class="card p-5"><h4 class="font-black text-sm mb-3"><i class="fa-solid fa-bolt text-emerald-500"></i> آخر المستخدمين نشاطاً</h4><div class="space-y-1.5">${[...U].filter(x => x.lastAct).sort((a, b) => lastTime(b) - lastTime(a)).slice(0, 5).map(x => miniUser(x, ago(x.lastAct))).join('') || '<p class="text-xs text-slate-400">لا توجد بيانات.</p>'}</div></div>
@@ -1389,7 +1389,7 @@ function tabOverview() {
 }
 
 /* المستخدمون */
-const UF = [['all', 'الكل'], ['online', 'متصل الآن'], ['active7', 'نشط ٧ أيام'], ['idle', 'خامل +٣٠ يوماً'], ['never', 'لم يدخل بعد'], ['blocked', 'محظور'], ['noted', 'عليه ملاحظات']];
+const UF = [['all', 'الكل'], ['online', 'متصل الآن'], ['active7', 'نشط 7 أيام'], ['idle', 'خامل +30 يوماً'], ['never', 'لم يدخل بعد'], ['blocked', 'محظور'], ['noted', 'عليه ملاحظات']];
 function filteredUsers() {
   const A = state.admin, q = lc(A.q), qd = normPhone(A.q), now = Date.now();
   let L = A.users.map(userInfo).filter(x => {
@@ -1439,7 +1439,7 @@ function jamListHtml() {
 function tabJam() {
   const A = state.admin, J = A.jamiyat, full = J.filter(j => filledOf(j) >= j.count).length;
   return `<div class="grid grid-cols-2 md:grid-cols-4 gap-3">${kpi('إجمالي الجمعيات', nf(J.length), 'fa-people-roof')}${kpi('مكتملة الأعضاء', nf(full), 'fa-circle-check', 'text-emerald-600')}${kpi('تنتظر أعضاء', nf(J.length - full), 'fa-hourglass-half', 'text-amber-600')}
-    ${kpi('متوسط الأعضاء', J.length ? nf(Math.round(J.reduce((s, j) => s + (j.memberUids || []).length, 0) / J.length * 10) / 10) : '٠', 'fa-user-group')}</div>
+    ${kpi('متوسط الأعضاء', J.length ? nf(Math.round(J.reduce((s, j) => s + (j.memberUids || []).length, 0) / J.length * 10) / 10) : '0', 'fa-user-group')}</div>
     <div class="card p-5 space-y-3"><input class="inp" data-adm-q="jq" value="${esc(A.jq)}" placeholder="بحث باسم الجمعية أو المشرف…"><div id="adm-jlist">${jamListHtml()}</div></div>`;
 }
 
@@ -1459,7 +1459,7 @@ function tabTraffic() {
     ${kpi('تسجيلات جديدة', nf(tot('regs')), 'fa-user-plus', 'text-emerald-600', delta(tot('regs'), ptot('regs')))}
     ${kpi('متوسط الزيارات اليومي', nf(Math.round(tot('visits') / R * 10) / 10), 'fa-gauge')}
     ${kpi('أفضل يوم', best[1] ? dayLbl(best[0]) + ' (' + nf(best[1]) + ')' : '—', 'fa-calendar-day')}
-    ${kpi('ذروة الساعات', hv[pk] ? nf(pk) + ':٠٠' : '—', 'fa-clock')}
+    ${kpi('ذروة الساعات', hv[pk] ? nf(pk) + ':00' : '—', 'fa-clock')}
     ${kpi('من التطبيق المثبّت', nf(tot('pwa')), 'fa-mobile-screen-button', 'text-violet-700')}
   </div>
   <div class="card p-5"><div class="flex flex-wrap justify-between gap-2 mb-3"><h4 class="font-black text-sm"><i class="fa-solid fa-chart-column text-teal-600"></i> ${M[A.metric]}</h4>
@@ -1471,7 +1471,7 @@ function tabTraffic() {
     ${breakdown('المتصفحات', 'fa-globe', sumMap(keys, 'br'))}
     ${breakdown('مصادر الزيارات', 'fa-link', sumMap(keys, 'src'))}
     ${breakdown('الصفحات الأكثر مشاهدة', 'fa-table-columns', sumMap(keys, 'views'), k => VIEW_L[k] || k)}
-    <div class="card p-5"><h4 class="font-black text-sm mb-3"><i class="fa-solid fa-clock text-teal-600"></i> الزيارات حسب ساعة اليوم (بتوقيت جهاز الزائر)</h4>${barChart(hv.map((_, h) => nf(h)), hv, 3, hv.map((_, h) => nf(h) + ':٠٠'))}</div>
+    <div class="card p-5"><h4 class="font-black text-sm mb-3"><i class="fa-solid fa-clock text-teal-600"></i> الزيارات حسب ساعة اليوم (بتوقيت جهاز الزائر)</h4>${barChart(hv.map((_, h) => nf(h)), hv, 3, hv.map((_, h) => nf(h) + ':00'))}</div>
   </div>
   <p class="text-[11px] text-slate-400 leading-relaxed">الزيارة تُحتسب مرة لكل جلسة متصفح. الدخول يُحتسب مرة لكل جلسة لكل مستخدم (إعادة تحميل الصفحة لا تزيده). نشاط المالك والمشرفين لا يدخل في إحصاءات الصفحات. تبدأ الإحصاءات من لحظة نشر هذه النسخة${devT ? '' : ' — ولا توجد بيانات بعد'}.</p>`;
 }
@@ -1484,7 +1484,7 @@ function tabLog() {
   return `<div class="card p-5 space-y-3"><div class="atabs">${chips.map(([k, l]) => `<button class="achip ${f === k ? 'on' : ''}" data-act="adm-evf" data-v="${k}">${l}</button>`).join('')}</div>
     <div class="space-y-1.5">${L.map(e => { const m = EV_L[e.type] || [e.type, 'fa-circle', 'text-slate-500'], d = tsd(e.ts);
       return `<div class="flex gap-3 items-start p-2.5 bg-slate-50 rounded-xl text-xs"><i class="fa-solid ${m[1]} ${m[2]} mt-1"></i><div class="flex-1 min-w-0"><b>${m[0]}</b> — ${esc(e.name || e.email || '')}${e.targetName ? ' ← ' + esc(e.targetName) : ''}${e.info ? `<p class="text-slate-500 break-words">${esc(e.info)}</p>` : ''}</div><span class="text-[11px] text-slate-400 flex-none text-left">${d ? fmtDT(d) : ''}</span></div>`; }).join('') || '<p class="text-xs text-slate-400">لا توجد أحداث.</p>'}</div>
-    <p class="text-[11px] text-slate-400">يعرض آخر ٢٠٠ حدث.</p></div>`;
+    <p class="text-[11px] text-slate-400">يعرض آخر 200 حدث.</p></div>`;
 }
 
 /* التحكم */
@@ -1867,6 +1867,7 @@ async function registerPush(force) {
     const reg = await navigator.serviceWorker.ready;
     const tok = await firebase.messaging().getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
     if (!tok) return { ok: false, err: 'no-token' };
+    state._tok = tok;
     const key = state.user.uid + ':' + tok;
     if (force || state._pushReg !== key) { await db.collection('users').doc(state.user.uid).set({ fcmTokens: FV.arrayUnion(tok) }, { merge: true }); state._pushReg = key; }
     return { ok: true };
@@ -1896,6 +1897,10 @@ async function sendNotifs(uids, title, body, jid, kind, tag) {
     return list.length;
   } catch (e) { console.warn('notif', e.code || e.message); return 0; }
 }
+// معرّف هذا الجهاز: بصمة رمز FCM (يطابقها الخادم) + معرّف محلي احتياطي. كل جهاز يؤكد استلامه بنفسه دون أن يمنع الدفع لبقية أجهزة الحساب
+const devId = () => { let d = lsGet('jm_dev'); if (!d) { d = 'd' + Math.random().toString(36).slice(2, 12); lsSet('jm_dev', d); } return d; };
+const devKeys = () => [devId(), ...(state._tok ? [state._tok.slice(-24)] : [])];
+const ackedHere = n => Array.isArray(n.ack) && devKeys().some(k => n.ack.includes(k));
 const nSecs = n => (n.createdAt && n.createdAt.seconds) || 0;
 const unreadCount = () => (state.inbox || []).filter(n => n.read !== true).length;
 function listenNotifs() {
@@ -1906,7 +1911,7 @@ function listenNotifs() {
       if (c.type !== 'added' || c.doc.metadata.hasPendingWrites) return;
       const n = { id: c.doc.id, ...c.doc.data() };
       // يُعرض محلياً إن لم يدفعه الخادم لجهاز المستخدم (أو لم يكن للمستخدم جهاز مسجّل)
-      if (n.read !== true && n.delivered !== true && (n.pushed !== true || n.noPush === true)) state.nq.push(n);
+      if (n.read !== true && !ackedHere(n) && (n.pushed !== true || n.noPush === true)) state.nq.push(n);
     });
     state.inbox.slice(30).forEach(n => { if (!state._pruned.has(n.id)) { state._pruned.add(n.id); db.collection('notifs').doc(n.id).delete().catch(() => {}); } }); // نحتفظ بآخر 30
     flushNotifs(); renderNav();
@@ -1925,7 +1930,7 @@ function flushNotifs() {
   fresh.slice(0, 3).forEach(n => show(n.title, n.body, tg(n), n.jid));
   if (fresh.length > 3) show('الجمعية الذكية', 'لديك ' + nf(fresh.length - 3) + ' إشعارات أخرى جديدة', 'more_' + Date.now(), '');
   fresh.forEach(n => seen.push(tg(n))); lsSet(seenKey(), JSON.stringify(seen.slice(-300)));
-  q.forEach(n => db.collection('notifs').doc(n.id).update({ pushed: true, delivered: true }).catch(() => {}));
+  q.forEach(n => db.collection('notifs').doc(n.id).update({ ack: FV.arrayUnion(...devKeys()) }).catch(() => {}));
 }
 async function markInboxRead() {
   const un = (state.inbox || []).filter(n => n.read !== true).slice(0, 30); if (!un.length) return;
@@ -2365,7 +2370,7 @@ function paintChat(stick) {
   const near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
   box.innerHTML = state.chat.length ? state.chat.map(m => {
     const mine = m.uid === me, mem = state.members[m.uid], t = tsd(m.createdAt);
-    const tm = t ? t.toLocaleString('ar-SA-u-ca-gregory', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'الآن';
+    const tm = t ? t.toLocaleString('ar-SA-u-ca-gregory-nu-latn', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'الآن';
     const tag = m.uid === j.creatorUid ? ' <span class="opacity-70">(مشرف)</span>' : (j.deputyUid && m.uid === j.deputyUid) ? ' <span class="opacity-70">(نائب)</span>' : '';
     return `<div class="flex ${mine ? 'justify-start' : 'justify-end'}"><div class="max-w-[85%] px-3 py-2 rounded-2xl ${mine ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-100'}">
       <p class="text-[10px] font-bold ${mine ? 'text-emerald-100' : 'text-teal-700'}">${mem ? esc(dispName(mem)) : 'عضو سابق'}${tag}</p>
