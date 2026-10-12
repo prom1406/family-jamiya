@@ -167,6 +167,31 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 .hbar{height:7px;border-radius:99px;background:#e2e8f0;overflow:hidden}.hbar>i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#14b8a6,#10b981)}
 .bdg{display:inline-flex;align-items:center;gap:.25rem;padding:.1rem .5rem;border-radius:99px;font-size:10px;font-weight:800}
 .dot-on{display:inline-block;width:9px;height:9px;border-radius:50%;background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.25)}
+
+/* ===== الهوية المالية: زجاجية زمردية (Advanced Glassmorphism) ===== */
+:root{--brand:#0f766e;--brand-2:#059669;--ink:#0f172a;--bg:#f8fafc;--loss:#e11d48}
+body{font-family:'Cairo',system-ui,sans-serif;color:var(--ink);
+  background:radial-gradient(900px 420px at 100% -8%,rgba(110,231,183,.35) 0,transparent 60%),radial-gradient(800px 380px at -10% 0,rgba(94,234,212,.28) 0,transparent 55%),linear-gradient(160deg,#f8fafc 0%,#e2e8f0 100%);background-attachment:fixed}
+.app-header{background:rgba(255,255,255,.28);-webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);border-bottom:1px solid rgba(255,255,255,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 12px 28px -18px rgba(15,23,42,.25)}
+.app-header .logo{border-radius:14px;box-shadow:0 8px 18px -8px rgba(5,150,105,.6)}
+.card{background:rgba(255,255,255,.94);border:1px solid rgba(255,255,255,.85);border-radius:1.6rem;box-shadow:0 2px 4px rgba(15,23,42,.04),0 12px 24px -10px rgba(15,23,42,.14),0 30px 60px -28px rgba(5,150,105,.22)}
+.b-pri{background:linear-gradient(135deg,#059669 0%,#0f766e 100%);box-shadow:0 12px 24px -10px rgba(5,150,105,.7),inset 0 1px 0 rgba(255,255,255,.3)}
+.b-pri:hover{filter:brightness(1.04)}
+.hero{background:linear-gradient(135deg,#047857 0%,#0f766e 100%);border-radius:2rem;padding:1rem;box-shadow:0 24px 48px -20px rgba(4,120,87,.6)}
+.hero::before{background:rgba(110,231,183,.45);filter:blur(40px)}
+.hero::after{background:rgba(94,234,212,.4);filter:blur(40px)}
+.hero>*{position:relative;z-index:1;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+.stat{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);border-radius:1.1rem;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:inset 0 1px 0 rgba(255,255,255,.45)}
+.tabbar{background:rgba(255,255,255,.3);-webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);border:1px solid rgba(255,255,255,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 24px 48px -16px rgba(5,150,105,.35)}
+.tab{font-weight:700}
+.tab.on{color:var(--brand)}
+.tab.on::before{background:var(--brand)}
+.jicon{background:linear-gradient(135deg,#10b981,#0f766e);box-shadow:0 8px 16px -8px rgba(5,150,105,.55)}
+.jcard:nth-child(n) .jicon{background:linear-gradient(135deg,#10b981,#0f766e)}
+.jcard:hover{transform:translateY(-2px)}
+.bar>i,.hbar>i{background:linear-gradient(90deg,#059669,#0f766e)}
+.toast.success{background:linear-gradient(135deg,#059669,#0f766e)}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body class="text-slate-800 antialiased">
@@ -182,7 +207,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2.7<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2.75<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
