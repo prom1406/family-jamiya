@@ -182,7 +182,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,t
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2.6<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2.7<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -216,7 +216,7 @@ const BANKS = ["مصرف الراجحي","البنك الأهلي السعودي
 
 /* ============ الحالة ============ */
 const state = {
-  user: null, profile: null, isAdmin: false, view: 'loading', authMode: 'login',
+  user: null, profile: null, isAdmin: false, view: 'loading', authMode: (function () { try { return localStorage.getItem('jm_email') ? 'login' : 'register'; } catch (e) { return 'login'; } })(),
   jamiyat: [], invites: [], activeId: null, j: null, members: {}, payments: [], jInvites: [],
   admin: { jamiyat: [], users: [] }, unsubs: [], jUnsubs: [], pays: {}, payLs: {}, afterOpen: null
 };
@@ -283,6 +283,9 @@ function authErr(e) {
     'auth/popup-closed-by-user': 'تم إغلاق نافذة جوجل.',
     'auth/popup-blocked': 'المتصفح منع نافذة جوجل، جرّب الدخول بالبريد وكلمة المرور.',
     'auth/unauthorized-domain': 'هذا الدومين غير مضاف في Authorized domains بإعدادات Firebase.',
+    'auth/operation-not-allowed': 'هذه الطريقة غير مفعّلة بعد في Firebase (فعّل Email link من Sign-in method).',
+    'auth/invalid-action-code': 'رابط الدخول منتهٍ أو مستخدم، اطلب رابطاً جديداً.',
+    'auth/expired-action-code': 'انتهت صلاحية الرابط، اطلب رابطاً جديداً.',
     'auth/network-request-failed': 'مشكلة في الاتصال بالإنترنت.'
   };
   return m[e.code] || e.message;
@@ -398,14 +401,12 @@ const filledOf = j => Math.max((j.turns || []).length, (j.memberUids || []).leng
 const needsPay = (c, u) => (u !== c.recUid || sharesOf(c.turns, u) > 1) && c.acct[u] && ['unpaid', 'partial'].includes(c.acct[u].status);
 
 /* ============ المصادقة ============ */
-auth.onAuthStateChanged(async user => {
+auth.onAuthStateChanged(async user => { if (state._registering) return; await bootUser(user); });
+async function bootUser(user) {
   cleanup(state.unsubs); cleanup(state.jUnsubs); stopPayListeners(); state.pays = {}; stopBlockWatch(); stopHeartbeat(); state._tv = null;
   state.user = user; state.profile = null; state.isAdmin = false;
   state.jamiyat = []; state.invites = [];
   if (!user) { unlock(); state.view = 'auth'; return render(); }
-
-  const needsVerify = !user.emailVerified && user.providerData.every(p => p.providerId === 'password');
-  if (needsVerify) { state.view = 'verify'; return render(); }
 
   try {
     // تحديث الرمز ليحمل حالة تفعيل البريد الحالية، وإلا ترفض القواعد القراءة حتى ساعة بعد التفعيل
@@ -417,6 +418,7 @@ auth.onAuthStateChanged(async user => {
   } catch (e) { toast('تعذر تحميل الحساب: ' + e.message, 'error'); }
 
   if (!state.isAdmin && await isBlockedNow()) return;
+  if (!state.profile && user.displayName) { if (!(await autoProfile(user, user.displayName))) return; }
   if (!state.profile) { state.view = 'complete'; return render(); }
   maybeLock(true); watchBlocked(); trackSession(); renderBanner();
   claimPhone(user.uid, state.profile.phone);
@@ -424,7 +426,7 @@ auth.onAuthStateChanged(async user => {
   if (state.isAdmin) { state.view = 'admin'; render(); loadAdmin(); toast('مرحباً بك في لوحة المالك', 'info'); return; }
   state.view = launchAction() || 'home'; render();
   checkPendingJoin();
-});
+}
 
 /* حجز رقم الجوال: مستند في phones/{الرقم} يحمل uid صاحبه، فلا يمكن لحسابين استخدام نفس الرقم */
 async function saveProfileWithPhone(uid, data, mode, oldPhone) {
@@ -446,7 +448,7 @@ const phoneSaveErr = e => e && e.message === 'PHONE_TAKEN' ? PHONE_TAKEN_MSG : (
 function cleanup(arr) { arr.forEach(u => u()); arr.length = 0; }
 
 function startListeners() {
-  const uid = state.user.uid, email = lc(state.user.email), phone = normPhone(state.profile && state.profile.phone);
+  const uid = state.user.uid, email = lc(state.user.email), phone = normPhone(state.profile && state.profile.phone), ver = !!state.user.emailVerified;
   let invA = [], invB = [];
   const merge = () => { const m = new Map(); [...invA, ...invB].forEach(i => m.set(i.id, i)); state.invites = [...m.values()];
     state.invites.forEach(i => pushLocal('دعوة جديدة للانضمام', `دعاك ${i.inviterName || ''} إلى جمعية «${i.jamiyaName || ''}»`, 'inv_' + i.id)); if (state.view === 'home') render(); };
@@ -456,80 +458,154 @@ function startListeners() {
       syncPayListeners();
       if (state.view === 'home') render(); else renderNav();
     }, e => toast('خطأ في تحميل الجمعيات: ' + e.message, 'error')),
-    db.collection('invites').where('email', '==', email).where('status', '==', 'pending').onSnapshot(s => {
+    ...(ver ? [db.collection('invites').where('email', '==', email).where('status', '==', 'pending').onSnapshot(s => {
       invA = s.docs.map(d => ({ id: d.id, ...d.data() })); merge();
-    }, e => toast('خطأ في تحميل الدعوات: ' + e.message, 'error'))
+    }, e => toast('خطأ في تحميل الدعوات: ' + e.message, 'error'))] : [])
   );
   listenNotifs(); registerPush();
-  if (validPhone(phone)) state.unsubs.push(
+  if (ver && validPhone(phone)) state.unsubs.push(
     db.collection('invites').where('phone', '==', phone).where('status', '==', 'pending').onSnapshot(s => {
       invB = s.docs.map(d => ({ id: d.id, ...d.data() })); merge();
     }, e => toast('تعذر تحميل دعوات الجوال: تحقق من قواعد Firestore (' + e.code + ')', 'error'))
   );
 }
 
+// إنشاء الملف الشخصي تلقائياً بالحد الأدنى (الاسم والبريد)، وباقي البيانات تُطلب عند الحاجة فقط
+async function autoProfile(u, name) {
+  if (state.settings.regClosed && !state.isAdmin) { toast(state.settings.regMsg || 'التسجيل الجديد متوقف مؤقتاً', 'error'); await auth.signOut().catch(() => {}); return false; }
+  const profile = { name, email: lc(u.email), phone: '', bank: '', iban: '', waOptIn: false, nick: '', showAs: 'name', showPhone: false, showEmail: false, avatar: u.photoURL || '', ownerNotified: false, createdAt: FV.serverTimestamp() };
+  try { await db.collection('users').doc(u.uid).set(profile); } catch (e) { toast('تعذر إنشاء الحساب: ' + e.message, 'error'); return false; }
+  state.profile = profile; if (!state.isAdmin) incStat({ regs: 1 }); logEvent('register', { name });
+  return true;
+}
 async function doRegister(f) {
   if (state.settings.regClosed) return toast(state.settings.regMsg || 'التسجيل الجديد متوقف مؤقتاً', 'error');
   const name = f.name.value.trim(), email = lc(f.email.value), pass = f.password.value;
-  const phone = normPhone(f.phone.value), bank = resolveBank(f), iban = fixIban(f.iban.value);
-  if (bank === null) return;
-  const idn = readIdentity(f), ie = identityErr(idn); if (ie) return toast(ie, 'error');
-  if (name.length < 3) return toast('اكتب الاسم الثلاثي', 'error');
+  if (name.length < 3) return toast('اكتب اسمك (3 أحرف على الأقل)', 'error');
   if (!validEmail(email)) return toast('البريد غير صحيح', 'error');
   if (pass.length < 6) return toast('كلمة المرور 6 أحرف على الأقل', 'error');
-  if (!validPhone(phone)) return toast('رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
-  if (!bank.startsWith('كاش') && !validIban(iban)) return toast('الآيبان يجب أن يكون SA متبوعاً بـ 22 رقماً', 'error');
-  if (!f.terms.checked) return toast('يجب الموافقة على الشروط', 'error');
+  const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+  state._registering = true;
   try {
     const cred = await auth.createUserWithEmailAndPassword(email, pass);
-    try {
-      await cred.user.updateProfile({ displayName: name });
-      await saveProfileWithPhone(cred.user.uid, { name, email, phone, bank, iban: bank.startsWith('كاش') ? '' : iban, waOptIn: f.waOptIn.checked, ...idn, avatar: '', ownerNotified: false, createdAt: FV.serverTimestamp() }, 'set', null);
-      incStat({ regs: 1 }); logEvent('register', { name });
-    } catch (e) {
-      await cred.user.delete().catch(() => {}); // نتراجع عن إنشاء الحساب ليعيد المحاولة برقم آخر
-      return toast(phoneSaveErr(e), 'error');
-    }
-    await cred.user.sendEmailVerification({ url: appUrl() });
-    toast('تم إنشاء الحساب وإرسال رابط التحقق إلى بريدك');
-    await auth.signOut().catch(() => {});
-    state.authMode = 'login'; state.view = 'auth'; render();
-    toast('فعّل بريدك من الرسالة ثم سجّل الدخول', 'info');
-  } catch (e) { toast(authErr(e), 'error'); }
+    await cred.user.updateProfile({ displayName: name }).catch(() => {});
+    cred.user.sendEmailVerification({ url: appUrl() }).catch(() => {});
+    try { localStorage.setItem('jm_email', email); } catch (e) {}
+    state._registering = false;
+    await bootUser(auth.currentUser); // ندخل مباشرة دون شاشة تحقق ولا إعادة تسجيل دخول
+    toast('أهلاً بك! أرسلنا رابط تفعيل إلى بريدك', 'success');
+  } catch (e) { state._registering = false; btn.disabled = false; toast(authErr(e), 'error'); }
 }
 async function doLogin(f) {
-  try {
-    const cred = await auth.signInWithEmailAndPassword(lc(f.email.value), f.password.value);
-    if (!cred.user.emailVerified) {
-      await cred.user.sendEmailVerification({ url: appUrl() }).catch(() => {});
-    }
-  } catch (e) { toast(authErr(e), 'error'); }
+  const email = lc(f.email.value);
+  try { await auth.signInWithEmailAndPassword(email, f.password.value); try { localStorage.setItem('jm_email', email); } catch (e) {} }
+  catch (e) { toast(authErr(e), 'error'); }
 }
 async function doReset(f) {
   try { await auth.sendPasswordResetEmail(lc(f.email.value), { url: appUrl() }); toast('أُرسل رابط إعادة تعيين كلمة المرور إلى بريدك'); state.authMode = 'login'; render(); }
   catch (e) { toast(authErr(e), 'error'); }
 }
 async function doGoogle() {
-  try { await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
-  catch (e) { toast(authErr(e), 'error'); }
+  const prov = new firebase.auth.GoogleAuthProvider();
+  try { const r = await auth.signInWithPopup(prov); try { localStorage.setItem('jm_email', r.user.email || ''); } catch (e) {} }
+  catch (e) {
+    if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/web-storage-unsupported'].includes(e.code)) { try { return await auth.signInWithRedirect(prov); } catch (e2) { e = e2; } }
+    toast(authErr(e), 'error');
+  }
 }
-async function doCompleteProfile(f) {
-  if (f.terms && !f.terms.checked) return toast('يجب الموافقة على الشروط وسياسة الخصوصية', 'error');
-  if (state.settings.regClosed && !state.isAdmin) return toast(state.settings.regMsg || 'التسجيل الجديد متوقف مؤقتاً', 'error');
-  const phone = normPhone(f.phone.value), bank = resolveBank(f), iban = fixIban(f.iban.value);
-  if (bank === null) return;
-  const idn = readIdentity(f), ie = identityErr(idn); if (ie) return toast(ie, 'error');
-  if (!validPhone(phone)) return toast('رقم الجوال غير صحيح', 'error');
-  if (!bank.startsWith('كاش') && !validIban(iban)) return toast('الآيبان غير صحيح', 'error');
-  const u = state.user;
-  const profile = { name: u.displayName || 'عضو', email: lc(u.email), phone, bank, iban: bank.startsWith('كاش') ? '' : iban, waOptIn: f.waOptIn.checked, ...idn, avatar: u.photoURL || '', ownerNotified: false, createdAt: FV.serverTimestamp() };
+// الدخول برابط يصل البريد (بدون كلمة مرور): أبسط طريقة للمستخدم الجديد
+async function doEmailLink() {
+  const fm = document.querySelector('#f-register, #f-login'), em = fm && fm.email ? lc(fm.email.value) : '';
+  if (!validEmail(em)) return toast('اكتب بريدك في الحقل أولاً ثم اضغط الزر', 'error');
   try {
-    await saveProfileWithPhone(u.uid, profile, 'set', null);
-    if (!state.isAdmin) incStat({ regs: 1 }); logEvent('register', { name: profile.name });
-    state.profile = profile; startListeners();
-    if (state.isAdmin) { state.view = 'admin'; render(); loadAdmin(); } else { state.view = 'home'; render(); }
+    await auth.sendSignInLinkToEmail(em, { url: appUrl(), handleCodeInApp: true });
+    try { localStorage.setItem('jm_emaillink', em); localStorage.setItem('jm_email', em); } catch (e) {}
+    toast('أرسلنا رابط الدخول إلى بريدك، افتحه من نفس الجهاز', 'success');
+  } catch (e) { toast(authErr(e), 'error'); }
+}
+(async function () {
+  try {
+    if (!auth.isSignInWithEmailLink(location.href)) return;
+    let em = ''; try { em = localStorage.getItem('jm_emaillink') || ''; } catch (e) {}
+    if (!em) em = (prompt('اكتب بريدك الإلكتروني لإكمال الدخول') || '').trim().toLowerCase();
+    if (!em) return;
+    await auth.signInWithEmailLink(em, location.href);
+    try { localStorage.removeItem('jm_emaillink'); localStorage.setItem('jm_email', em); } catch (e) {}
+    history.replaceState(null, '', location.pathname);
+  } catch (e) { toast(authErr(e), 'error'); }
+})();
+// بعد إنشاء حساب بطريقة الرابط أو بلا اسم: نسأل عن الاسم فقط
+async function doCompleteProfile(f) {
+  const name = f.name.value.trim(); if (name.length < 3) return toast('اكتب اسمك (3 أحرف على الأقل)', 'error');
+  try {
+    await state.user.updateProfile({ displayName: name }).catch(() => {});
+    if (await autoProfile(state.user, name)) await bootUser(auth.currentUser);
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+/* ---- تفعيل البريد بدون تعطيل: تنبيه خفيف، ويُطلب عند الحاجة فقط ---- */
+let verChecking = false;
+async function softVerifyCheck(manual) {
+  const u = auth.currentUser; if (!u || verChecking) return;
+  if (u.emailVerified) { if (manual) toast('بريدك مفعّل ✓'); return; }
+  verChecking = true;
+  try {
+    await u.reload();
+    if (u.emailVerified) { await u.getIdToken(true); state.user = auth.currentUser; if (state.profile) { cleanup(state.unsubs); startListeners(); } toast('تم تفعيل بريدك ✓'); closeModal(); render(); }
+    else if (manual) toast('لم يُفعَّل بعد، افتح الرابط المرسل لبريدك ثم عد هنا', 'error');
+  } catch (e) { if (manual) toast(authErr(e), 'error'); } finally { verChecking = false; }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') softVerifyCheck(false); });
+function needVerified(next) {
+  if (!state.user || state.user.emailVerified) return next();
+  state._afterVerify = next;
+  showModal('فعّل بريدك أولاً', `<div class="space-y-3 text-center"><div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl"><i class="fa-solid fa-envelope-circle-check"></i></div>
+    <p class="text-xs text-slate-600 leading-relaxed">لحماية حسابك وأموال الأعضاء نفعّل بريدك مرة واحدة فقط. أرسلنا الرابط إلى <b dir="ltr">${esc(state.user.email)}</b>، افتحه ثم عد واضغط «تم التفعيل».</p>
+    <button class="btn b-pri w-full py-3" data-act="verify-check">تم التفعيل، تابع</button><button class="btn b-sec w-full" data-act="verify-resend">إعادة إرسال الرابط</button></div>`);
+}
+async function verifyCheckAction() {
+  await softVerifyCheck(true);
+  if (state.user && state.user.emailVerified && state._afterVerify) { const n = state._afterVerify; state._afterVerify = null; n(); }
+}
+function verifyBanner() {
+  if (!state.user || state.user.emailVerified) return '';
+  return `<div class="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs space-y-2"><p class="font-black text-amber-900"><i class="fa-solid fa-envelope-circle-check"></i> فعّل بريدك لتنضم أو تنشئ جمعية</p>
+    <p class="text-amber-800 leading-relaxed">أرسلنا رابط التفعيل إلى <b dir="ltr">${esc(state.user.email)}</b>. افتحه ثم ارجع هنا وسيُحدَّث تلقائياً.</p>
+    <div class="flex gap-2"><button class="btn b-pri flex-1" data-act="verify-check">تم التفعيل</button><button class="btn b-sec flex-1" data-act="verify-resend">إعادة الإرسال</button></div></div>`;
+}
+
+/* ---- البيانات تُطلب عند الحاجة: الجوال والحساب البنكي قبل الانضمام لجمعية فقط ---- */
+const profileComplete = p => !!p && validPhone(p.phone) && !!p.bank && (String(p.bank).startsWith('كاش') || validIban(p.iban));
+function needDetails(next) {
+  if (profileComplete(state.profile)) return next();
+  state._afterDetails = next;
+  const p = state.profile || {}, known = BANKS.includes(p.bank), sel = known ? p.bank : (p.bank ? OTHER_BANK : undefined), lb = 'text-xs font-semibold block mb-1';
+  showModal('خطوة أخيرة قبل المتابعة', `<form id="f-need" class="space-y-3"><p class="text-xs text-slate-600 leading-relaxed">لتشارك في جمعية نحتاج جوالك (للتواصل والتذكير) وحسابك البنكي (لتستلم دورك). تُدخلها مرة واحدة فقط.</p>
+    <div><label class="${lb}">رقم الجوال (05xxxxxxxx)</label><input name="phone" class="inp" type="tel" inputmode="numeric" autocomplete="tel" value="${esc(p.phone)}" placeholder="05xxxxxxxx"></div>
+    <div><label class="${lb}">البنك</label><select name="bank" class="inp">${bankOpts(sel)}</select><div data-other class="${sel === OTHER_BANK ? '' : 'hide'} mt-2"><input name="bankOther" class="inp" placeholder="اكتب اسم البنك أو المحفظة" value="${esc(known ? '' : p.bank)}"></div></div>
+    <div><label class="${lb}">الآيبان (SA + 22 رقماً) — اتركه فارغاً للكاش</label><input name="iban" class="inp" dir="ltr" value="${esc(p.iban)}" placeholder="SA0000000000000000000000"></div>
+    <label class="flex items-start gap-2 text-xs"><input type="checkbox" name="waOptIn" class="mt-0.5" checked> <span>أرغب بتنبيهات السداد والدعوات عبر واتساب</span></label>
+    <button class="btn b-pri w-full py-3" type="submit">حفظ ومتابعة</button></form>`);
+}
+async function doNeedDetails(f) {
+  const phone = normPhone(f.phone.value), bank = resolveBank(f), iban = fixIban(f.iban.value); if (bank === null) return;
+  if (!validPhone(phone)) return toast('رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
+  if (!bank.startsWith('كاش') && !validIban(iban)) return toast('الآيبان يجب أن يكون SA متبوعاً بـ 22 رقماً', 'error');
+  const old = state.profile && state.profile.phone, data = { phone, bank, iban: bank.startsWith('كاش') ? '' : iban, waOptIn: f.waOptIn.checked };
+  try {
+    await saveProfileWithPhone(state.user.uid, data, 'update', validPhone(old) ? old : null);
+    state.profile = { ...state.profile, ...data }; cleanup(state.unsubs); startListeners();
+    closeModal(); toast('تم حفظ بياناتك');
+    const n = state._afterDetails; state._afterDetails = null; if (n) n(); else render();
   } catch (e) { toast(phoneSaveErr(e), 'error'); }
 }
+function detailsNudge() {
+  if (profileComplete(state.profile) || lsGet('jm_nudge_x')) return '';
+  return `<div class="p-4 bg-sky-50 border border-sky-100 rounded-2xl text-xs flex items-start gap-3"><div class="flex-1 space-y-1"><p class="font-black text-sky-900"><i class="fa-solid fa-circle-user"></i> أكمل بياناتك مرة واحدة</p>
+    <p class="text-sky-800 leading-relaxed">الجوال والحساب البنكي لتنضم إلى الجمعيات وتستلم دورك. ليست مطلوبة للتعاون العائلي.</p><button class="btn b-pri mt-1" data-act="open-details">أكمل الآن</button></div>
+    <button class="text-sky-400" data-act="dismiss-nudge" aria-label="إخفاء"><i class="fa-solid fa-xmark"></i></button></div>`;
+}
+
 async function recheckVerification() {
   await auth.currentUser.reload();
   if (auth.currentUser.emailVerified) { await auth.currentUser.getIdToken(true); toast('تم التحقق من البريد'); location.reload(); }
@@ -606,7 +682,11 @@ async function sendInviteMail(i) {
       <button class="btn b-sec" data-act="copy-invite"><i class="fa-solid fa-copy"></i> نسخ نص الدعوة</button></div></div>`);
   }
 }
-async function acceptInvite(inviteId) {
+function acceptInvite(inviteId) {
+  const inv = state.invites.find(i => i.id === inviteId); if (!inv) return;
+  needVerified(() => inv.family ? acceptInviteCore(inviteId) : needDetails(() => acceptInviteCore(inviteId)));
+}
+async function acceptInviteCore(inviteId) {
   const inv = state.invites.find(i => i.id === inviteId); if (!inv) return;
   const uid = state.user.uid, p = state.profile;
   const batch = db.batch();
@@ -614,7 +694,7 @@ async function acceptInvite(inviteId) {
   batch.update(jRef, { memberUids: FV.arrayUnion(uid), turns: FV.arrayUnion(uid) });
   batch.update(db.collection('invites').doc(inviteId), { status: 'accepted' });
   batch.set(jRef.collection('members').doc(uid), memberDoc(uid, p));
-  try { await batch.commit(); toast('تم الانضمام للجمعية'); notifyJoin(inv); logEvent(inv.jamiyaId, 'join', `${dispName(state.profile)} انضم إلى الجمعية بالدعوة`); } catch (e) { toast(e.code === 'permission-denied' ? 'تعذر الانضمام: ربما اكتمل عدد أعضاء الجمعية أو أُلغيت الدعوة' : 'تعذر الانضمام: ' + e.message, 'error'); }
+  try { await batch.commit(); toast('تم الانضمام للجمعية'); notifyJoin(inv); jlog(inv.jamiyaId, 'join', `${dispName(state.profile)} انضم إلى الجمعية بالدعوة`); } catch (e) { toast(e.code === 'permission-denied' ? 'تعذر الانضمام: ربما اكتمل عدد أعضاء الجمعية أو أُلغيت الدعوة' : 'تعذر الانضمام: ' + e.message, 'error'); }
 }
 async function removeMember(uid) {
   const c = ctx(); if (!c || !c.isCreator || uid === c.j.creatorUid) return;
@@ -626,7 +706,7 @@ async function removeMember(uid) {
   batch.update(ref, { memberUids: FV.arrayRemove(uid), turns: FV.arrayRemove(uid), ...(c.j.deputyUid === uid ? { deputyUid: '' } : {}) });
   batch.delete(ref.collection('members').doc(uid));
   batch.delete(ref.collection('wishes').doc(uid));
-  try { await batch.commit(); toast('تم حذف العضو'); logEvent(c.j.id, 'remove', `${dispName(state.profile)} أزال ${dispName(m)} من الجمعية`); } catch (e) { toast('تعذر الحذف: ' + e.message, 'error'); }
+  try { await batch.commit(); toast('تم حذف العضو'); jlog(c.j.id, 'remove', `${dispName(state.profile)} أزال ${dispName(m)} من الجمعية`); } catch (e) { toast('تعذر الحذف: ' + e.message, 'error'); }
 }
 async function declineInvite(inviteId) {
   try { await db.collection('invites').doc(inviteId).update({ status: 'declined' }); toast('تم رفض الدعوة', 'info'); }
@@ -634,7 +714,8 @@ async function declineInvite(inviteId) {
 }
 
 /* ============ إنشاء وفتح الجمعية ============ */
-async function handleCreate(f) {
+function handleCreate(f) { needVerified(() => needDetails(() => handleCreateCore(f))); }
+async function handleCreateCore(f) {
   const name = f.jname.value.trim(), count = parseInt(f.count.value), amount = parseFloat(f.amount.value);
   const startDate = f.start.value, lastDay = parseInt(f.lastDay.value), payDay = parseInt(f.payDay.value);
   const frequency = FREQS[f.frequency.value] ? f.frequency.value : 'monthly', maxDay = maxDayOf({ frequency });
@@ -885,7 +966,7 @@ async function submitPayment(f) {
     });
     await batch.commit();
     sendNotifs([c.recUid, c.j.creatorUid], 'إيصال جديد بانتظار تأكيدك', `${dispName(state.profile)} — جمعية «${c.j.name}» — ${fmtNum(amount)} ريال`, c.j.id, 'pay', 'pp_' + pid);
-    logEvent(c.j.id, 'pay', `${dispName(state.profile)} رفع إيصال سداد ${fmtNum(amount)} ريال (${periodLabel(c.j, c.cur)})`);
+    jlog(c.j.id, 'pay', `${dispName(state.profile)} رفع إيصال سداد ${fmtNum(amount)} ريال (${periodLabel(c.j, c.cur)})`);
     const rn = c.rec ? dispName(c.rec) : 'المستلم';
     showModal('تم إرسال الإيصال ✓', `<div class="space-y-3 text-center"><div class="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl space-y-1"><p class="text-3xl">⏳</p><p class="font-black text-emerald-800">بانتظار تأكيد ${esc(rn)}</p><p class="text-xs text-slate-600">وصله إشعار بإيصالك (${fmtNum(amount)} ريال). ستصلك رسالة عند التأكيد.</p></div>
       ${c.rec && c.rec.phone ? `<a class="btn b-sec w-full" target="_blank" rel="noopener" href="${waLink(c.rec.phone, `السلام عليكم ${rn}، سددت ${fmtNum(amount)} ريال لجمعية «${c.j.name}» ورفعت الإيصال في التطبيق، بانتظار تأكيدك 🙏`)}"><i class="fa-brands fa-whatsapp"></i> إبلاغ ${esc(rn)} عبر واتساب (اختياري)</a>` : ''}
@@ -936,8 +1017,8 @@ async function confirmPayment(payId) {
     if (reached) { upd.closed = true; upd.reached = true; }
     if (Object.keys(upd).length) b.update(jr, upd);
     await b.commit();
-    if (reached) { sendNotifs(jj.memberUids, 'اكتمل الهدف 🎉', `بلغ تعاون «${jj.name}» مبلغه المستهدف، جزاكم الله خيراً`, jj.id, 'family'); logEvent(jj.id, 'family', 'اكتمل المبلغ المستهدف وأُغلق التعاون تلقائياً'); }
-    if (pay) logEvent(state.j.id, 'confirm', `${dispName(state.profile)} أكّد استلام ${fmtNum(pay.amount)} ريال من ${pay.name || 'عضو'}`);
+    if (reached) { sendNotifs(jj.memberUids, 'اكتمل الهدف 🎉', `بلغ تعاون «${jj.name}» مبلغه المستهدف، جزاكم الله خيراً`, jj.id, 'family'); jlog(jj.id, 'family', 'اكتمل المبلغ المستهدف وأُغلق التعاون تلقائياً'); }
+    if (pay) jlog(state.j.id, 'confirm', `${dispName(state.profile)} أكّد استلام ${fmtNum(pay.amount)} ريال من ${pay.name || 'عضو'}`);
     if (pay) sendNotifs([pay.uid], 'تم تأكيد سدادك ✓', `${state.j.type === 'family' ? 'تعاون' : 'جمعية'} «${state.j.name}» — ${fmtNum(pay.amount)} ريال`, state.j.id, 'pay', 'pc_' + payId);
     closeModal(); toast('تم تأكيد الاستلام'); }
   catch (e) { toast(e.message, 'error'); }
@@ -993,7 +1074,7 @@ function orderShuffle() {
 async function orderSave() {
   const c = ctx();
   if (state.orderDraft.slice(0, lockedCount(c)).join() !== c.turns.slice(0, lockedCount(c)).join()) return toast('لا يمكن تغيير الدورات المقفلة', 'error');
-  try { await db.collection('jamiyat').doc(c.j.id).update({ turns: state.orderDraft }); closeModal(); toast('تم حفظ ترتيب القبض'); logEvent(c.j.id, 'order', `${dispName(state.profile)} عدّل ترتيب القبض`); }
+  try { await db.collection('jamiyat').doc(c.j.id).update({ turns: state.orderDraft }); closeModal(); toast('تم حفظ ترتيب القبض'); jlog(c.j.id, 'order', `${dispName(state.profile)} عدّل ترتيب القبض`); }
   catch (e) { toast(e.message, 'error'); }
 }
 
@@ -1041,7 +1122,7 @@ async function submitEdit(f) {
 async function saveEdit(upd) {
   const j = state.j, patch = { ...upd };
   if (upd.amount !== j.amount) patch.amountHistory = [...(j.amountHistory || []), { from: j.amount, to: upd.amount, at: Date.now(), by: dispName(state.profile) }];
-  try { await db.collection('jamiyat').doc(j.id).update(patch); state.pendingEdit = null; closeModal(); toast('تم حفظ التعديلات'); logEvent(j.id, 'edit', `${dispName(state.profile)} عدّل شروط الجمعية${upd.amount !== j.amount ? ` (القسط من ${fmtNum(j.amount)} إلى ${fmtNum(upd.amount)} ريال)` : ''}`); } catch (e) { toast(e.message, 'error'); }
+  try { await db.collection('jamiyat').doc(j.id).update(patch); state.pendingEdit = null; closeModal(); toast('تم حفظ التعديلات'); jlog(j.id, 'edit', `${dispName(state.profile)} عدّل شروط الجمعية${upd.amount !== j.amount ? ` (القسط من ${fmtNum(j.amount)} إلى ${fmtNum(upd.amount)} ريال)` : ''}`); } catch (e) { toast(e.message, 'error'); }
 }
 // معاينة: كيف تُقسَّم مدفوعات كل عضو على القيمة الجديدة قبل الحفظ
 function showRepriceModal(c, upd) {
@@ -2018,24 +2099,27 @@ function identityFields(p = {}) {
     <p class="text-[11px] text-emerald-700 font-bold" data-preview></p></div>`;
 }
 function vAuth() {
-  const m = state.authMode;
-  const title = { login: 'تسجيل الدخول', register: 'إنشاء حساب جديد', reset: 'استعادة كلمة المرور' }[m];
-  return `<div class="max-w-md mx-auto card p-8">
-    <div class="text-center mb-6"><img src="logo-full.jpg" alt="الجمعية الذكية - منصة الجمعيات العائلية" width="176" height="176" class="w-44 h-44 mx-auto -mt-2 mb-1 object-contain">
-    <h2 class="text-xl font-black">${title}</h2></div>
-    ${m !== 'reset' ? `<button data-act="google" class="w-full mb-4 py-3 border border-slate-200 rounded-xl font-semibold text-sm hover:bg-slate-50 flex items-center justify-center gap-3"><img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="">المتابعة بحساب جوجل</button>
+  const m = state.authMode, jp = state.joinPreview, reg = m === 'register', lb = 'text-xs font-semibold block mb-1';
+  let last = ''; try { last = localStorage.getItem('jm_email') || ''; } catch (e) {}
+  const title = { login: 'أهلاً بعودتك', register: 'ابدأ في أقل من دقيقة', reset: 'استعادة كلمة المرور' }[m];
+  const invite = jp ? `<div class="mb-4 p-3 rounded-2xl bg-emerald-50 border border-emerald-100 text-center space-y-0.5"><p class="text-[11px] text-emerald-700 font-bold">${esc(jp.creatorName || 'المشرف')} يدعوك للانضمام إلى</p><p class="font-black text-emerald-900">${esc(jp.name)}</p>
+    <p class="text-[11px] text-slate-500">${jp.type === 'family' ? 'تعاون عائلي' : 'القسط ' + money(jp.amount) + ' ' + (FREQS[jp.frequency] || FREQS.monthly).every}</p></div>` : '';
+  const seg = m === 'reset' ? '' : `<div class="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-2xl mb-4">${[['register', 'حساب جديد'], ['login', 'دخول']].map(([k, l]) => `<button type="button" data-act="auth-${k}" class="py-2 rounded-xl text-sm font-bold ${m === k ? 'bg-white shadow text-emerald-700' : 'text-slate-500'}">${l}</button>`).join('')}</div>`;
+  const pass = `<div><label class="${lb}">كلمة المرور</label><div class="relative"><input name="password" type="password" autocomplete="${reg ? 'new-password' : 'current-password'}" class="inp pl-12" required minlength="6" placeholder="${reg ? '6 أحرف على الأقل' : ''}"><button type="button" data-act="toggle-pass" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" aria-label="إظهار كلمة المرور"><i class="fa-regular fa-eye"></i></button></div></div>`;
+  return `<div class="max-w-md mx-auto card p-6 sm:p-8">
+    <div class="text-center mb-4"><img src="logo-full.jpg" alt="الجمعية الذكية - منصة الجمعيات العائلية" width="112" height="112" class="w-24 h-24 mx-auto mb-1 object-contain"><h2 class="text-xl font-black">${title}</h2></div>
+    ${invite}${seg}
+    ${m !== 'reset' ? `<button data-act="google" class="w-full mb-4 py-3.5 border-2 border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center justify-center gap-3"><img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="">${reg ? 'التسجيل بحساب جوجل (بضغطة واحدة)' : 'الدخول بحساب جوجل'}</button>
     <div class="flex items-center my-4"><div class="flex-grow border-t"></div><span class="px-3 text-xs text-slate-400">أو بالبريد</span><div class="flex-grow border-t"></div></div>` : ''}
-    <form id="${m === 'register' ? 'f-register' : m === 'reset' ? 'f-reset' : 'f-login'}" class="space-y-3">
-      ${m === 'register' ? '<div><label class="text-xs font-semibold block mb-1">الاسم الثلاثي</label><input name="name" class="inp" required></div>' : ''}
-      <div><label class="text-xs font-semibold block mb-1">البريد الإلكتروني</label><input name="email" type="email" dir="ltr" class="inp" required></div>
-      ${m !== 'reset' ? '<div><label class="text-xs font-semibold block mb-1">كلمة المرور</label><input name="password" type="password" class="inp" required minlength="6"></div>' : ''}
-      ${m === 'register' ? bankFields() + '<label class="flex items-center gap-2 text-xs"><input type="checkbox" name="terms"> أوافق على <a href=\"privacy.html#terms\" target=\"_blank\" rel=\"noopener\" class=\"underline text-emerald-700\">الشروط والأحكام</a> و<a href=\"privacy.html#privacy\" target=\"_blank\" rel=\"noopener\" class=\"underline text-emerald-700\">سياسة الخصوصية</a></label>' : ''}
-      <button class="btn b-pri w-full py-3 text-sm" type="submit">${m === 'login' ? 'دخول' : m === 'register' ? 'إنشاء الحساب' : 'إرسال رابط الاستعادة'}</button>
+    <form id="${reg ? 'f-register' : m === 'reset' ? 'f-reset' : 'f-login'}" class="space-y-3">
+      ${reg ? `<div><label class="${lb}">اسمك</label><input name="name" class="inp" autocomplete="name" required placeholder="الاسم الأول والأخير"></div>` : ''}
+      <div><label class="${lb}">البريد الإلكتروني</label><input name="email" type="email" dir="ltr" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" class="inp" required value="${m === 'login' ? esc(last) : ''}"></div>
+      ${m !== 'reset' ? pass : ''}
+      <button class="btn b-pri w-full py-3 text-sm" type="submit">${m === 'login' ? 'دخول' : reg ? 'إنشاء الحساب' : 'إرسال رابط الاستعادة'}</button>
     </form>
-    <div class="text-center mt-5 space-y-1">
-      ${m === 'login' ? '<button class="text-xs text-emerald-600 font-semibold" data-act="auth-register">ليس لديك حساب؟ سجّل الآن</button><br><button class="text-xs text-slate-500" data-act="auth-reset">نسيت كلمة المرور؟</button>'
-        : '<button class="text-xs text-emerald-600 font-semibold" data-act="auth-login">لديك حساب؟ سجّل الدخول</button>'}
-    </div></div>`;
+    ${m !== 'reset' ? `<button type="button" data-act="email-link" class="w-full mt-3 py-2.5 rounded-xl border border-dashed border-slate-300 text-xs font-semibold text-slate-600"><i class="fa-solid fa-wand-magic-sparkles"></i> أرسل لي رابط دخول بدون كلمة مرور</button>` : ''}
+    <div class="text-center mt-4 space-y-1">${m === 'login' ? '<button class="text-xs text-slate-500" data-act="auth-reset">نسيت كلمة المرور؟</button>' : m === 'reset' ? '<button class="text-xs text-emerald-600 font-semibold" data-act="auth-login">العودة لتسجيل الدخول</button>' : ''}</div>
+    <p class="text-[11px] text-slate-400 text-center leading-relaxed mt-4">بالمتابعة أنت توافق على <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline text-emerald-700">الشروط والأحكام</a> و<a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline text-emerald-700">سياسة الخصوصية</a></p></div>`;
 }
 function vVerify() {
   return `<div class="max-w-md mx-auto card p-8 text-center space-y-4">
@@ -2047,9 +2131,9 @@ function vVerify() {
     <button class="text-xs text-slate-500" data-act="logout">تسجيل الخروج</button></div>`;
 }
 function vComplete() {
-  return `<div class="max-w-md mx-auto card p-8"><h3 class="text-xl font-bold text-center mb-1">أكمل بيانات حسابك</h3>
-    <p class="text-xs text-slate-500 text-center mb-5">مرحباً ${esc(state.user.displayName || '')}، نحتاج بيانات الجوال والتحويل البنكي لتستلم دورك.</p>
-    <form id="f-complete" class="space-y-3">${bankFields()}<label class="flex items-start gap-2 text-xs"><input type="checkbox" name="terms" class="mt-0.5"> <span>أوافق على <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline text-emerald-700">الشروط والأحكام</a> و<a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline text-emerald-700">سياسة الخصوصية</a></span></label><button class="btn b-pri w-full py-3" type="submit">حفظ ومتابعة</button></form></div>`;
+  return `<div class="max-w-md mx-auto card p-8"><h3 class="text-xl font-bold text-center mb-1">ما اسمك؟</h3>
+    <p class="text-xs text-slate-500 text-center mb-5">خطوة واحدة فقط ونبدأ. بقية البيانات تُطلب عند الحاجة.</p>
+    <form id="f-complete" class="space-y-3"><input name="name" class="inp" autocomplete="name" required placeholder="الاسم الأول والأخير"><button class="btn b-pri w-full py-3" type="submit">متابعة</button></form></div>`;
 }
 
 function vHome() {
@@ -2073,6 +2157,7 @@ function vHome() {
       <div class="stat"><p class="text-[11px] text-emerald-50">دعوات</p><b class="text-lg">${state.invites.length}</b></div>
       <button class="stat text-right" data-act="alerts-open"><p class="text-[11px] text-emerald-50"><i class="fa-solid fa-bell"></i> تنبيهات</p><b class="text-lg">${bellCount()}</b></button>
       <button class="btn b-white mr-auto" data-act="go-create"><i class="fa-solid fa-circle-plus"></i> جديد</button></div></div>
+    ${verifyBanner()}${detailsNudge()}
     ${inv ? `<div class="space-y-2"><h3 class="font-black text-sm"><i class="fa-solid fa-envelope-open-text text-amber-500"></i> دعوات بانتظارك</h3>${inv}</div>` : ''}
     <div class="space-y-2.5"><h3 class="font-black text-sm">جمعياتك وتعاوناتك</h3>${js || '<div class="card p-8 text-center text-xs text-slate-400"><i class="fa-regular fa-folder-open text-3xl mb-2 block"></i>لا توجد جمعيات بعد. أنشئ جمعيتك الأولى أو انتظر دعوة.</div>'}</div></div>`;
 }
@@ -2463,7 +2548,7 @@ async function approveShare(uid) {
   const batch = db.batch();
   batch.update(ref, { turns: [...c.turns, ...Array(r.extra).fill(uid)] });
   batch.delete(ref.collection('shareReqs').doc(uid));
-  try { await batch.commit(); toast('تمت الموافقة وأُضيفت الأسهم'); logEvent(c.j.id, 'share', `${dispName(state.profile)} وافق على إضافة ${r.extra} ${r.extra === 1 ? 'سهم' : 'أسهم'} لـ ${dispName(state.members[uid])}`); sendNotifs([uid], 'تمت الموافقة على طلبك', `أُضيف ${r.extra} ${r.extra === 1 ? 'سهم' : 'أسهم'} لك في جمعية «${c.j.name}»`, c.j.id, 'share'); }
+  try { await batch.commit(); toast('تمت الموافقة وأُضيفت الأسهم'); jlog(c.j.id, 'share', `${dispName(state.profile)} وافق على إضافة ${r.extra} ${r.extra === 1 ? 'سهم' : 'أسهم'} لـ ${dispName(state.members[uid])}`); sendNotifs([uid], 'تمت الموافقة على طلبك', `أُضيف ${r.extra} ${r.extra === 1 ? 'سهم' : 'أسهم'} لك في جمعية «${c.j.name}»`, c.j.id, 'share'); }
   catch (e) { toast('تعذر التنفيذ: ' + e.message, 'error'); }
 }
 async function rejectShare(uid) {
@@ -2529,7 +2614,7 @@ async function approveSwap(id) {
   const batch = db.batch(); batch.update(ref, { turns: n, lastSwap: id }); batch.delete(reqRef);
   try {
     await batch.commit(); toast('تم تبديل الدورين');
-    logEvent(c.j.id, 'swap', `تبادل ${dispName(state.members[r.fromUid])} و${dispName(state.members[me])} دوريهما (رقم ${r.fromIdx + 1} ورقم ${r.toIdx + 1})`);
+    jlog(c.j.id, 'swap', `تبادل ${dispName(state.members[r.fromUid])} و${dispName(state.members[me])} دوريهما (رقم ${r.fromIdx + 1} ورقم ${r.toIdx + 1})`);
     sendNotifs([r.fromUid, c.j.creatorUid], 'تم تبديل الأدوار', `تبادل ${dispName(state.members[r.fromUid])} و${dispName(state.members[me])} دوريهما في جمعية «${c.j.name}»`, c.j.id, 'swap');
   } catch (e) { toast(e.code === 'permission-denied' ? 'تعذر التبديل: لم تقبل قواعد Firestore العملية. انشر أحدث نسخة من firestore.rules ثم أعد المحاولة' : 'تعذر التبديل: ' + e.message, 'error'); }
 }
@@ -2595,19 +2680,23 @@ async function checkPendingJoin() {
       <div class="flex gap-2"><button class="btn b-sec flex-1" data-act="close">لاحقاً</button>${l.open ? '<button class="btn b-pri flex-1" data-act="join-do"><i class="fa-solid fa-user-plus"></i> انضم الآن</button>' : ''}</div></div>`);
   } catch (e) { toast('تعذر فتح رابط الانضمام: ' + e.message, 'error'); }
 }
-async function joinFromLink() {
+function joinFromLink() {
+  const l = state.joinLink; if (!l) return;
+  needVerified(() => l.type === 'family' ? joinFromLinkCore() : needDetails(() => joinFromLinkCore()));
+}
+async function joinFromLinkCore() {
   const l = state.joinLink; if (!l || !state.user) return;
   const uid = state.user.uid, ref = db.collection('jamiyat').doc(l.jid), b = db.batch();
   b.set(db.collection('joins').doc(`${l.jid}__${uid}__${l.code}`), { jid: l.jid, uid, code: l.code, createdAt: FV.serverTimestamp() });
   b.update(ref, { memberUids: FV.arrayUnion(uid), turns: FV.arrayUnion(uid) });
   b.set(ref.collection('members').doc(uid), memberDoc(uid, state.profile));
-  try { await b.commit(); closeModal(); toast('تم الانضمام للجمعية 🎉'); notifyJoin({ jamiyaId: l.jid }); logEvent(l.jid, 'join', `${dispName(state.profile)} انضم إلى الجمعية عبر الرابط`); state.joinLink = null; openJamiya(l.jid); }
+  try { await b.commit(); closeModal(); toast('تم الانضمام للجمعية 🎉'); notifyJoin({ jamiyaId: l.jid }); jlog(l.jid, 'join', `${dispName(state.profile)} انضم إلى الجمعية عبر الرابط`); state.joinLink = null; openJamiya(l.jid); }
   catch (e) { toast(e.code === 'permission-denied' ? 'تعذر الانضمام: اكتمل عدد الأعضاء أو أُوقف الرابط أو لم يُوثَّق بريدك بعد' : 'تعذر الانضمام: ' + e.message, 'error'); }
 }
 
 /* ============ الثقة: سجل النشاط + كشف العضو + نسبة الالتزام + قفل التطبيق ============ */
 const LOG_ICO = { pledge: '📝', family: '🤝', pay: '💸', confirm: '✅', swap: '🔁', share: '🧩', join: '👋', edit: '✏️', order: '🔢', remove: '🚪' };
-function logEvent(jid, type, text) {
+function jlog(jid, type, text) {
   if (!state.user || !jid) return;
   db.collection('jamiyat').doc(jid).collection('log').add({ uid: state.user.uid, type, text: String(text).slice(0, 200), createdAt: FV.serverTimestamp() }).catch(() => {});
 }
@@ -2778,7 +2867,8 @@ function vCreateFamily() {
       <p class="text-[11px] text-slate-500">عُبّئ من ملفك الشخصي، عدّله إن كان الحساب مختلفاً. يظهر لأعضاء هذا التعاون فقط.</p></div>
     <button class="btn b-pri w-full py-3" type="submit">إنشاء التعاون</button></form></div>`;
 }
-async function handleCreateFamily(f) {
+function handleCreateFamily(f) { needVerified(() => handleCreateFamilyCore(f)); }
+async function handleCreateFamilyCore(f) {
   const monthly = f.mode.value === 'monthly', name = f.jname.value.trim(), goal = f.goal.value.trim(), reasons = f.reasons.value.trim();
   const bank = resolveBank(f); if (bank === null) return;
   const iban = fixIban(f.iban.value);
@@ -2801,7 +2891,7 @@ async function handleCreateFamily(f) {
     doc.endDate = endDate; doc.endAt = firebase.firestore.Timestamp.fromDate(new Date(endDate + 'T23:59:59')); if (target) doc.targetAmount = target;
   }
   batch.set(ref, doc); batch.set(ref.collection('members').doc(uid), memberDoc(uid, p));
-  try { await batch.commit(); toast('تم إنشاء التعاون'); logEvent(ref.id, 'family', `${dispName(p)} أنشأ التعاون «${name}»`); openJamiya(ref.id); }
+  try { await batch.commit(); toast('تم إنشاء التعاون'); jlog(ref.id, 'family', `${dispName(p)} أنشأ التعاون «${name}»`); openJamiya(ref.id); }
   catch (e) { toast('تعذر الإنشاء: ' + e.message, 'error'); }
 }
 const famEnd = j => j.endAt && j.endAt.toDate ? j.endAt.toDate() : new Date((j.endDate || '') + 'T23:59:59');
@@ -2921,7 +3011,7 @@ async function submitSelfContrib(f) {
     const upd = {}; if (!j.hasConfirmed) upd.hasConfirmed = true;
     if (famAutoClose(j, pr.id, amount)) { upd.closed = true; upd.reached = true; }
     if (Object.keys(upd).length) await ref.update(upd).catch(() => {});
-    closeModal(); toast('سُجّلت مساهمتك'); logEvent(j.id, 'pay', `${dispName(state.profile)} سجّل مساهمة شخصية بمبلغ ${fmtNum(amount)} ريال`);
+    closeModal(); toast('سُجّلت مساهمتك'); jlog(j.id, 'pay', `${dispName(state.profile)} سجّل مساهمة شخصية بمبلغ ${fmtNum(amount)} ريال`);
   } catch (e) { btn.disabled = false; toast('تعذر التسجيل: ' + e.message, 'error'); }
 }
 
@@ -2980,18 +3070,18 @@ async function submitPledge(f) {
   try {
     await jref().collection('pledges').doc(uid).set(doc);
     closeModal(); toast(first ? (mo ? 'تم تثبيت قيمتك الشهرية' : 'تم تحديد مساهمتك') : 'تم التحديث');
-    logEvent(j.id, 'pledge', `${dispName(state.profile)} ${first ? 'حدد' : 'عدّل'} ${w} بمبلغ ${fmtNum(amount)} ريال`);
+    jlog(j.id, 'pledge', `${dispName(state.profile)} ${first ? 'حدد' : 'عدّل'} ${w} بمبلغ ${fmtNum(amount)} ريال`);
     sendNotifs([j.creatorUid], first ? 'تعهد جديد بمساهمة' : 'تعديل مبلغ مساهمة', `${dispName(state.profile)} ${first ? 'حدد' : 'عدّل'} ${w} في «${j.name}»: ${fmtNum(amount)} ريال${mo ? ' شهرياً' : ''}`, j.id, 'pledge');
   } catch (e) { toast(e.code === 'permission-denied' ? 'تعذر الحفظ: التعاون مغلق أو لم تُنشر قواعد Firestore المحدّثة' : 'تعذر الحفظ: ' + e.message, 'error'); }
 }
 async function keepPledge() { // «أبقِها كما هي»: تأكيد المبلغ الحالي لهذا الشهر
   const c = ctx(); if (!c || !c.family) return; const j = c.j, uid = state.user.uid, pl = state.pledges[uid]; if (!pl) return;
-  try { await jref().collection('pledges').doc(uid).update({ chk: famCycle(j), updatedAt: FV.serverTimestamp() }); toast('أُبقي مبلغك الشهري كما هو'); logEvent(j.id, 'pledge', `${dispName(state.profile)} أبقى قيمته الشهرية ${fmtNum(pl.amount)} ريال`); }
+  try { await jref().collection('pledges').doc(uid).update({ chk: famCycle(j), updatedAt: FV.serverTimestamp() }); toast('أُبقي مبلغك الشهري كما هو'); jlog(j.id, 'pledge', `${dispName(state.profile)} أبقى قيمته الشهرية ${fmtNum(pl.amount)} ريال`); }
   catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
 }
 async function deletePledge() {
   const c = ctx(); if (!c || !c.family) return;
-  try { await jref().collection('pledges').doc(state.user.uid).delete(); closeModal(); toast('أُلغي تعهدك', 'info'); logEvent(c.j.id, 'pledge', `${dispName(state.profile)} ألغى تعهده بالمساهمة`); }
+  try { await jref().collection('pledges').doc(state.user.uid).delete(); closeModal(); toast('أُلغي تعهدك', 'info'); jlog(c.j.id, 'pledge', `${dispName(state.profile)} ألغى تعهده بالمساهمة`); }
   catch (e) { toast('تعذر الإلغاء: ' + e.message, 'error'); }
 }
 
@@ -3022,7 +3112,7 @@ async function submitFamilyPay(f) {
     batch.set(ref.collection('payments').doc(pid), { month: famCycle1(j), uid, name: dispName(state.profile), amount, ref: f.ref.value.trim(), hasProof: true, status: 'pending', recipientUid: j.creatorUid, createdAt: FV.serverTimestamp() });
     await batch.commit();
     sendNotifs([j.creatorUid], 'مساهمة جديدة بانتظار تأكيدك', `${dispName(state.profile)} — تعاون «${j.name}» — ${fmtNum(amount)} ريال`, j.id, 'pay', 'pp_' + pid);
-    logEvent(j.id, 'pay', `${dispName(state.profile)} رفع إيصال مساهمة ${fmtNum(amount)} ريال`);
+    jlog(j.id, 'pay', `${dispName(state.profile)} رفع إيصال مساهمة ${fmtNum(amount)} ريال`);
     const rn = j.creatorName || 'المستفيد', ph = c.rec && c.rec.phone;
     showModal('تم إرسال الإيصال ✓', `<div class="space-y-3 text-center"><div class="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl space-y-1"><p class="text-3xl">⏳</p><p class="font-black text-emerald-800">بانتظار تأكيد ${esc(rn)}</p><p class="text-xs text-slate-600">وصله إشعار بمساهمتك (${fmtNum(amount)} ريال). ستصلك رسالة عند التأكيد، جزاك الله خيراً.</p></div>
       ${ph ? `<a class="btn b-sec w-full" target="_blank" rel="noopener" href="${waLink(ph, `السلام عليكم ${rn}، ساهمت بمبلغ ${fmtNum(amount)} ريال في «${j.name}» ورفعت الإيصال في التطبيق 🤍`)}"><i class="fa-brands fa-whatsapp"></i> إبلاغ ${esc(rn)} عبر واتساب (اختياري)</a>` : ''}<button class="btn b-pri w-full" data-act="close">تم</button></div>`);
@@ -3035,14 +3125,14 @@ async function rejectFamilyPay(payId) {
   const ref = jref(), b = db.batch(); b.delete(ref.collection('payments').doc(payId)); b.delete(ref.collection('proofs').doc(payId));
   try {
     await b.commit(); toast('رُفض الإيصال', 'info');
-    if (famAutoClose(c.j, payId, 0)) { await ref.update({ closed: true, reached: true }).catch(() => {}); sendNotifs(c.j.memberUids, 'اكتمل الهدف 🎉', `بلغ تعاون «${c.j.name}» مبلغه المستهدف، جزاكم الله خيراً`, c.j.id, 'family'); logEvent(c.j.id, 'family', 'اكتمل المبلغ المستهدف وأُغلق التعاون تلقائياً'); }
+    if (famAutoClose(c.j, payId, 0)) { await ref.update({ closed: true, reached: true }).catch(() => {}); sendNotifs(c.j.memberUids, 'اكتمل الهدف 🎉', `بلغ تعاون «${c.j.name}» مبلغه المستهدف، جزاكم الله خيراً`, c.j.id, 'family'); jlog(c.j.id, 'family', 'اكتمل المبلغ المستهدف وأُغلق التعاون تلقائياً'); }
     sendNotifs([p.uid], 'لم يُقبل إيصالك', `تعاون «${c.j.name}»: لم يُقبل إيصال ${fmtNum(p.amount)} ريال، تواصل مع المستفيد وارفع إيصالاً صحيحاً`, c.j.id, 'pay');
-    logEvent(c.j.id, 'pay', `${dispName(state.profile)} رفض إيصالاً بقيمة ${fmtNum(p.amount)} ريال من ${p.name || 'عضو'}`);
+    jlog(c.j.id, 'pay', `${dispName(state.profile)} رفض إيصالاً بقيمة ${fmtNum(p.amount)} ريال من ${p.name || 'عضو'}`);
   } catch (e) { toast('تعذر التنفيذ: ' + e.message, 'error'); }
 }
 async function toggleFamClosed() {
   const c = ctx(); if (!c || !c.family || !c.isCreator) return; const closed = !c.j.closed;
-  try { await jref().update({ closed }); toast(closed ? 'أُغلق باب المساهمة' : 'أُعيد فتح المساهمة', closed ? 'info' : 'success'); logEvent(c.j.id, 'edit', `${dispName(state.profile)} ${closed ? 'أغلق' : 'أعاد فتح'} باب المساهمة`); }
+  try { await jref().update({ closed }); toast(closed ? 'أُغلق باب المساهمة' : 'أُعيد فتح المساهمة', closed ? 'info' : 'success'); jlog(c.j.id, 'edit', `${dispName(state.profile)} ${closed ? 'أغلق' : 'أعاد فتح'} باب المساهمة`); }
   catch (e) { toast('تعذر التنفيذ: ' + e.message, 'error'); }
 }
 function openFamilyEdit() {
@@ -3068,7 +3158,7 @@ async function submitFamilyEdit(f) {
   const upd = { name, goal, reasons, benBank: bank, benIban: iban };
   if (mo) { const day = parseInt(f.monthlyDay.value, 10); if (!(day >= 1 && day <= 28)) return toast('يوم السداد من 1 إلى 28', 'error'); upd.monthlyDay = day; upd.targetAmount = target; }
   else { const endDate = f.endDate.value; if (!endDate) return toast('حدد تاريخ النهاية', 'error'); upd.endDate = endDate; upd.endAt = firebase.firestore.Timestamp.fromDate(new Date(endDate + 'T23:59:59')); upd.targetAmount = target || FV.delete(); }
-  try { await jref().update(upd); closeModal(); toast('تم حفظ التعديلات'); logEvent(j.id, 'edit', `${dispName(state.profile)} عدّل بيانات التعاون`); }
+  try { await jref().update(upd); closeModal(); toast('تم حفظ التعديلات'); jlog(j.id, 'edit', `${dispName(state.profile)} عدّل بيانات التعاون`); }
   catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
 }
 function famRemind() {
@@ -3096,6 +3186,9 @@ function ibDismissed() { try { return Date.now() - Number(localStorage.getItem(i
     if (c && /^[a-z0-9]{8,20}$/i.test(c)) localStorage.setItem('jm_join', c);
     if (q.has('join')) { q.delete('join'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '')); }
   } catch (e) {}
+})();
+(async function () { // معاينة الدعوة على شاشة الدخول ليعرف الزائر إلى ماذا يُدعى
+  try { const c = localStorage.getItem('jm_join'); if (!c) return; const sn = await db.collection('joinLinks').doc(c).get(); if (sn.exists) { state.joinPreview = sn.data(); if (state.view === 'auth') render(); } } catch (e) {}
 })();
 function launchAction() {
   try { const a = new URLSearchParams(location.search).get('action'); if (a) history.replaceState(null, '', location.pathname); return a === 'create' ? 'create' : null; } catch (e) { return null; }
@@ -3172,6 +3265,9 @@ const actions = {
   'logout': async () => { if (state.user) ssDel('jm_sess_' + state.user.uid); stopHeartbeat(); await Promise.race([unregisterPush(), new Promise(r => setTimeout(r, 3000))]); auth.signOut(); },
   'reg-push': async () => { const r = await registerPush(true); toast(r.ok ? 'سُجّل هذا الجهاز لإشعارات حسابك ✓' : 'تعذر تسجيل الجهاز: ' + r.err, r.ok ? 'success' : 'error'); },
   'google': doGoogle,
+  'toggle-pass': el => { const i = el.parentElement.querySelector('input'); if (i) { const show = i.type === 'password'; i.type = show ? 'text' : 'password'; el.innerHTML = show ? '<i class="fa-regular fa-eye-slash"></i>' : '<i class="fa-regular fa-eye"></i>'; } },
+  'email-link': doEmailLink, 'verify-check': verifyCheckAction, 'verify-resend': () => auth.currentUser.sendEmailVerification({ url: appUrl() }).then(() => toast('أُعيد إرسال رابط التفعيل')).catch(e => toast(authErr(e), 'error')),
+  'open-details': () => needDetails(() => render()), 'dismiss-nudge': () => { lsSet('jm_nudge_x', '1'); render(); },
   'auth-register': () => { state.authMode = 'register'; render(); },
   'auth-login': () => { state.authMode = 'login'; render(); },
   'auth-reset': () => { state.authMode = 'reset'; render(); },
@@ -3243,7 +3339,7 @@ document.addEventListener('input', e => {
   if (fm.querySelector('[data-identity]')) updPreview(fm);
   if (e.target.name === 'icon') fm.querySelectorAll('.emo').forEach(b => b.classList.toggle('on', b.dataset.v === e.target.value.trim()));
 });
-const forms = { 'f-register': doRegister, 'f-login': doLogin, 'f-reset': doReset, 'f-complete': doCompleteProfile, 'f-create': handleCreate,
+const forms = { 'f-register': doRegister, 'f-login': doLogin, 'f-reset': doReset, 'f-complete': doCompleteProfile, 'f-need': doNeedDetails, 'f-create': handleCreate,
   'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-notif': submitNotif, 'f-deputy': f => setDeputy(f.uid.value), 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete, 'f-wish': submitWish, 'f-chat': sendChat, 'f-create-family': handleCreateFamily, 'f-fampay': submitFamilyPay, 'f-famself': submitSelfContrib, 'f-pledge': submitPledge, 'f-famedit': submitFamilyEdit, 'f-share': submitShare, 'f-swap': submitSwap, 'f-lock': submitLock, 'f-lockoff': submitLockOff };
 Object.assign(forms, ADMIN_FORMS);
 document.addEventListener('submit', e => { const fn = forms[e.target.id]; if (fn) { e.preventDefault(); fn(e.target); } });
