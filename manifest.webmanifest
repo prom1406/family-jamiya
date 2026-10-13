@@ -8,24 +8,74 @@
   "start_url": "./?source=pwa",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "portrait",
-  "background_color": "#f3f6f5",
-  "theme_color": "#0d9488",
-  "categories": ["finance", "productivity", "lifestyle"],
+  "background_color": "#F1F4F2",
+  "theme_color": "#0B2E33",
+  "categories": [
+    "finance",
+    "productivity",
+    "lifestyle"
+  ],
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "shortcuts": [
-    { "name": "جمعياتي", "short_name": "جمعياتي", "url": "./?action=home&source=shortcut", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
-    { "name": "إنشاء جمعية جديدة", "short_name": "جمعية جديدة", "url": "./?action=create&source=shortcut", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
+    {
+      "name": "جمعياتي",
+      "short_name": "جمعياتي",
+      "url": "./?action=home&source=shortcut",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "إنشاء جمعية جديدة",
+      "short_name": "جمعية جديدة",
+      "url": "./?action=create&source=shortcut",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
   ],
   "handle_links": "preferred",
-  "launch_handler": { "client_mode": ["navigate-existing", "auto"] },
+  "launch_handler": {
+    "client_mode": [
+      "navigate-existing",
+      "auto"
+    ]
+  },
   "prefer_related_applications": false,
   "related_applications": [
-    { "platform": "webapp", "url": "https://prom1406.github.io/family-jamiya/manifest.webmanifest" }
+    {
+      "platform": "webapp",
+      "url": "https://prom1406.github.io/family-jamiya/manifest.webmanifest"
+    }
   ]
 }
