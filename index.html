@@ -10,7 +10,7 @@
 <meta name="application-name" content="الجمعية الذكية">
 <meta name="format-detection" content="telephone=no">
 <title>الجمعية الذكية</title>
-<meta name="theme-color" content="#0d9488">
+<meta name="theme-color" content="#0B2E33">
 <meta name="description" content="الجمعية الذكية — منصة الجمعيات العائلية">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -25,7 +25,7 @@
 <meta name="twitter:card" content="summary">
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -192,6 +192,67 @@ body{font-family:'Cairo',system-ui,sans-serif;color:var(--ink);
 .bar>i,.hbar>i{background:linear-gradient(90deg,#059669,#0f766e)}
 .toast.success{background:linear-gradient(135deg,#059669,#0f766e)}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* ===== تصميم v7 — «دفتر الثقة»: بترولي هادئ، ذهبي للمال، بلا زجاج ولا تدرجات زخرفية ===== */
+:root{--petrol:#0B2E33;--petrol-2:#144B51;--brand:#135D62;--brand-2:#1B7A74;--ink:#0E1F22;--muted:#5B6E71;--bg:#F1F4F2;--surface:#fff;--line:#DCE4E1;--line-2:#C7D4CF;--gold:#C8912B;--gold-soft:#F8EFDC;--ok:#2E7D5B;--loss:#B42F34;--r-card:18px;--r-ctl:12px;--shadow:0 1px 2px rgba(11,46,51,.05),0 8px 20px -14px rgba(11,46,51,.22)}
+body{font-family:'IBM Plex Sans Arabic',system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg);line-height:1.7}
+h1,h2,h3,.font-display{font-family:'Reem Kufi','IBM Plex Sans Arabic',sans-serif;letter-spacing:0;color:var(--petrol)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:6px}
+
+/* الرأس: شريط هادئ بخط فاصل واحد */
+.app-header{background:rgba(241,244,242,.94);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.app-header .logo{border-radius:12px;box-shadow:none}
+
+/* البطاقات: حدّ واحد وظل واحد ونصف قطر واحد لكل المستويات */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);box-shadow:var(--shadow)}
+
+/* الأزرار: لون واحد أساسي، والثانوي محايد */
+.btn{border-radius:var(--r-ctl);font-weight:600;font-size:.875rem;min-height:44px;padding:.6rem 1.05rem}
+.b-pri,.b-pri:hover{background:var(--brand);color:#fff;box-shadow:none;filter:none}
+.b-pri:hover{background:var(--petrol-2)}
+.b-sec{background:#E7EDEB;color:var(--petrol)}.b-sec:hover{background:#DBE5E1}
+.b-red{background:#FBEAEA;color:var(--loss)}.b-red:hover{background:#F6DADA}
+.b-white{background:#fff;color:var(--petrol);box-shadow:none}
+
+/* الحقول */
+.inp{border:1px solid var(--line-2);border-radius:var(--r-ctl);background:#fff;min-height:46px}
+.inp:focus{border-color:var(--brand-2);background:#fff;box-shadow:0 0 0 3px rgba(27,122,116,.16)}
+
+/* البطل: مساحة بترولية صلبة مع الأرقام بارزة */
+.hero{background:var(--petrol);color:#fff;border-radius:22px;box-shadow:var(--shadow);padding:1.25rem}
+.hero::before,.hero::after{display:none}
+.hero h1,.hero h2,.hero h3{color:#fff}
+.stat{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:var(--r-ctl);-webkit-backdrop-filter:none;backdrop-filter:none}
+
+/* بطاقة الجمعية في القائمة */
+.jcard{background:#fff;border:1px solid var(--line);border-radius:var(--r-card);box-shadow:none;animation:none}
+.jcard:hover{transform:none;box-shadow:var(--shadow);border-color:var(--line-2)}
+.jcard:active{transform:scale(.99)}
+.jicon,.jcard .jicon,.jcard:nth-child(n) .jicon{width:44px;height:44px;border-radius:12px;background:#E4EEEC !important;color:var(--brand);box-shadow:none !important;font-size:1.05rem}
+
+/* أشرطة التقدم: لون واحد، والمكتمل بالذهبي */
+.bar,.hbar{background:#E3EAE7;border-radius:99px}
+.bar>i,.hbar>i{background:var(--brand-2);border-radius:99px}
+
+/* الشريط السفلي: مرسوم بالكامل من الحافة، بلا طفو */
+.tabbar{left:0;right:0;bottom:0;height:calc(var(--tab-h) + var(--sab));padding-bottom:var(--sab);border-radius:0;background:#fff;border:0;border-top:1px solid var(--line);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+.tab{font-weight:600;color:#7A8D90}
+.tab.on{color:var(--petrol)}
+.tab.on::before{top:0;width:28px;height:3px;border-radius:0 0 3px 3px;background:var(--gold);background-color:var(--gold)}
+
+/* النوافذ والإشعارات */
+.sheet{border-radius:24px}
+@media(max-width:639px){.sheet{border-radius:24px 24px 0 0}}
+.toast{border-radius:var(--r-ctl);box-shadow:0 12px 24px -14px rgba(11,46,51,.55)}
+.toast.success{background:var(--ok)}
+.toast.info{background:var(--petrol)}
+.ibar{background:var(--petrol);border-radius:var(--r-card)}
+
+/* الفلاتر والخيارات */
+.achip{border-radius:999px;border:1px solid var(--line-2);background:#fff;color:var(--petrol);font-weight:600}
+.achip.on{background:var(--petrol);color:#fff;border-color:var(--petrol)}
+.emo.on{border-color:var(--gold);background:var(--gold-soft)}
+.bdg{font-weight:600}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body class="text-slate-800 antialiased">
@@ -207,7 +268,7 @@ body{font-family:'Cairo',system-ui,sans-serif;color:var(--ink);
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2.7<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.2.8<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
