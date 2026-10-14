@@ -494,6 +494,7 @@ async function bootUser(user) {
   state.jamiyat = []; state.invites = [];
   if (!user) { unlock(); state.view = 'auth'; return render(); }
 
+  let loadFailed = false;
   try {
     // تحديث الرمز ليحمل حالة تفعيل البريد الحالية، وإلا ترفض القواعد القراءة حتى ساعة بعد التفعيل
     if (user.emailVerified) await user.getIdToken(true).catch(() => {});
@@ -501,7 +502,9 @@ async function bootUser(user) {
     state.profile = snap.exists ? snap.data() : null;
     const adm = await db.collection('admins').doc(user.uid).get().catch(() => ({ exists: false }));
     state.isAdmin = adm.exists || (lc(user.email) === OWNER_EMAIL && user.emailVerified);
-  } catch (e) { toast('تعذر تحميل الحساب: ' + e.message, 'error'); }
+  } catch (e) { loadFailed = true; toast('تعذر تحميل الحساب: ' + e.message, 'error'); }
+  // حماية البيانات: إذا فشلت قراءة الملف الشخصي لا نُنشئ ملفاً فارغاً فوق الملف الحقيقي
+  if (loadFailed) { await auth.signOut().catch(() => {}); return; }
 
   if (!state.isAdmin && await isBlockedNow()) return;
   if (!state.profile && user.displayName) { if (!(await autoProfile(user, user.displayName))) return; }
@@ -559,6 +562,8 @@ function startListeners() {
 // إنشاء الملف الشخصي تلقائياً بالحد الأدنى (الاسم والبريد)، وباقي البيانات تُطلب عند الحاجة فقط
 async function autoProfile(u, name) {
   if (state.settings.regClosed && !state.isAdmin) { toast(state.settings.regMsg || 'التسجيل الجديد متوقف مؤقتاً', 'error'); await auth.signOut().catch(() => {}); return false; }
+  try { const ex = await db.collection('users').doc(u.uid).get({ source: 'server' }); if (ex.exists) { state.profile = ex.data(); return true; } } // لا نكتب فوق ملف موجود
+  catch (e) { toast('تعذر التحقق من الحساب: ' + e.message, 'error'); return false; }
   const profile = { name, email: lc(u.email), phone: '', bank: '', iban: '', waOptIn: false, nick: '', showAs: 'name', showPhone: false, showEmail: false, avatar: u.photoURL || '', ownerNotified: false, createdAt: FV.serverTimestamp() };
   try { await db.collection('users').doc(u.uid).set(profile); } catch (e) { toast('تعذر إنشاء الحساب: ' + e.message, 'error'); return false; }
   state.profile = profile; if (!state.isAdmin) incStat({ regs: 1 }); logEvent('register', { name });
