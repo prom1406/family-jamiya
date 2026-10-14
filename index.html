@@ -268,7 +268,7 @@ h1,h2,h3,.font-display{font-family:'Cairo',system-ui,sans-serif;letter-spacing:0
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.3.0<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.3.1<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -2186,6 +2186,14 @@ function identityFields(p = {}) {
     <p class="text-[11px] text-slate-500 leading-relaxed">مشرف الجمعية يرى جميع بياناتك (الجوال والبريد والبنك) دائماً، أما الاسم والكنية فيظهر له ما اخترته أنت.</p>
     <p class="text-[11px] text-emerald-700 font-bold" data-preview></p></div>`;
 }
+/* ===== نقاط الثقة في شاشة الدخول ===== */
+function trustStrip() {
+  const row = (ic, t, d) => `<div class="flex items-start gap-2.5"><i class="fa-solid ${ic} text-emerald-600 mt-0.5 w-4 text-center"></i><p class="leading-relaxed"><b class="text-slate-800">${t}</b> <span class="text-slate-500">${d}</span></p></div>`;
+  return `<div class="mb-4 p-3.5 rounded-2xl bg-slate-50 border border-slate-100 text-[11px] space-y-2">
+    ${row('fa-gift', 'مجاني في فترة التجربة', 'ولمدة محدودة، وقد يتحول لاحقاً إلى تطبيق بمقابل.')}
+    ${row('fa-ban', 'لا نستلم أموالاً', 'كل التحويلات بين الأعضاء تتم خارج التطبيق، وهو للإدارة والمتابعة فقط.')}
+    ${row('fa-shield-halved', 'بياناتك محدودة', 'لا نطلب هوية وطنية ولا بيانات بطاقات بنكية.')}</div>`;
+}
 function vAuth() {
   const m = state.authMode, jp = state.joinPreview, reg = m === 'register', lb = 'text-xs font-semibold block mb-1';
   let last = ''; try { last = localStorage.getItem('jm_email') || ''; } catch (e) {}
@@ -2197,7 +2205,7 @@ function vAuth() {
   const pass = `<div><label class="${lb}">كلمة المرور</label><div class="relative"><input name="password" type="password" autocomplete="${reg ? 'new-password' : 'current-password'}" class="inp pl-12" required minlength="6" placeholder="${reg ? '6 أحرف على الأقل' : ''}"><button type="button" data-act="toggle-pass" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" aria-label="إظهار كلمة المرور"><i class="fa-regular fa-eye"></i></button></div></div>`;
   return `<div class="max-w-md mx-auto card p-6 sm:p-8">
     <div class="text-center mb-4"><img src="logo-full.jpg" alt="الجمعية الذكية - منصة الجمعيات العائلية" width="112" height="112" class="w-24 h-24 mx-auto mb-1 object-contain"><h2 class="text-xl font-black">${title}</h2></div>
-    ${invite}${seg}
+    ${invite}${trustStrip()}${seg}
     ${m !== 'reset' ? `<button data-act="google" class="w-full mb-4 py-3.5 border-2 border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center justify-center gap-3"><img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="">${reg ? 'التسجيل بحساب جوجل (بضغطة واحدة)' : 'الدخول بحساب جوجل'}</button>
     <div class="flex items-center my-4"><div class="flex-grow border-t"></div><span class="px-3 text-xs text-slate-400">أو بالبريد</span><div class="flex-grow border-t"></div></div>` : ''}
     <form id="${reg ? 'f-register' : m === 'reset' ? 'f-reset' : 'f-login'}" class="space-y-3">
