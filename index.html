@@ -268,7 +268,7 @@ h1,h2,h3,.font-display{font-family:'Cairo',system-ui,sans-serif;letter-spacing:0
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.3.1<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.3.2<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -2212,10 +2212,11 @@ function vAuth() {
       ${reg ? `<div><label class="${lb}">اسمك</label><input name="name" class="inp" autocomplete="name" required placeholder="الاسم الأول والأخير"></div>` : ''}
       <div><label class="${lb}">البريد الإلكتروني</label><input name="email" type="email" dir="ltr" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" class="inp" required value="${m === 'login' ? esc(last) : ''}"></div>
       ${m !== 'reset' ? pass : ''}
-      <button class="btn b-pri w-full py-3 text-sm" type="submit">${m === 'login' ? 'دخول' : reg ? 'إنشاء الحساب' : 'إرسال رابط الاستعادة'}</button>
+      <button class="btn b-pri w-full py-3 text-sm" type="submit">${m === 'login' ? 'دخول' : reg ? 'ابدأ مجاناً الآن' : 'إرسال رابط الاستعادة'}</button>
     </form>
     ${m !== 'reset' ? `<button type="button" data-act="email-link" class="w-full mt-3 py-2.5 rounded-xl border border-dashed border-slate-300 text-xs font-semibold text-slate-600"><i class="fa-solid fa-wand-magic-sparkles"></i> أرسل لي رابط دخول بدون كلمة مرور</button>` : ''}
     <div class="text-center mt-4 space-y-1">${m === 'login' ? '<button class="text-xs text-slate-500" data-act="auth-reset">نسيت كلمة المرور؟</button>' : m === 'reset' ? '<button class="text-xs text-emerald-600 font-semibold" data-act="auth-login">العودة لتسجيل الدخول</button>' : ''}</div>
+    ${m === 'login' ? `<button type="button" data-act="auth-register" class="btn b-sec w-full py-3 text-sm mt-3">جديد هنا؟ <b>ابدأ مجاناً الآن</b></button>` : ''}
     <p class="text-[11px] text-slate-400 text-center leading-relaxed mt-4">بالمتابعة أنت توافق على <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline text-emerald-700">الشروط والأحكام</a> و<a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline text-emerald-700">سياسة الخصوصية</a></p></div>`;
 }
 function vVerify() {
@@ -2281,7 +2282,7 @@ function vHome() {
       <button class="btn b-white mr-auto" data-act="go-create"><i class="fa-solid fa-circle-plus"></i> جديد</button></div></div>
     ${verifyBanner()}${detailsNudge()}${growthCards()}
     ${inv ? `<div class="space-y-2"><h3 class="font-black text-sm"><i class="fa-solid fa-envelope-open-text text-amber-500"></i> دعوات بانتظارك</h3>${inv}</div>` : ''}
-    <div class="space-y-2.5"><h3 class="font-black text-sm">جمعياتك وتعاوناتك</h3>${js || '<div class="card p-8 text-center text-xs text-slate-400"><i class="fa-regular fa-folder-open text-3xl mb-2 block"></i>لا توجد جمعيات بعد. أنشئ جمعيتك الأولى أو انتظر دعوة.</div>'}</div></div>`;
+    <div class="space-y-2.5"><h3 class="font-black text-sm">جمعياتك وتعاوناتك</h3>${js || '<div class="card p-8 text-center text-xs text-slate-400"><i class="fa-regular fa-folder-open text-3xl mb-2 block"></i>لا توجد جمعيات بعد. أنشئ جمعيتك الأولى أو انتظر دعوة.<br><button class="btn b-pri mt-4" data-act="go-create">ابدأ مجاناً الآن</button></div>'}</div></div>`;
 }
 
 function dayLabels(freq) {
