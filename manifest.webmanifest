@@ -1,5 +1,5 @@
 {
-  "id": "/family-jamiya/",
+  "id": "/",
   "name": "الجمعية الذكية",
   "short_name": "الجمعية",
   "description": "أدر جمعيتك العائلية: دعوات، ترتيب القبض، متابعة السداد والتنبيهات.",
@@ -75,7 +75,7 @@
   "related_applications": [
     {
       "platform": "webapp",
-      "url": "https://prom1406.github.io/family-jamiya/manifest.webmanifest"
+      "url": "https://aljameyah.com/manifest.webmanifest"
     }
   ]
 }
