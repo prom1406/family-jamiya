@@ -2,6 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
+<script>try{if(localStorage.getItem('jm_lang')==='en'){document.documentElement.lang='en';document.documentElement.dir='ltr';document.write('<script src="i18n-en.js"><\/script>');}}catch(e){}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -275,6 +276,45 @@ h1,h2,h3,.font-display{font-family:'Cairo',system-ui,sans-serif;letter-spacing:0
 <div id="toasts" class="toasts" aria-live="polite"></div>
 
 <script>
+
+/* ============ اللغة: عربي / English ============ */
+const LANG = document.documentElement.lang === 'en' ? 'en' : 'ar';
+const LOCD = () => LANG === 'en' ? 'en-GB' : 'ar-SA-u-ca-gregory-nu-latn', LOCN = () => LANG === 'en' ? 'en-US' : 'ar-SA-u-nu-latn';
+let tr = s => s;
+if (LANG === 'en' && window.I18N_EN) (function () {
+  const D = window.I18N_EN, AR = /[؀-ۿ]/, KEEP = new Set(['ريال', 'اليوم', 'غداً']);
+  const ks = Object.keys(D).filter(k => k.length >= 6 || /\s/.test(k) || KEEP.has(k)).sort((a, b) => b.length - a.length);
+  const re = ks.length ? new RegExp('(?<![\\u0600-\\u06FF])(?:' + ks.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')(?![\\u0600-\\u06FF])', 'g') : null;
+  tr = s => {
+    if (typeof s !== 'string' || !AR.test(s)) return s;
+    const t = s.trim(); let o;
+    if (Object.prototype.hasOwnProperty.call(D, t)) o = s.replace(t, D[t]); else o = re ? s.replace(re, m => D[m]) : s;
+    return AR.test(o) ? o : o.replace(/،/g, ',').replace(/؟/g, '?');
+  };
+  const ATTRS = ['placeholder', 'title', 'aria-label', 'alt'];
+  const fix = root => {
+    if (!root) return;
+    if (root.nodeType === 3) { const v = tr(root.nodeValue); if (v !== root.nodeValue) root.nodeValue = v; return; }
+    if (root.nodeType !== 1 || /^(SCRIPT|STYLE|TEXTAREA)$/.test(root.tagName)) return;
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => (n.parentNode && /^(SCRIPT|STYLE|TEXTAREA)$/.test(n.parentNode.tagName)) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    const nodes = []; while (w.nextNode()) nodes.push(w.currentNode); nodes.forEach(n => fix(n));
+    const els = root.querySelectorAll ? [root, ...root.querySelectorAll('[placeholder],[title],[aria-label],[alt]')] : [root];
+    els.forEach(el => ATTRS.forEach(a => { const v = el.getAttribute && el.getAttribute(a); if (v) { const t = tr(v); if (t !== v) el.setAttribute(a, t); } }));
+  };
+  const start = () => {
+    document.title = tr(document.title); fix(document.body);
+    new MutationObserver(ms => ms.forEach(m => {
+      if (m.type === 'characterData') fix(m.target);
+      else if (m.type === 'attributes') { const v = m.target.getAttribute(m.attributeName); if (v) { const t = tr(v); if (t !== v) m.target.setAttribute(m.attributeName, t); } }
+      else m.addedNodes.forEach(n => fix(n));
+    })).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS });
+  };
+  if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+  const _c = window.confirm.bind(window), _a = window.alert.bind(window);
+  window.confirm = m => _c(tr(m)); window.alert = m => _a(tr(m));
+})();
+const setLang = l => { try { localStorage.setItem('jm_lang', l); } catch (e) {} location.reload(); };
+const langBtn = () => `<button class="btn b-sec" data-act="lang-toggle" aria-label="Language"><i class="fa-solid fa-language"></i> ${LANG === 'en' ? 'عربي' : 'EN'}</button>`;
 /* ============ الإعدادات ============ */
 const firebaseConfig = {
   apiKey: "AIzaSyBD_a9TrhsCL5ognnIxhv2OuyiWJmdr33o",
@@ -311,7 +351,7 @@ const state = {
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const lc = s => String(s || '').trim().toLowerCase();
-const money = n => Number(n || 0).toLocaleString('ar-SA-u-nu-latn') + ' ريال';
+const money = n => Number(n || 0).toLocaleString(LOCN()) + ' ريال';
 const bankOpts = sel => BANKS.map(b => `<option ${b === sel ? 'selected' : ''}>${b}</option>`).join('');
 const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 const fixIban = s => String(s || '').replace(/\s+/g, '').toUpperCase();
@@ -347,8 +387,8 @@ const normPhone = s => {
   return d;
 };
 const validPhone = s => /^05\d{8}$/.test(String(s || '').trim());
-const fmtDate = d => d.toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' });
-const fmtMonth = d => d.toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { year: 'numeric', month: 'long' });
+const fmtDate = d => d.toLocaleDateString(LOCD(), { year: 'numeric', month: 'long', day: 'numeric' });
+const fmtMonth = d => d.toLocaleDateString(LOCD(), { year: 'numeric', month: 'long' });
 
 function toast(msg, type = 'success') {
   const t = document.createElement('div');
@@ -438,13 +478,13 @@ function periodLabel(j, idx) {
   if (!f.days) return fmtMonth(periodStart(j, idx));
   const a = periodStart(j, idx), b = new Date(a.getFullYear(), a.getMonth(), a.getDate() + f.days - 1);
   const o = { day: 'numeric', month: 'long' };
-  return `${a.toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', o)} – ${b.toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', o)}`;
+  return `${a.toLocaleDateString(LOCD(), o)} – ${b.toLocaleDateString(LOCD(), o)}`;
 }
 const dayStart = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 function periodEnd(j, idx) { const n = periodStart(j, idx + 1); return new Date(n.getFullYear(), n.getMonth(), n.getDate() - 1); } // آخر يوم في الدورة
 const daysAr = n => n === 1 ? 'يوم واحد' : n === 2 ? 'يومان' : n >= 3 && n <= 10 ? n + ' أيام' : n + ' يوماً';
 const r2 = n => Math.round(n * 100) / 100;
-const fmtNum = n => Number(r2(n)).toLocaleString('ar-SA-u-nu-latn', { maximumFractionDigits: 2 });
+const fmtNum = n => Number(r2(n)).toLocaleString(LOCN(), { maximumFractionDigits: 2 });
 
 // حساب العضو التراكمي: كل ما دفعه يُقسَّم على قيمة القسط الحالية.
 // المستحق = (عدد الدورات حتى الآن ما عدا دور استلامه) × القسط. الزائد رصيد مقدّم يغطي الدفعات القادمة.
@@ -1336,8 +1376,8 @@ state.settings = {}; state._tv = null;
 /* --- أدوات --- */
 const dayKey = (t = Date.now()) => new Date(t + 3 * 3600000).toISOString().slice(0, 10); // بتوقيت الرياض
 const tsd = v => !v ? null : (v.toDate ? v.toDate() : new Date(v));
-const nf = n => Number(n || 0).toLocaleString('ar-SA-u-nu-latn');
-const fmtDT = d => d ? fmtDate(d) + ' ' + d.toLocaleTimeString('ar-SA-u-nu-latn', { hour: '2-digit', minute: '2-digit' }) : '—';
+const nf = n => Number(n || 0).toLocaleString(LOCN());
+const fmtDT = d => d ? fmtDate(d) + ' ' + d.toLocaleTimeString(LOCN(), { hour: '2-digit', minute: '2-digit' }) : '—';
 const ssGet = k => { try { return sessionStorage.getItem(k); } catch (e) { return null; } };
 const ssSet = (k, v) => { try { sessionStorage.setItem(k, v); } catch (e) {} };
 const ssDel = k => { try { sessionStorage.removeItem(k); } catch (e) {} };
@@ -1954,6 +1994,12 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (t && t.matches && t.matches('select[name=mode]') && t.form) { const f = t.form, o = f.querySelector('[data-fam-once]'), m = f.querySelector('[data-fam-monthly]'); if (o && m) { o.classList.toggle('hide', t.value !== 'once'); m.classList.toggle('hide', t.value !== 'monthly'); } return; }
   if (t && t.matches && t.matches('#f-pay [name=file], #f-fampay [name=file]')) { const im = $('pay-prev'), f = t.files && t.files[0]; if (im && f) { im.src = URL.createObjectURL(f); im.classList.remove('hide'); } return; }
+  if (t && t.matches && t.matches('[data-rel-optin]') && state.user) {
+    const v = t.checked;
+    db.collection('users').doc(state.user.uid).update({ showRel: v }).then(() => { if (state.profile) state.profile.showRel = v; lsSet('jm_relpub_' + state.user.uid, ''); loadMyStats(true); toast(v ? 'سيرى المشرفون نسبة التزامك عند دعوتك' : 'أُخفيت نسبة التزامك عن المشرفين', v ? 'success' : 'info'); })
+      .catch(err => { t.checked = !v; toast('تعذر الحفظ: ' + err.message, 'error'); });
+    return;
+  }
   if (!t.matches || !t.matches('[data-wa-optin]') || !state.user) return;
   const v = t.checked;
   db.collection('users').doc(state.user.uid).update({ waOptIn: v }).then(() => { if (state.profile) state.profile.waOptIn = v; toast(v ? 'فُعّلت تنبيهات واتساب' : 'أُوقفت تنبيهات واتساب', v ? 'success' : 'info'); })
@@ -2141,7 +2187,7 @@ function render() {
   syncPayListeners();
   renderNav();
   const v = state.view, app = $('app');
-  const views = { loading: vLoading, auth: vAuth, verify: vVerify, complete: vComplete, home: vHome, create: vCreate, jamiya: vJamiya, profile: vProfile, admin: vAdmin };
+  const views = { loading: vLoading, auth: vAuth, verify: vVerify, complete: vComplete, home: vHome, follow: vFollow, create: vCreate, jamiya: vJamiya, profile: vProfile, admin: vAdmin };
   if (maintOn()) { $('tabbar').classList.add('hide'); app.innerHTML = vMaint(); return; }
   app.innerHTML = `<div class="fade">${annHtml()}${(views[v] || vLoading)()}</div>`;
   trackView(v);
@@ -2153,15 +2199,15 @@ function renderNav() {
   const canInst = !isStandalone() && !instFlag() && (deferredPrompt || isIOS());
   const instBtn = canInst ? '<button class="btn b-pri" data-act="install-app" aria-label="تثبيت التطبيق"><i class="fa-solid fa-download"></i><span class="hidden sm:inline"> تثبيت</span></button>' : '';
   const shareBtn = '<button class="btn b-sec" data-act="share-app" aria-label="مشاركة التطبيق"><i class="fa-solid fa-share-nodes"></i><span class="hidden sm:inline"> مشاركة</span></button>';
-  if (!state.user || !state.profile) { nav.innerHTML = instBtn + shareBtn; sub.textContent = 'منصة الجمعيات العائلية'; tb.classList.add('hide'); return; }
+  if (!state.user || !state.profile) { nav.innerHTML = langBtn() + instBtn + shareBtn; sub.textContent = 'منصة الجمعيات العائلية'; tb.classList.add('hide'); return; }
   sub.textContent = state.profile.name;
   const nAl = bellCount(), bellBtn = `<button class="btn b-sec bellbtn" data-act="alerts-open" aria-label="التنبيهات"><i class="fa-solid fa-bell ${nAl ? 'text-rose-500' : ''}"></i>${nAl ? `<span class="cnt">${nf(nAl)}</span>` : ''}</button>`;
-  nav.innerHTML = `${instBtn}${bellBtn}${shareBtn}<div class="dnav">${state.isAdmin ? '<button class="btn b-pri" data-act="go-admin"><i class="fa-solid fa-shield-halved"></i> لوحة المالك</button>' : ''}
+  nav.innerHTML = `${langBtn()}${instBtn}${bellBtn}${shareBtn}<div class="dnav">${state.isAdmin ? '<button class="btn b-pri" data-act="go-admin"><i class="fa-solid fa-shield-halved"></i> لوحة المالك</button>' : ''}
     <button class="btn b-sec" data-act="go-home"><i class="fa-solid fa-house"></i> جمعياتي</button>
     <button class="btn b-sec" data-act="go-profile"><i class="fa-solid fa-user-gear"></i> حسابي</button>
     <button class="btn b-red" data-act="logout" aria-label="خروج"><i class="fa-solid fa-right-from-bracket"></i></button></div>`;
   const v = state.view, tab = (act, icon, label, on) => `<button class="tab ${on ? 'on' : ''}" data-act="${act}"><i class="fa-solid ${icon}"></i>${label}</button>`;
-  tb.innerHTML = tab('go-home', 'fa-house', 'جمعياتي', ['home', 'jamiya'].includes(v)) + tab('go-create', 'fa-circle-plus', 'جديد', v === 'create')
+  tb.innerHTML = tab('go-home', 'fa-house', 'جمعياتي', ['home', 'jamiya', 'follow'].includes(v)) + tab('go-create', 'fa-circle-plus', 'جديد', v === 'create')
     + (state.isAdmin ? tab('go-admin', 'fa-shield-halved', 'المالك', v === 'admin') : '') + tab('go-profile', 'fa-user', 'حسابي', v === 'profile');
   tb.classList.remove('hide');
 }
@@ -2266,6 +2312,58 @@ function growthCards() {
   return h ? `<div class="space-y-2">${h}</div>` : '';
 }
 
+const staffJams = () => state.jamiyat.filter(j => j.type !== 'family' && (j.creatorUid === state.user.uid || (j.deputyUid && j.deputyUid === state.user.uid)));
+function followData() {
+  const me = state.user.uid, now = Date.now(), people = {}; let running = 0, notStarted = 0, finished = 0, waiting = 0;
+  staffJams().forEach(j => {
+    if (!j.startDate) return; const idx = monthIdx(j);
+    if (idx < 0) { notStarted++; return; } if (idx >= j.count) { finished++; return; }
+    const pays = state.pays[j.id]; if (!pays) { waiting++; return; } running++;
+    const turns = j.turns || [], cur = idx, mem = (state.fMem || {})[j.id] || {}, due = dayIn(j, cur, j.lastDay), dueEnd = due.getTime() + DAY_MS;
+    [...new Set(turns)].forEach(u => {
+      if (u === me) return;
+      const a = accountFor(j, turns, cur, true, pays, u), r = rateOf(j, pays, u);
+      const pp = people[u] = people[u] || { uid: u, name: '', phone: '', rows: [], total: 0, late: false, on: 0, due: 0 };
+      const m = mem[u]; if (m) { pp.name = pp.name || dispName(m); if (m.phone && (j.creatorUid === me || m.showPhone)) pp.phone = pp.phone || m.phone; }
+      if (r) { pp.on += r.on; pp.due += r.tot; }
+      if (!(a.remaining > 0.005) || (u === turns[cur] && sharesOf(turns, u) === 1)) return;
+      const prev = cur > 0 ? accountFor(j, turns, cur - 1, true, pays, u) : null;
+      const late = dueEnd < now || !!(prev && ['unpaid', 'partial'].includes(prev.status));
+      pp.rows.push({ j, remaining: a.remaining, late, lateDays: dueEnd < now ? Math.floor((now - dueEnd) / DAY_MS) + 1 : 0, due, pend: a.pending });
+      pp.total = r2(pp.total + a.remaining); if (late) pp.late = true;
+    });
+  });
+  const list = Object.values(people).filter(x => x.rows.length).sort((a, b) => (b.late - a.late) || (b.total - a.total));
+  return { list, running, notStarted, finished, waiting, total: r2(list.reduce((t, x) => t + x.total, 0)), nLate: list.filter(x => x.late).length, nOk: Object.values(people).filter(x => !x.rows.length).length };
+}
+async function loadFollowMembers() {
+  state.fMem = state.fMem || {};
+  await Promise.all(staffJams().filter(j => !state.fMem[j.id]).map(async j => {
+    try { const sn = await db.collection('jamiyat').doc(j.id).collection('members').get(); const o = {}; sn.docs.forEach(d => o[d.id] = d.data()); state.fMem[j.id] = o; } catch (e) { state.fMem[j.id] = {}; }
+  }));
+  if (state.view === 'follow') render();
+}
+function vFollow() {
+  const D = followData(), kp = (l, v, cl) => `<div class="p-3 rounded-2xl bg-white border border-slate-100 text-center"><p class="text-[10px] text-slate-500">${l}</p><b class="text-lg ${cl || ''}">${v}</b></div>`;
+  const rows = D.list.map(x => {
+    const rate = x.due ? Math.round(x.on / x.due * 100) : null, rc = rate == null ? 'bg-slate-100 text-slate-500' : rate >= 90 ? 'bg-emerald-100 text-emerald-700' : rate >= 70 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700';
+    const lines = x.rows.map(r => `<button class="w-full text-right flex justify-between items-center gap-2 p-2 bg-slate-50 rounded-lg" data-act="follow-open" data-id="${esc(r.j.id)}"><span class="min-w-0 truncate">${esc(r.j.name)}<span class="block text-[10px] ${r.late ? 'text-rose-600' : 'text-slate-400'}">${r.lateDays ? 'متأخر ' + daysAr(r.lateDays) : r.late ? 'متأخر عن دورة سابقة' : 'آخر موعد ' + fmtDate(r.due)}${r.pend > 0 ? ' • بانتظار تأكيد ' + fmtNum(r.pend) : ''}</span></span><b class="flex-none">${fmtNum(r.remaining)} ريال</b></button>`).join('');
+    return `<div class="card p-4 space-y-2 ${x.late ? 'border-rose-200' : ''}"><div class="flex justify-between items-center gap-2"><div class="min-w-0"><b class="text-sm">${esc(x.name || '…')}</b>${x.late ? ' <span class="text-[10px] px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 font-bold">متأخر</span>' : ''}<span class="block text-[10px] text-slate-500">في ${nf(x.rows.length)} ${x.rows.length === 1 ? 'جمعية' : 'جمعيات'}</span></div>
+      <div class="text-left flex-none"><b class="text-base text-rose-600">${fmtNum(x.total)}</b> <span class="text-[10px] text-slate-400">ريال</span><span class="block text-[10px] px-1.5 py-0.5 rounded-md ${rc} text-center mt-0.5">${rate == null ? 'جديد' : 'التزام ' + rate + '%'}</span></div></div>
+      <div class="space-y-1 text-xs">${lines}</div>
+      ${x.phone ? `<button class="btn bg-emerald-50 text-emerald-700 w-full" data-act="follow-wa" data-uid="${esc(x.uid)}"><i class="fa-brands fa-whatsapp"></i> تذكيره بكل ما عليه</button>` : ''}</div>`;
+  }).join('');
+  const loading = staffJams().some(j => !(state.fMem || {})[j.id]);
+  return `<div class="space-y-4 max-w-2xl mx-auto"><div class="flex items-center gap-3"><button class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex-none" data-act="go-home" aria-label="رجوع"><i class="fa-solid fa-arrow-right"></i></button><div><h2 class="font-black text-lg">متابعة الأعضاء</h2><p class="text-[11px] text-slate-500">ما على أعضائك عبر كل الجمعيات التي تشرف عليها</p></div></div>
+    <div class="grid grid-cols-3 gap-2">${kp('عليهم مبالغ', nf(D.list.length))}${kp('متأخرون', nf(D.nLate), D.nLate ? 'text-rose-600' : '')}${kp('إجمالي المتبقي', fmtNum(D.total))}</div>
+    <p class="text-[11px] text-slate-400">${nf(D.running)} جمعية جارية${D.notStarted ? ' • ' + nf(D.notStarted) + ' لم تبدأ' : ''}${D.finished ? ' • ' + nf(D.finished) + ' منتهية' : ''}${D.nOk ? ' • ' + nf(D.nOk) + ' عضو مسدد بالكامل ✓' : ''}${D.waiting || loading ? ' • جارٍ تحميل البيانات…' : ''}</p>
+    ${rows || (D.running ? '<div class="card p-8 text-center text-xs text-slate-400"><i class="fa-regular fa-face-smile text-3xl mb-2 block"></i>لا يوجد أحد عليه مبلغ حالياً 🎉</div>' : '<div class="card p-8 text-center text-xs text-slate-400">لا توجد جمعية جارية تشرف عليها الآن.</div>')}</div>`;
+}
+function followWa(uid) {
+  const x = followData().list.find(y => y.uid === uid); if (!x || !x.phone) return;
+  const t = `السلام عليكم ${x.name}، تذكير ودي بالأقساط المتبقية:\n` + x.rows.map(r => `• «${r.j.name}»: ${fmtNum(r.remaining)} ريال (آخر موعد ${fmtDate(r.due)})`).join('\n') + `\nالإجمالي ${fmtNum(x.total)} ريال. جزاك الله خيراً 🤍`;
+  window.open(waLink(x.phone, t), '_blank', 'noopener');
+}
 function vHome() {
   const inv = state.invites.map(i => `<div class="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-wrap justify-between items-center gap-3 text-xs">
       <div><p class="font-bold text-sm">${esc(i.jamiyaName)}</p><p class="text-slate-500">دعوة من ${esc(i.inviterName)} • ${i.family ? 'تعاون عائلي' : 'الاشتراك ' + money(i.amount) + ' ' + esc(i.every || 'شهرياً')}</p></div>
@@ -2288,6 +2386,7 @@ function vHome() {
       <button class="stat text-right" data-act="alerts-open"><p class="text-[11px] text-emerald-50"><i class="fa-solid fa-bell"></i> تنبيهات</p><b class="text-lg">${bellCount()}</b></button>
       <button class="btn b-white mr-auto" data-act="go-create"><i class="fa-solid fa-circle-plus"></i> جديد</button></div></div>
     ${verifyBanner()}${detailsNudge()}${growthCards()}
+    ${staffJams().length ? (() => { const D = followData(); return `<button class="w-full text-right card p-4 flex items-center justify-between gap-3" data-act="go-follow"><span class="flex items-center gap-3 min-w-0"><span class="jicon"><i class="fa-solid fa-list-check"></i></span><span class="min-w-0"><b class="text-sm block">متابعة الأعضاء</b><span class="text-[11px] ${D.nLate ? 'text-rose-600' : 'text-slate-500'}">${D.list.length ? nf(D.list.length) + ' عضو عليهم مبالغ' + (D.nLate ? ' • ' + nf(D.nLate) + ' متأخر' : '') : 'كل شيء مسدد حالياً ✓'}</span></span></span><i class="fa-solid fa-chevron-left text-slate-300"></i></button>`; })() : ''}
     ${inv ? `<div class="space-y-2"><h3 class="font-black text-sm"><i class="fa-solid fa-envelope-open-text text-amber-500"></i> دعوات بانتظارك</h3>${inv}</div>` : ''}
     <div class="space-y-2.5"><h3 class="font-black text-sm">جمعياتك وتعاوناتك</h3>${js || '<div class="card p-8 text-center text-xs text-slate-400"><i class="fa-regular fa-folder-open text-3xl mb-2 block"></i>لا توجد جمعيات بعد. أنشئ جمعيتك الأولى أو انتظر دعوة.<br><button class="btn b-pri mt-4" data-act="go-create">ابدأ مجاناً الآن</button></div>'}</div></div>`;
 }
@@ -2426,7 +2525,8 @@ function vProfile() {
   return `<div class="max-w-xl mx-auto space-y-4"><div class="card p-6 space-y-5"><div class="flex justify-between items-center gap-3"><div class="flex items-center gap-3 min-w-0"><div class="jicon !rounded-full"><i class="fa-solid fa-user"></i></div><div class="min-w-0"><h3 class="font-black text-lg truncate">${esc(p.name)}</h3><p class="text-xs text-slate-500 truncate" dir="ltr">${esc(p.email)}</p></div></div><button class="btn b-sec hidden md:inline-flex" data-act="go-home">الرئيسية</button></div>
     <form id="f-profile" class="space-y-3"><div><label class="text-xs font-semibold block mb-1">الاسم</label><input name="name" class="inp" value="${esc(p.name)}" required></div>${bankFields(p)}
     <button class="btn b-pri w-full py-3" type="submit">حفظ التعديلات</button></form></div>
-    <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-chart-simple text-teal-600"></i> نشاطي في الجمعيات</h4>${state.stats ? statsTiles(state.stats) : '<p class="text-xs text-slate-400">جارٍ حساب إحصاءاتك…</p>'}</div>
+    <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-chart-simple text-teal-600"></i> نشاطي في الجمعيات</h4>${state.stats ? statsTiles(state.stats) : '<p class="text-xs text-slate-400">جارٍ حساب إحصاءاتك…</p>'}
+      <label class="flex items-start gap-2 text-xs leading-relaxed"><input type="checkbox" data-rel-optin class="mt-0.5 w-4 h-4 accent-teal-600" ${p.showRel !== false ? 'checked' : ''}> <span>السماح للمشرفين برؤية نسبة التزامي عند دعوتي لجمعية. إن أخفيتها يظهر لهم أنك أخفيتها.</span></label></div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-bell text-amber-500"></i> إشعارات الجوال</h4>
       <p class="text-xs text-slate-500 leading-relaxed">${!notifSupported() ? 'هذا المتصفح لا يدعم الإشعارات.' : Notification.permission === 'denied' ? 'الإشعارات محظورة لهذا الموقع، فعّلها من إعدادات المتصفح.' : notifOn() ? 'الإشعارات مفعّلة ✓ ستصلك تنبيهات الدعوات والإيصالات والأعضاء الجدد وطلبات التعديل ورسائل الإدارة ومواعيد السداد.' : 'فعّلها لتصلك تنبيهات الدعوات والإيصالات ومواعيد السداد خارج التطبيق.'}${isIOS() && !isStandalone() ? ' على الآيفون يلزم تثبيت التطبيق أولاً.' : ''}</p>
       <div class="flex flex-wrap gap-2">${notifOn() ? '<button class="btn b-sec" data-act="test-notif"><i class="fa-solid fa-paper-plane"></i> إشعار تجريبي</button><button class="btn b-sec" data-act="reg-push"><i class="fa-solid fa-rotate"></i> إعادة تسجيل الجهاز</button>' : '<button class="btn b-pri" data-act="enable-notif"><i class="fa-solid fa-bell"></i> تفعيل الإشعارات</button>'}</div></div>
@@ -2449,14 +2549,34 @@ function showModal(title, body) {
 }
 function closeModal() { stopChat(); $('modal').innerHTML = ''; }
 
+function bindRelLookup() {
+  const f = $('f-invite'), box = $('rel-box'); if (!f || !box) return; let last = '';
+  const paint = (t, cl) => { box.className = 'mt-2 p-2.5 rounded-xl text-[11px] leading-relaxed ' + cl; box.textContent = t; };
+  const run = async () => {
+    const ph = normPhone(f.phone.value); if (!validPhone(ph) || ph === last) return; last = ph;
+    paint('جارٍ التحقق من سجل التزامه…', 'bg-slate-50 text-slate-500');
+    try {
+      const ps = await db.collection('phones').doc(ph).get();
+      if (!ps.exists) return paint('غير مسجّل في التطبيق بعد، فلا يوجد سجل التزام له.', 'bg-slate-50 text-slate-500');
+      const rs = await db.collection('reliability').doc(ps.data().uid).get();
+      if (!rs.exists) return paint('مسجّل في التطبيق ولا يوجد له سجل التزام بعد.', 'bg-slate-50 text-slate-500');
+      const r = rs.data();
+      if (!r.show) return paint('أخفى سجل التزامه.', 'bg-slate-50 text-slate-500');
+      if (r.pct < 0) return paint(`جديد: لم يحلّ عليه موعد سداد بعد (عضو في ${nf(r.mem)} جمعية، وأشرف على ${nf(r.sup)}).`, 'bg-sky-50 text-sky-800');
+      paint(`التزامه ${r.pct}% — سدّد ${nf(r.on)} من ${nf(r.due)} دفعة في موعدها • عضو في ${nf(r.mem)} جمعية وأشرف على ${nf(r.sup)}.`, r.pct >= 90 ? 'bg-emerald-50 text-emerald-800' : r.pct >= 70 ? 'bg-amber-50 text-amber-800' : 'bg-rose-50 text-rose-800');
+    } catch (e) { last = ''; paint('تعذر جلب سجل الالتزام.', 'bg-slate-50 text-slate-500'); }
+  };
+  f.phone.addEventListener('input', run); f.phone.addEventListener('blur', run);
+}
 function openModal(kind) {
   const c = ctx();
   if (kind === 'notif') { showModal('إشعار لأعضاء الجمعية', `<form id="f-notif" class="space-y-3"><input name="title" class="inp" maxlength="100" placeholder="عنوان الإشعار" required><textarea name="body" rows="4" class="inp" maxlength="500" placeholder="نص الإشعار…" required></textarea><p class="text-[11px] text-slate-500">يصل لكل أعضاء الجمعية على جوالهم.</p><button class="btn b-pri w-full py-3" type="submit"><i class="fa-solid fa-bullhorn"></i> إرسال</button></form>`); return; }
   if (kind === 'invite') showModal('دعوة عضو للجمعية', `<form id="f-invite" class="space-y-3"><div><label class="text-xs font-semibold block mb-1">اسم العضو</label><input name="name" class="inp" required></div>
-    <div><label class="text-xs font-semibold block mb-1">رقم جواله (05xxxxxxxx)</label><input name="phone" type="tel" inputmode="tel" dir="ltr" class="inp" placeholder="05xxxxxxxx" required></div>
+    <div><label class="text-xs font-semibold block mb-1">رقم جواله (05xxxxxxxx)</label><input name="phone" type="tel" inputmode="tel" dir="ltr" class="inp" placeholder="05xxxxxxxx" required><div id="rel-box" class="hide mt-2"></div></div>
     <div><label class="text-xs font-semibold block mb-1">بريده الإلكتروني (اختياري)</label><input name="email" type="email" dir="ltr" class="inp"></div>
     <p class="text-[11px] text-slate-500 leading-relaxed">تظهر الدعوة للعضو تلقائياً عند تسجيله أو دخوله بنفس رقم الجوال. بعد الإنشاء ترسلها له عبر واتساب بضغطة واحدة.</p>
     <button class="btn b-pri w-full py-3" type="submit"><i class="fa-brands fa-whatsapp"></i> إنشاء الدعوة</button></form>`);
+  if (kind === 'invite') bindRelLookup();
   if (kind === 'pay') showModal('إثبات سداد القسط', `<form id="f-pay" class="space-y-3"><p class="text-xs text-slate-500">حوّل إلى: <b>${esc(c.rec ? dispName(c.rec) : '')}</b> — ${esc(c.rec?.bank)} <span dir="ltr">${esc(c.rec?.iban || '')}</span></p>${c.rec?.iban ? `<button type="button" class="btn b-sec w-full" data-act="copy-iban" data-v="${esc(fixIban(c.rec.iban))}"><i class="fa-regular fa-copy"></i> نسخ الآيبان</button>` : ''}
     <div class="p-2.5 bg-slate-50 rounded-xl text-[11px] text-slate-600">القسط ${fmtNum(c.j.amount)} ريال ${c.f.every} • المستحق عليك حتى الآن ${fmtNum(c.me?.owed || 0)} • المتبقي <b>${fmtNum(c.me?.remaining || 0)}</b> ريال</div>
     <div><label class="text-xs font-semibold block mb-1">المبلغ المحوّل (ريال) — يمكنك دفع جزء أو أكثر من قسط</label><input name="amount" type="number" step="0.01" min="1" class="inp" value="${c.me && c.me.remaining > 0 ? c.me.remaining : c.j.amount}" required>
@@ -2600,7 +2720,7 @@ function paintChat(stick) {
   const near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
   box.innerHTML = state.chat.length ? state.chat.map(m => {
     const mine = m.uid === me, mem = state.members[m.uid], t = tsd(m.createdAt);
-    const tm = t ? t.toLocaleString('ar-SA-u-ca-gregory-nu-latn', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'الآن';
+    const tm = t ? t.toLocaleString(LOCD(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'الآن';
     const tag = m.uid === j.creatorUid ? ' <span class="opacity-70">(مشرف)</span>' : (j.deputyUid && m.uid === j.deputyUid) ? ' <span class="opacity-70">(نائب)</span>' : '';
     return `<div class="flex ${mine ? 'justify-start' : 'justify-end'}"><div class="max-w-[85%] px-3 py-2 rounded-2xl ${mine ? 'bg-emerald-600 text-white' : 'bg-white border border-slate-100'}">
       <p class="text-[10px] font-bold ${mine ? 'text-emerald-100' : 'text-teal-700'}">${mem ? esc(dispName(mem)) : 'عضو سابق'}${tag}</p>
@@ -2902,6 +3022,10 @@ async function loadMyStats(force) {
       memJ.forEach(j => { if (!state.myPays[j.id]) return; const r = rateOf(j, state.myPays[j.id], uid); if (r) { on += r.on; due += r.tot; } });
       const st = { n: js.length, sup: js.filter(j => j.creatorUid === uid).length, mem: memJ.length, on, due, pct: due ? Math.round(on / due * 100) : null };
       state.stats = { ...st, at: Date.now(), key }; state.statsPub = st;
+      { // سجل الالتزام العام: يقرؤه من يدعوك فقط عن طريق جوالك، ويمكنك إخفاؤه من حسابك
+        const show = state.profile.showRel !== false, rk = 'jm_relpub_' + uid, rh = JSON.stringify([show, st.pct, st.on, st.due, st.n, st.sup, st.mem]);
+        if (force || lsGet(rk) !== rh) db.collection('reliability').doc(uid).set(show ? { pct: st.pct == null ? -1 : st.pct, on: st.on, due: st.due, n: st.n, sup: st.sup, mem: st.mem, show: true, at: FV.serverTimestamp() } : { show: false, at: FV.serverTimestamp() }).then(() => lsSet(rk, rh)).catch(() => {});
+      }
       const hk = 'jm_stpub_' + uid, hash = JSON.stringify(st);
       if (force || lsGet(hk) !== hash) { // ننشرها في ملف العضوية بكل جمعياته ليراها مشرفوها
         await Promise.all(memJ.map(j => db.collection('jamiyat').doc(j.id).collection('members').doc(uid).update({ st }).catch(() => {})));
@@ -3573,6 +3697,7 @@ document.addEventListener('click', e => { if (e.target.matches && e.target.match
 renderBanner();
 
 const actions = {
+  'go-follow': () => { state.fMem = {}; state.view = 'follow'; render(); loadFollowMembers(); }, 'follow-open': el => openJamiya(el.dataset.id), 'follow-wa': el => followWa(el.dataset.uid),
   'go-home': () => { cleanup(state.jUnsubs); state.view = state.user && state.profile ? 'home' : state.view; render(); },
   'go-create': () => { state.createType = 'jamiya'; state.view = 'create'; render(); },
   'growth-create': () => { logEvent('growth_create_click'); lsSet(GK.create, String(Date.now())); state.createType = 'jamiya'; state.view = 'create'; render(); },
@@ -3615,7 +3740,7 @@ const actions = {
   'alert-remind': (el) => { closeModal(); state.afterOpen = { id: el.dataset.id, act: 'wa-remind' }; openJamiya(el.dataset.id); },
   'cancel-inv': (el) => cancelInvite(el.dataset.id),
   'order-modal': openOrderModal,
-  'wa-remind': openWaReminders, 'share-app': shareApp,
+  'wa-remind': openWaReminders, 'share-app': shareApp, 'lang-toggle': () => setLang(LANG === 'en' ? 'ar' : 'en'),
   'copy-share': () => navigator.clipboard.writeText(state.shareText).then(() => toast('تم نسخ الرابط')).catch(() => toast('تعذر النسخ', 'error')),
   'od-up': (el) => orderMove(+el.dataset.i, -1), 'od-down': (el) => orderMove(+el.dataset.i, 1),
   'od-shuffle': orderShuffle, 'od-save': orderSave,
