@@ -533,19 +533,23 @@ const needsPay = (c, u) => (u !== c.recUid || sharesOf(c.turns, u) > 1) && c.acc
 auth.onAuthStateChanged(async user => { if (state._registering) return; await bootUser(user); });
 async function bootUser(user) {
   cleanup(state.unsubs); cleanup(state.jUnsubs); stopPayListeners(); state.pays = {}; stopBlockWatch(); stopHeartbeat(); state._tv = null;
-  state.user = user; state.profile = null; state.isAdmin = false;
+  state.user = user; state.profile = null; state.isAdmin = false; state._restoreTried = false;
   state.jamiyat = []; state.invites = [];
   if (!user) { unlock(); state.view = 'auth'; return render(); }
 
+  let loadErr = null;
   try {
     // تحديث الرمز ليحمل حالة تفعيل البريد الحالية، وإلا ترفض القواعد القراءة حتى ساعة بعد التفعيل
     if (user.emailVerified) await user.getIdToken(true).catch(() => {});
-    const snap = await db.collection('users').doc(user.uid).get();
+    let snap = await db.collection('users').doc(user.uid).get();
+    if (!snap.exists && snap.metadata && snap.metadata.fromCache) snap = await db.collection('users').doc(user.uid).get({ source: 'server' }); // لا نصدّق «غير موجود» القادم من الذاكرة المؤقتة
     state.profile = snap.exists ? snap.data() : null;
     const adm = await db.collection('admins').doc(user.uid).get().catch(() => ({ exists: false }));
     state.isAdmin = adm.exists || (lc(user.email) === OWNER_EMAIL && user.emailVerified);
-  } catch (e) { toast('تعذر تحميل الحساب: ' + e.message, 'error'); }
+  } catch (e) { loadErr = e; toast('تعذر تحميل الحساب: ' + e.message, 'error'); }
 
+  // فشلت قراءة الملف الشخصي: لا ننشئ ملفاً جديداً حتى لا نمسح بيانات حساب قديم موجود، ونطلب إعادة المحاولة
+  if (loadErr && !state.profile) { state.view = 'loaderr'; return render(); }
   if (!state.isAdmin && await isBlockedNow()) return;
   if (!state.profile && user.displayName) { if (!(await autoProfile(user, user.displayName))) return; }
   if (!state.profile) { state.view = 'complete'; return render(); }
@@ -576,10 +580,25 @@ const phoneSaveErr = e => e && e.message === 'PHONE_TAKEN' ? PHONE_TAKEN_MSG : (
 
 function cleanup(arr) { arr.forEach(u => u()); arr.length = 0; }
 
+// استعادة بيانات حساب فُرّغ ملفه (الجوال والبنك) من نسخته المحفوظة في ملف عضويته داخل جمعياته
+async function maybeRestoreProfile() {
+  const p = state.profile; if (!p || !state.user || state._restoreTried || state.isAdmin || !state.jamiyat.length) return;
+  if (validPhone(normPhone(p.phone))) return;
+  state._restoreTried = true;
+  for (const j of state.jamiyat) {
+    try {
+      const sn = await db.collection('jamiyat').doc(j.id).collection('members').doc(state.user.uid).get(), m = sn.exists ? sn.data() : null;
+      if (!m || !validPhone(normPhone(m.phone))) continue;
+      const upd = { name: (m.name || p.name || '').trim() || p.name, phone: normPhone(m.phone), bank: m.bank || '', iban: m.iban || '', waOptIn: m.waOptIn !== false, nick: m.nick || '', showAs: (m.showAs === 'nick' && m.nick) ? 'nick' : 'name', showPhone: !!m.showPhone, showEmail: !!m.showEmail };
+      await saveProfileWithPhone(state.user.uid, upd, 'update', null);
+      state.profile = { ...p, ...upd }; toast('استُعيدت بياناتك (الجوال والحساب البنكي) من جمعياتك', 'success'); renderBanner(); render(); return;
+    } catch (e) { /* ننتقل للجمعية التالية */ }
+  }
+}
 function startListeners() {
   const uid = state.user.uid, email = lc(state.user.email), phone = normPhone(state.profile && state.profile.phone), ver = !!state.user.emailVerified;
   let invA = [], invB = [], jA = [], jB = [];
-  const mergeJ = () => { const m = new Map(); [...jA, ...jB].forEach(x => m.set(x.id, x)); state.jamiyat = [...m.values()]; syncPayListeners(); schedStats(); if (state.view === 'home') render(); else renderNav(); };
+  const mergeJ = () => { const m = new Map(); [...jA, ...jB].forEach(x => m.set(x.id, x)); state.jamiyat = [...m.values()]; maybeRestoreProfile(); syncPayListeners(); schedStats(); if (state.view === 'home') render(); else renderNav(); };
   const merge = () => { const m = new Map(); [...invA, ...invB].forEach(i => m.set(i.id, i)); state.invites = [...m.values()];
     state.invites.forEach(i => pushLocal('دعوة جديدة للانضمام', `دعاك ${i.inviterName || ''} إلى جمعية «${i.jamiyaName || ''}»`, 'inv_' + i.id)); if (state.view === 'home') render(); };
   state.unsubs.push(
@@ -605,7 +624,12 @@ function startListeners() {
 async function autoProfile(u, name) {
   if (state.settings.regClosed && !state.isAdmin) { toast(state.settings.regMsg || 'التسجيل الجديد متوقف مؤقتاً', 'error'); await auth.signOut().catch(() => {}); return false; }
   const profile = { name, email: lc(u.email), phone: '', bank: '', iban: '', waOptIn: false, nick: '', showAs: 'name', showPhone: false, showEmail: false, avatar: u.photoURL || '', ownerNotified: false, createdAt: FV.serverTimestamp() };
-  try { await db.collection('users').doc(u.uid).set(profile); } catch (e) { toast('تعذر إنشاء الحساب: ' + e.message, 'error'); return false; }
+  let existing = null;
+  try {
+    const ref = db.collection('users').doc(u.uid);
+    await db.runTransaction(async t => { const sn = await t.get(ref); if (sn.exists) { existing = sn.data(); return; } t.set(ref, profile); }); // إنشاء فقط إن لم يكن الملف موجوداً
+  } catch (e) { toast('تعذر إنشاء الحساب: ' + e.message, 'error'); return false; }
+  if (existing) { state.profile = existing; return true; }
   state.profile = profile; if (!state.isAdmin) incStat({ regs: 1 }); logEvent('register', { name });
   return true;
 }
@@ -2183,7 +2207,7 @@ function render() {
   syncPayListeners();
   renderNav();
   const v = state.view, app = $('app');
-  const views = { loading: vLoading, auth: vAuth, verify: vVerify, complete: vComplete, home: vHome, follow: vFollow, create: vCreate, jamiya: vJamiya, profile: vProfile, admin: vAdmin };
+  const views = { loading: vLoading, auth: vAuth, verify: vVerify, complete: vComplete, loaderr: vLoadErr, home: vHome, follow: vFollow, create: vCreate, jamiya: vJamiya, profile: vProfile, admin: vAdmin };
   if (maintOn()) { $('tabbar').classList.add('hide'); app.innerHTML = vMaint(); return; }
   app.innerHTML = `<div class="fade">${annHtml()}${(views[v] || vLoading)()}</div>`;
   trackView(v);
@@ -2207,6 +2231,9 @@ function renderNav() {
     + (state.isAdmin ? tab('go-admin', 'fa-shield-halved', 'المالك', v === 'admin') : '') + tab('go-profile', 'fa-user', 'حسابي', v === 'profile');
   tb.classList.remove('hide');
 }
+const vLoadErr = () => `<div class="max-w-md mx-auto card p-8 text-center space-y-4"><i class="fa-solid fa-wifi text-3xl text-amber-500"></i><h3 class="font-black text-lg">تعذر تحميل حسابك</h3>
+  <p class="text-xs text-slate-500 leading-relaxed">لم نتمكن من قراءة بياناتك الآن، غالباً بسبب ضعف الاتصال. بياناتك محفوظة ولم يتغير فيها شيء. أعد المحاولة.</p>
+  <button class="btn b-pri w-full py-3" data-act="retry-boot"><i class="fa-solid fa-rotate"></i> إعادة المحاولة</button><button class="btn b-sec w-full" data-act="logout">تسجيل الخروج</button></div>`;
 const vLoading = () => `<div class="text-center py-24 text-slate-400"><i class="fa-solid fa-spinner fa-spin text-3xl"></i></div>`;
 
 const OTHER_BANK = "بنك رقمي / أخرى";
@@ -3736,7 +3763,7 @@ const actions = {
   'alert-remind': (el) => { closeModal(); state.afterOpen = { id: el.dataset.id, act: 'wa-remind' }; openJamiya(el.dataset.id); },
   'cancel-inv': (el) => cancelInvite(el.dataset.id),
   'order-modal': openOrderModal,
-  'wa-remind': openWaReminders, 'share-app': shareApp, 'lang-toggle': () => setLang(LANG === 'en' ? 'ar' : 'en'),
+  'wa-remind': openWaReminders, 'share-app': shareApp, 'lang-toggle': () => setLang(LANG === 'en' ? 'ar' : 'en'), 'retry-boot': () => { state.view = 'loading'; render(); bootUser(auth.currentUser); },
   'copy-share': () => navigator.clipboard.writeText(state.shareText).then(() => toast('تم نسخ الرابط')).catch(() => toast('تعذر النسخ', 'error')),
   'od-up': (el) => orderMove(+el.dataset.i, -1), 'od-down': (el) => orderMove(+el.dataset.i, 1),
   'od-shuffle': orderShuffle, 'od-save': orderSave,

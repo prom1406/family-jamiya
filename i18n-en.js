@@ -1166,5 +1166,9 @@ window.I18N_EN = {
 "تم نسخ الرابط": "Link copied",
 "اكتمل عدد الأعضاء. احذف عضواً (زر «حذف» بجانب اسمه) لتتمكن من دعوة بديل": "The association is full. Remove a member (\"Remove\" button beside their name) so you can invite a replacement",
 "تم نسخ نص الدعوة": "Invitation text copied",
-"تم نسخ الآيبان": "IBAN copied"
+"تم نسخ الآيبان": "IBAN copied",
+"تعذر تحميل حسابك": "Could not load your account",
+"لم نتمكن من قراءة بياناتك الآن، غالباً بسبب ضعف الاتصال. بياناتك محفوظة ولم يتغير فيها شيء. أعد المحاولة.": "We could not read your data right now, most likely because of a weak connection. Your data is safe and nothing changed. Try again.",
+"إعادة المحاولة": "Try again",
+"استُعيدت بياناتك (الجوال والحساب البنكي) من جمعياتك": "Your details (mobile and bank account) were restored from your associations"
 };
