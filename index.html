@@ -1743,6 +1743,8 @@ function tabSettings() {
     <hr class="border-slate-100"><h4 class="font-black text-sm"><i class="fa-solid fa-screwdriver-wrench text-amber-600"></i> وضع الصيانة</h4>
     ${sw('maintenance', s.maintenance, 'إيقاف المنصة مؤقتاً لكل المستخدمين (المشرفون لا يتأثرون)')}
     <input name="maintMsg" class="inp" maxlength="200" value="${esc(s.maintMsg || '')}" placeholder="رسالة الصيانة (اختياري)">
+    <hr class="border-slate-100"><h4 class="font-black text-sm"><i class="fa-solid fa-gauge-high text-emerald-600"></i> سجل التزام الأعضاء</h4>
+    ${sw('relOn', s.relOn !== false, 'إظهار سجل التزام العضو (نسبة الالتزام وعدد الجمعيات) للمشرف عند دعوته وفي قائمة أعضاء جمعيته. أوقفه لإخفائه عن الجميع.')}
     <hr class="border-slate-100"><h4 class="font-black text-sm"><i class="fa-solid fa-user-lock text-rose-600"></i> التسجيل الجديد</h4>
     ${sw('regClosed', s.regClosed, 'إيقاف تسجيل الحسابات الجديدة')}
     <input name="regMsg" class="inp" maxlength="200" value="${esc(s.regMsg || '')}" placeholder="رسالة تظهر لمن يحاول التسجيل (اختياري)">
@@ -1911,7 +1913,7 @@ async function addAdminByEmail(f) {
 }
 async function saveSettings(f) {
   const s = state.settings || {}, annText = f.annText.value.trim(), annActive = f.annActive.checked;
-  const data = { annText, annType: f.annType.value, annActive, maintenance: f.maintenance.checked, maintMsg: f.maintMsg.value.trim(), regClosed: f.regClosed.checked, regMsg: f.regMsg.value.trim(), annVer: (annText !== s.annText || (annActive && !s.annActive)) ? Date.now() : (s.annVer || 0) };
+  const data = { annText, annType: f.annType.value, annActive, maintenance: f.maintenance.checked, maintMsg: f.maintMsg.value.trim(), regClosed: f.regClosed.checked, regMsg: f.regMsg.value.trim(), relOn: f.relOn.checked, annVer: (annText !== s.annText || (annActive && !s.annActive)) ? Date.now() : (s.annVer || 0) };
   try { await db.collection('settings').doc('app').set(data, { merge: true }); state.settings = { ...s, ...data }; logEvent('adm_settings', { info: [data.maintenance ? 'صيانة' : '', data.regClosed ? 'تسجيل مغلق' : '', annActive ? 'إعلان' : ''].filter(Boolean).join(' • ') || 'حفظ' }); toast('تم حفظ الإعدادات'); render(); }
   catch (e) { toast('تعذر الحفظ: ' + e.message + ' — تأكد من نشر القواعد', 'error'); }
 }
@@ -1994,12 +1996,6 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (t && t.matches && t.matches('select[name=mode]') && t.form) { const f = t.form, o = f.querySelector('[data-fam-once]'), m = f.querySelector('[data-fam-monthly]'); if (o && m) { o.classList.toggle('hide', t.value !== 'once'); m.classList.toggle('hide', t.value !== 'monthly'); } return; }
   if (t && t.matches && t.matches('#f-pay [name=file], #f-fampay [name=file]')) { const im = $('pay-prev'), f = t.files && t.files[0]; if (im && f) { im.src = URL.createObjectURL(f); im.classList.remove('hide'); } return; }
-  if (t && t.matches && t.matches('[data-rel-optin]') && state.user) {
-    const v = t.checked;
-    db.collection('users').doc(state.user.uid).update({ showRel: v }).then(() => { if (state.profile) state.profile.showRel = v; lsSet('jm_relpub_' + state.user.uid, ''); loadMyStats(true); toast(v ? 'سيرى المشرفون نسبة التزامك عند دعوتك' : 'أُخفيت نسبة التزامك عن المشرفين', v ? 'success' : 'info'); })
-      .catch(err => { t.checked = !v; toast('تعذر الحفظ: ' + err.message, 'error'); });
-    return;
-  }
   if (!t.matches || !t.matches('[data-wa-optin]') || !state.user) return;
   const v = t.checked;
   db.collection('users').doc(state.user.uid).update({ waOptIn: v }).then(() => { if (state.profile) state.profile.waOptIn = v; toast(v ? 'فُعّلت تنبيهات واتساب' : 'أُوقفت تنبيهات واتساب', v ? 'success' : 'info'); })
@@ -2312,6 +2308,7 @@ function growthCards() {
   return h ? `<div class="space-y-2">${h}</div>` : '';
 }
 
+const relOn = () => (state.settings || {}).relOn !== false; // مفتاح المالك لإظهار سجل الالتزام للمشرفين
 const staffJams = () => state.jamiyat.filter(j => j.type !== 'family' && (j.creatorUid === state.user.uid || (j.deputyUid && j.deputyUid === state.user.uid)));
 function followData() {
   const me = state.user.uid, now = Date.now(), people = {}; let running = 0, notStarted = 0, finished = 0, waiting = 0;
@@ -2466,7 +2463,7 @@ function vJamiya() {
     const detail = c.started ? `مدفوع ${fmtNum(ac.paid)} من ${fmtNum(ac.owed)}${ac.credit > 0 ? ` • رصيد مقدّم ${fmtNum(ac.credit)}` : ac.remaining > 0 ? ` • متبقي ${fmtNum(ac.remaining)}` : ''}` : '';
     return `<div class="p-3 bg-slate-50 border border-slate-100 rounded-xl flex flex-wrap justify-between items-center gap-2 text-xs">
       <div class="flex items-center gap-3"><span class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center">${i + 1}</span>
-      <div><p class="font-bold">${esc(dispName(m))} ${u === j.creatorUid ? '<span class="text-[10px] text-indigo-600">(مشرف)</span>' : ''}${j.deputyUid && u === j.deputyUid ? '<span class="text-[10px] text-amber-600">(نائب المشرف)</span>' : ''}${nSh > 1 ? ' <span class="text-[10px] text-sky-600">(' + nSh + ' أسهم)</span>' : ''} ${c.canManage ? rateBadge(c, u) : ''}</p><p class="text-[10px] text-slate-400">دوره: ${periodLabel(j, i)}</p>${contact}${detail ? `<p class="text-[10px] text-slate-500">${detail}</p>` : ''}${c.canManage || u === uid ? statLine(u === uid && state.stats ? state.stats : m.st) : ''}</div></div>
+      <div><p class="font-bold">${esc(dispName(m))} ${u === j.creatorUid ? '<span class="text-[10px] text-indigo-600">(مشرف)</span>' : ''}${j.deputyUid && u === j.deputyUid ? '<span class="text-[10px] text-amber-600">(نائب المشرف)</span>' : ''}${nSh > 1 ? ' <span class="text-[10px] text-sky-600">(' + nSh + ' أسهم)</span>' : ''} ${c.canManage ? rateBadge(c, u) : ''}</p><p class="text-[10px] text-slate-400">دوره: ${periodLabel(j, i)}</p>${contact}${detail ? `<p class="text-[10px] text-slate-500">${detail}</p>` : ''}${(c.canManage && relOn()) || u === uid ? statLine(u === uid && state.stats ? state.stats : m.st) : ''}</div></div>
       <div class="flex items-center gap-2 flex-wrap">
         ${c.finished ? '' : `<span class="px-2 py-1 rounded-lg font-bold ${b[1]}">${b[0]}</span>`}
         ${swapBtn(c, i)}
@@ -2525,8 +2522,7 @@ function vProfile() {
   return `<div class="max-w-xl mx-auto space-y-4"><div class="card p-6 space-y-5"><div class="flex justify-between items-center gap-3"><div class="flex items-center gap-3 min-w-0"><div class="jicon !rounded-full"><i class="fa-solid fa-user"></i></div><div class="min-w-0"><h3 class="font-black text-lg truncate">${esc(p.name)}</h3><p class="text-xs text-slate-500 truncate" dir="ltr">${esc(p.email)}</p></div></div><button class="btn b-sec hidden md:inline-flex" data-act="go-home">الرئيسية</button></div>
     <form id="f-profile" class="space-y-3"><div><label class="text-xs font-semibold block mb-1">الاسم</label><input name="name" class="inp" value="${esc(p.name)}" required></div>${bankFields(p)}
     <button class="btn b-pri w-full py-3" type="submit">حفظ التعديلات</button></form></div>
-    <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-chart-simple text-teal-600"></i> نشاطي في الجمعيات</h4>${state.stats ? statsTiles(state.stats) : '<p class="text-xs text-slate-400">جارٍ حساب إحصاءاتك…</p>'}
-      <label class="flex items-start gap-2 text-xs leading-relaxed"><input type="checkbox" data-rel-optin class="mt-0.5 w-4 h-4 accent-teal-600" ${p.showRel !== false ? 'checked' : ''}> <span>السماح للمشرفين برؤية نسبة التزامي عند دعوتي لجمعية. إن أخفيتها يظهر لهم أنك أخفيتها.</span></label></div>
+    <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-chart-simple text-teal-600"></i> نشاطي في الجمعيات</h4>${state.stats ? statsTiles(state.stats) : '<p class="text-xs text-slate-400">جارٍ حساب إحصاءاتك…</p>'}</div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-bell text-amber-500"></i> إشعارات الجوال</h4>
       <p class="text-xs text-slate-500 leading-relaxed">${!notifSupported() ? 'هذا المتصفح لا يدعم الإشعارات.' : Notification.permission === 'denied' ? 'الإشعارات محظورة لهذا الموقع، فعّلها من إعدادات المتصفح.' : notifOn() ? 'الإشعارات مفعّلة ✓ ستصلك تنبيهات الدعوات والإيصالات والأعضاء الجدد وطلبات التعديل ورسائل الإدارة ومواعيد السداد.' : 'فعّلها لتصلك تنبيهات الدعوات والإيصالات ومواعيد السداد خارج التطبيق.'}${isIOS() && !isStandalone() ? ' على الآيفون يلزم تثبيت التطبيق أولاً.' : ''}</p>
       <div class="flex flex-wrap gap-2">${notifOn() ? '<button class="btn b-sec" data-act="test-notif"><i class="fa-solid fa-paper-plane"></i> إشعار تجريبي</button><button class="btn b-sec" data-act="reg-push"><i class="fa-solid fa-rotate"></i> إعادة تسجيل الجهاز</button>' : '<button class="btn b-pri" data-act="enable-notif"><i class="fa-solid fa-bell"></i> تفعيل الإشعارات</button>'}</div></div>
@@ -2550,7 +2546,7 @@ function showModal(title, body) {
 function closeModal() { stopChat(); $('modal').innerHTML = ''; }
 
 function bindRelLookup() {
-  const f = $('f-invite'), box = $('rel-box'); if (!f || !box) return; let last = '';
+  const f = $('f-invite'), box = $('rel-box'); if (!f || !box || !relOn()) return; let last = '';
   const paint = (t, cl) => { box.className = 'mt-2 p-2.5 rounded-xl text-[11px] leading-relaxed ' + cl; box.textContent = t; };
   const run = async () => {
     const ph = normPhone(f.phone.value); if (!validPhone(ph) || ph === last) return; last = ph;
@@ -2561,7 +2557,7 @@ function bindRelLookup() {
       const rs = await db.collection('reliability').doc(ps.data().uid).get();
       if (!rs.exists) return paint('مسجّل في التطبيق ولا يوجد له سجل التزام بعد.', 'bg-slate-50 text-slate-500');
       const r = rs.data();
-      if (!r.show) return paint('أخفى سجل التزامه.', 'bg-slate-50 text-slate-500');
+      if (!r.show || r.pct == null) return paint('لم يُحدَّث سجل التزامه بعد، يظهر بعد أن يفتح التطبيق.', 'bg-slate-50 text-slate-500');
       if (r.pct < 0) return paint(`جديد: لم يحلّ عليه موعد سداد بعد (عضو في ${nf(r.mem)} جمعية، وأشرف على ${nf(r.sup)}).`, 'bg-sky-50 text-sky-800');
       paint(`التزامه ${r.pct}% — سدّد ${nf(r.on)} من ${nf(r.due)} دفعة في موعدها • عضو في ${nf(r.mem)} جمعية وأشرف على ${nf(r.sup)}.`, r.pct >= 90 ? 'bg-emerald-50 text-emerald-800' : r.pct >= 70 ? 'bg-amber-50 text-amber-800' : 'bg-rose-50 text-rose-800');
     } catch (e) { last = ''; paint('تعذر جلب سجل الالتزام.', 'bg-slate-50 text-slate-500'); }
@@ -3023,8 +3019,8 @@ async function loadMyStats(force) {
       const st = { n: js.length, sup: js.filter(j => j.creatorUid === uid).length, mem: memJ.length, on, due, pct: due ? Math.round(on / due * 100) : null };
       state.stats = { ...st, at: Date.now(), key }; state.statsPub = st;
       { // سجل الالتزام العام: يقرؤه من يدعوك فقط عن طريق جوالك، ويمكنك إخفاؤه من حسابك
-        const show = state.profile.showRel !== false, rk = 'jm_relpub_' + uid, rh = JSON.stringify([show, st.pct, st.on, st.due, st.n, st.sup, st.mem]);
-        if (force || lsGet(rk) !== rh) db.collection('reliability').doc(uid).set(show ? { pct: st.pct == null ? -1 : st.pct, on: st.on, due: st.due, n: st.n, sup: st.sup, mem: st.mem, show: true, at: FV.serverTimestamp() } : { show: false, at: FV.serverTimestamp() }).then(() => lsSet(rk, rh)).catch(() => {});
+        const rk = 'jm_relpub_' + uid, rh = JSON.stringify([1, st.pct, st.on, st.due, st.n, st.sup, st.mem]);
+        if (force || lsGet(rk) !== rh) db.collection('reliability').doc(uid).set({ pct: st.pct == null ? -1 : st.pct, on: st.on, due: st.due, n: st.n, sup: st.sup, mem: st.mem, show: true, at: FV.serverTimestamp() }).then(() => lsSet(rk, rh)).catch(() => {});
       }
       const hk = 'jm_stpub_' + uid, hash = JSON.stringify(st);
       if (force || lsGet(hk) !== hash) { // ننشرها في ملف العضوية بكل جمعياته ليراها مشرفوها
@@ -3095,7 +3091,7 @@ function openMemberStatement(uid) {
   showModal('كشف حساب ' + esc(d.name), `<div class="space-y-3 text-xs">
     <div class="grid grid-cols-2 gap-2">${[['المستحق حتى الآن', d.a.owed], ['المؤكد', d.a.confirmed], ['بانتظار التأكيد', d.a.pending], ['المتبقي', d.a.remaining]].map(([t, v]) => `<div class="p-2.5 bg-slate-50 rounded-xl"><p class="text-[10px] text-slate-500">${t}</p><b class="text-sm">${fmtNum(v || 0)}</b> <span class="text-[10px] text-slate-400">ريال</span></div>`).join('')}</div>
     <div class="p-2.5 bg-slate-50 rounded-xl flex justify-between"><span>الأسهم: <b>${d.sh}</b></span><span>الالتزام بالمواعيد: <b>${d.rate ? d.rate.pct + '%' : '—'}</b></span></div>
-    <div><p class="font-bold mb-1">${uid === state.user.uid ? 'نشاطك' : 'نشاطه'} في كل الجمعيات</p>${statsTiles(uid === state.user.uid && state.stats ? state.stats : (state.members[uid] || {}).st)}</div>
+    ${uid === state.user.uid || relOn() ? `<div><p class="font-bold mb-1">${uid === state.user.uid ? 'نشاطك' : 'نشاطه'} في كل الجمعيات</p>${statsTiles(uid === state.user.uid && state.stats ? state.stats : (state.members[uid] || {}).st)}</div>` : ''}
     <div><p class="font-bold mb-1">أدوار القبض</p>${d.turnsOf.map(k => `<div class="p-2 bg-slate-50 rounded-lg flex justify-between mb-1"><span>رقم ${k + 1} — ${periodLabel(j, k)}</span><b>${turnState(c, k)}</b></div>`).join('') || '<p class="text-slate-400">—</p>'}</div>
     <div><p class="font-bold mb-1">الدفعات (${d.pays.length})</p>${d.pays.map(p => `<div class="p-2 bg-slate-50 rounded-lg flex justify-between gap-2 mb-1"><span>${periodLabel(j, p.month)}${p.ref ? ' • ' + esc(p.ref) : ''}<br><span class="text-[10px] text-slate-400">${tsd(p.createdAt) ? fmtDate(tsd(p.createdAt)) : ''}</span></span><span class="text-left"><b>${fmtNum(p.amount)}</b><br>${stl(p)}</span></div>`).join('') || '<p class="text-slate-400">لا توجد دفعات.</p>'}</div>
     <div class="flex gap-2"><button class="btn b-sec flex-1" data-act="close">إغلاق</button><button class="btn b-pri flex-1" data-act="stmt-print" data-uid="${esc(uid)}"><i class="fa-solid fa-print"></i> طباعة / PDF</button></div></div>`);
