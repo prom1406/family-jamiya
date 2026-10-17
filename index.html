@@ -254,6 +254,97 @@ h1,h2,h3,.font-display{font-family:'Cairo',system-ui,sans-serif;letter-spacing:0
 .emo.on{border-color:var(--gold);background:var(--gold-soft)}
 .bdg{font-weight:600}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ===== v8 — Modern Light UI: فاتح وهادئ (طبقة أنماط فقط، بلا تغيير في HTML أو JavaScript) ===== */
+:root{--bg:#F6F9FC;--surface:#FFFFFF;--brand:#0D9488;--brand-dark:#0F766E;--brand-soft:#E6F7F4;--brand-line:#CDEBE6;--ink:#17324D;--muted:#647A8B;--line:#E4EBF1;--line-2:#D3DEE7;
+  /* إعادة توجيه متغيرات الإصدارات السابقة إلى لوحة الألوان الجديدة */
+  --petrol:#17324D;--petrol-2:#0F766E;--brand-2:#0D9488;--gold:#0D9488;--gold-soft:#E6F7F4;--r-card:20px;--r-ctl:14px;
+  --shadow:0 1px 2px rgba(23,50,77,.04),0 8px 22px -14px rgba(23,50,77,.14)}
+body{background:var(--bg);background-image:none;color:var(--ink)}
+h1,h2,h3,.font-display{color:var(--ink)}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+/* الرأس */
+.app-header{background:rgba(255,255,255,.94);border-bottom:1px solid var(--line);box-shadow:none}
+
+/* البطاقات والقوائم */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);box-shadow:var(--shadow)}
+.jcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);padding:1rem 1.1rem}
+.jcard:hover{border-color:var(--brand-line);box-shadow:var(--shadow)}
+.jicon,.jcard .jicon,.jcard:nth-child(n) .jicon{background:var(--brand-soft)!important;color:var(--brand)!important;border-radius:14px}
+
+/* الأزرار */
+.btn{border-radius:var(--r-ctl);min-height:46px;font-weight:700;font-size:.875rem;padding:.6rem 1.1rem}
+.btn:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(13,148,136,.28)}
+.btn:disabled,.btn[disabled]{opacity:.5;cursor:not-allowed;box-shadow:none}
+.b-pri{background:var(--brand);color:#fff;box-shadow:0 1px 2px rgba(15,118,110,.25)}
+.b-pri:hover{background:var(--brand-dark);filter:none}
+.b-pri:active{background:var(--brand-dark)}
+.b-sec{background:var(--brand-soft);color:var(--brand-dark);border:1px solid transparent;box-shadow:none}
+.b-sec:hover{background:#D5F0EB;border-color:var(--brand-line)}
+.b-red{background:#FEF1F2;color:#BE123C;border:1px solid #FBD5DA}
+.b-red:hover{background:#FDE3E6}
+.b-white{background:#fff;color:var(--brand-dark);border:1px solid var(--line);box-shadow:none}
+
+/* الحقول والنماذج */
+.inp{min-height:48px;background:#fff;border:1.5px solid var(--line-2);border-radius:var(--r-ctl);color:var(--ink)}
+.inp::placeholder{color:#9AABB8}
+.inp:hover{border-color:#C3D2DD}
+.inp:focus{border-color:var(--brand);background:#fff;box-shadow:0 0 0 4px rgba(13,148,136,.14)}
+.inp:disabled,.inp[disabled],.inp[readonly]{background:#F1F5F9;color:var(--muted);cursor:not-allowed}
+
+/* لوحة المعلومات: بطل صلب بلا تدرجات */
+.hero{background:var(--brand-dark);color:#fff;border-radius:22px;box-shadow:var(--shadow);padding:1.25rem}
+.hero::before,.hero::after{display:none}
+.stat{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:16px}
+/* بطاقات الملخص المبنية بنمط inline (القطة، الديون، التعاون العائلي): لون صلب بدل التدرج */
+[style*="linear-gradient"]{background:var(--brand-dark)!important;box-shadow:var(--shadow)!important}
+[style*="linear-gradient"][style*="1e293b"]{background:var(--ink)!important}
+
+/* أشرطة التقدم والرسوم */
+.bar,.hbar{background:var(--line);border-radius:99px}
+.bar>i,.hbar>i{background:var(--brand);border-radius:99px}
+.bar.w-full{background:var(--brand);border-radius:6px 6px 2px 2px}
+.bar.w-full.z{background:var(--line)}
+
+/* شريط التنقل */
+.tabbar{background:#fff;border-top:1px solid var(--line)}
+.tab{color:var(--muted);font-weight:700}
+.tab.on{color:var(--brand-dark)}
+.tab.on::before{background:var(--brand);background-color:var(--brand)}
+
+/* النوافذ المنبثقة والتنبيهات */
+.sheet-wrap{background:rgba(23,50,77,.42);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.sheet{border-radius:22px;box-shadow:0 24px 48px -24px rgba(23,50,77,.4)}
+@media(max-width:639px){.sheet{border-radius:22px 22px 0 0}.sheet::before{background:var(--line-2)}}
+.toast{border-radius:var(--r-ctl)}
+.toast.success{background:var(--brand-dark)}
+.toast.info{background:var(--ink)}
+.ibar{background:var(--ink);border-radius:var(--r-card)}
+
+/* الفلاتر والشارات والاختيارات */
+.achip{border:1px solid var(--line-2);background:#fff;color:var(--ink);font-weight:700}
+.achip:hover{border-color:var(--brand-line);background:var(--brand-soft)}
+.achip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.emo.on{border-color:var(--brand);background:var(--brand-soft)}
+.dot-on{background:var(--brand);box-shadow:0 0 0 3px rgba(13,148,136,.22)}
+#lock-screen{background:var(--ink)!important}
+
+/* توحيد ألوان Tailwind المستخدمة في الواجهة مع اللوحة الجديدة (الحالات: أحمر/كهرماني/أزرق تبقى كما هي) */
+body .text-slate-400,body .text-slate-500{color:var(--muted)}
+body .text-slate-600{color:#4F657A}
+body .text-slate-700,body .text-slate-800,body .text-slate-900{color:var(--ink)}
+body .border-slate-100,body .border-slate-200{border-color:var(--line)}
+body .bg-slate-50{background-color:var(--bg)}
+body .bg-slate-100{background-color:#EEF3F7}
+body .text-emerald-600,body .text-emerald-700,body .text-emerald-800,body .text-teal-600,body .text-teal-700{color:var(--brand-dark)}
+body .bg-emerald-50,body .bg-emerald-100,body .bg-teal-50,body .bg-teal-100{background-color:var(--brand-soft)}
+body .bg-emerald-500,body .bg-emerald-600{background-color:var(--brand)}
+body .border-emerald-100,body .border-emerald-200{border-color:var(--brand-line)}
+
+/* التجاوب: منع تجاوز العناصر لعرض الشاشة */
+main,.sheet{min-width:0;overflow-wrap:anywhere}
+main img,.sheet img,main table,.sheet table{max-width:100%}
 </style>
 </head>
 <body class="text-slate-800 antialiased">
@@ -269,7 +360,7 @@ h1,h2,h3,.font-display{font-family:'Cairo',system-ui,sans-serif;letter-spacing:0
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.3.5<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.3.6<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
