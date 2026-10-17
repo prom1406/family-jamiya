@@ -269,12 +269,13 @@ h1,h2,h3,.font-display{font-family:'Cairo',system-ui,sans-serif;letter-spacing:0
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.3.2<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.3.3<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
 <div id="toasts" class="toasts" aria-live="polite"></div>
 
+<script src="qattah.js"></script>
 <script>
 
 /* ============ اللغة: عربي / English ============ */
@@ -532,7 +533,7 @@ const needsPay = (c, u) => (u !== c.recUid || sharesOf(c.turns, u) > 1) && c.acc
 /* ============ المصادقة ============ */
 auth.onAuthStateChanged(async user => { if (state._registering) return; await bootUser(user); });
 async function bootUser(user) {
-  cleanup(state.unsubs); cleanup(state.jUnsubs); stopPayListeners(); state.pays = {}; stopBlockWatch(); stopHeartbeat(); state._tv = null;
+  cleanup(state.unsubs); cleanup(state.jUnsubs); stopPayListeners(); state.pays = {}; stopBlockWatch(); stopHeartbeat(); state._tv = null; stopQattah();
   state.user = user; state.profile = null; state.isAdmin = false; state._restoreTried = false;
   state.jamiyat = []; state.invites = [];
   if (!user) { unlock(); state.view = 'auth'; return render(); }
@@ -556,6 +557,7 @@ async function bootUser(user) {
   maybeLock(true); watchBlocked(); trackSession(); renderBanner();
   claimPhone(user.uid, state.profile.phone);
   startListeners();
+  startQattahListeners();
   if (state.isAdmin) { state.view = 'admin'; render(); loadAdmin(); toast('مرحباً بك في لوحة المالك', 'info'); return; }
   state.view = launchAction() || 'home'; render();
   checkPendingJoin();
@@ -2207,7 +2209,7 @@ function render() {
   syncPayListeners();
   renderNav();
   const v = state.view, app = $('app');
-  const views = { loading: vLoading, auth: vAuth, verify: vVerify, complete: vComplete, loaderr: vLoadErr, home: vHome, follow: vFollow, create: vCreate, jamiya: vJamiya, profile: vProfile, admin: vAdmin };
+  const views = { loading: vLoading, auth: vAuth, verify: vVerify, complete: vComplete, loaderr: vLoadErr, home: vHome, follow: vFollow, create: vCreate, jamiya: vJamiya, profile: vProfile, admin: vAdmin, qattah: qtView };
   if (maintOn()) { $('tabbar').classList.add('hide'); app.innerHTML = vMaint(); return; }
   app.innerHTML = `<div class="fade">${annHtml()}${(views[v] || vLoading)()}</div>`;
   trackView(v);
@@ -2227,7 +2229,7 @@ function renderNav() {
     <button class="btn b-sec" data-act="go-profile"><i class="fa-solid fa-user-gear"></i> حسابي</button>
     <button class="btn b-red" data-act="logout" aria-label="خروج"><i class="fa-solid fa-right-from-bracket"></i></button></div>`;
   const v = state.view, tab = (act, icon, label, on) => `<button class="tab ${on ? 'on' : ''}" data-act="${act}"><i class="fa-solid ${icon}"></i>${label}</button>`;
-  tb.innerHTML = tab('go-home', 'fa-house', 'جمعياتي', ['home', 'jamiya', 'follow'].includes(v)) + tab('go-create', 'fa-circle-plus', 'جديد', v === 'create')
+  tb.innerHTML = tab('go-home', 'fa-house', 'جمعياتي', ['home', 'jamiya', 'follow', 'qattah'].includes(v)) + tab('go-create', 'fa-circle-plus', 'جديد', v === 'create')
     + (state.isAdmin ? tab('go-admin', 'fa-shield-halved', 'المالك', v === 'admin') : '') + tab('go-profile', 'fa-user', 'حسابي', v === 'profile');
   tb.classList.remove('hide');
 }
@@ -2412,6 +2414,7 @@ function vHome() {
     ${verifyBanner()}${detailsNudge()}${growthCards()}
     ${staffJams().length ? (() => { const D = followData(); return `<button class="w-full text-right card p-4 flex items-center justify-between gap-3" data-act="go-follow"><span class="flex items-center gap-3 min-w-0"><span class="jicon"><i class="fa-solid fa-list-check"></i></span><span class="min-w-0"><b class="text-sm block">متابعة الأعضاء</b><span class="text-[11px] ${D.nLate ? 'text-rose-600' : 'text-slate-500'}">${D.list.length ? nf(D.list.length) + ' عضو عليهم مبالغ' + (D.nLate ? ' • ' + nf(D.nLate) + ' متأخر' : '') : 'كل شيء مسدد حالياً ✓'}</span></span></span><i class="fa-solid fa-chevron-left text-slate-300"></i></button>`; })() : ''}
     ${inv ? `<div class="space-y-2"><h3 class="font-black text-sm"><i class="fa-solid fa-envelope-open-text text-amber-500"></i> دعوات بانتظارك</h3>${inv}</div>` : ''}
+    ${qtHomeBlock()}
     <div class="space-y-2.5"><h3 class="font-black text-sm">جمعياتك وتعاوناتك</h3>${js || '<div class="card p-8 text-center text-xs text-slate-400"><i class="fa-regular fa-folder-open text-3xl mb-2 block"></i>لا توجد جمعيات بعد. أنشئ جمعيتك الأولى أو انتظر دعوة.<br><button class="btn b-pri mt-4" data-act="go-create">ابدأ مجاناً الآن</button></div>'}</div></div>`;
 }
 
@@ -2423,6 +2426,7 @@ function dayLabels(freq) {
 function freqOpts(sel) { return Object.entries(FREQS).map(([k, v]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${v.label}</option>`).join(''); }
 function vCreate() {
   if (state.createType === 'family') return vCreateFamily();
+  if (state.createType === 'qattah') return qtCreateView();
   const dl = dayLabels('monthly');
   return `<div class="max-w-xl mx-auto card p-8"><div class="flex justify-between items-center mb-5"><h3 class="text-xl font-bold">إنشاء جديد</h3><button data-act="go-home" class="text-slate-400"><i class="fa-solid fa-xmark text-lg"></i></button></div>
   ${createTabs()}
@@ -3209,9 +3213,9 @@ async function submitLockOff(f) {
 
 /* ============ التعاون العائلي: فترة واحدة، المشرف هو المستفيد، ومساهمات بمبالغ حرة ============ */
 const createTabs = () => {
-  const t = state.createType === 'family' ? 'family' : 'jamiya';
+  const t = ['family', 'qattah'].includes(state.createType) ? state.createType : 'jamiya';
   const b = (k, ico, ttl, sub) => `<button type="button" data-act="ctype" data-v="${k}" class="p-3 rounded-2xl border-2 text-right ${t === k ? 'border-teal-600 bg-teal-50' : 'border-slate-200 bg-white'}"><p class="font-black text-sm">${ico} ${ttl}</p><p class="text-[11px] text-slate-500 mt-0.5 leading-snug">${sub}</p></button>`;
-  return `<div class="grid grid-cols-2 gap-2 mb-5">${b('jamiya', '🔄', 'جمعية', 'أقساط دورية بالتناوب بين الأعضاء')}${b('family', '🤝', 'تعاون عائلي', 'مساهمات لمرة واحدة لدعم هدف')}</div>`;
+  return `<div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-5">${b('jamiya', '🔄', 'جمعية', 'أقساط دورية بالتناوب بين الأعضاء')}${b('family', '🤝', 'تعاون عائلي', 'مساهمات لمرة واحدة لدعم هدف')}${b('qattah', '💰', 'قطة', 'صندوق مشترك لفعالية أو رحلة')}</div>`;
 };
 function vCreateFamily() {
   const p = state.profile || {}, known = BANKS.includes(p.bank), sel = known ? p.bank : (p.bank ? OTHER_BANK : undefined), lbl = 'text-xs font-semibold block mb-1';
@@ -3721,7 +3725,7 @@ renderBanner();
 
 const actions = {
   'go-follow': () => { state.fMem = {}; state.view = 'follow'; render(); loadFollowMembers(); }, 'follow-open': el => openJamiya(el.dataset.id), 'follow-wa': el => followWa(el.dataset.uid),
-  'go-home': () => { cleanup(state.jUnsubs); state.view = state.user && state.profile ? 'home' : state.view; render(); },
+  'go-home': () => { cleanup(state.jUnsubs); qtLeave(); state.view = state.user && state.profile ? 'home' : state.view; render(); },
   'go-create': () => { state.createType = 'jamiya'; state.view = 'create'; render(); },
   'growth-create': () => { logEvent('growth_create_click'); lsSet(GK.create, String(Date.now())); state.createType = 'jamiya'; state.view = 'create'; render(); },
   'growth-dismiss': el => { const k = el && el.dataset && el.dataset.k; if (GK[k]) { lsSet(GK[k], String(Date.now())); logEvent('growth_dismiss_' + k); } render(); },
@@ -3787,6 +3791,7 @@ const actions = {
   'pay-fill': el => { const i = document.querySelector('#f-pay [name=amount], #f-fampay [name=amount]'); if (i) i.value = el.dataset.v; },
   'swap-modal': el => openSwapModal(+el.dataset.i), 'swap-yes': el => approveSwap(el.dataset.id), 'swap-no': el => rejectSwap(el.dataset.id, false), 'swap-cancel': el => rejectSwap(el.dataset.id, true)
 };
+Object.assign(actions, QT_ACTIONS);
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
   const fn = actions[el.dataset.act]; if (fn) fn(el);
@@ -3811,6 +3816,7 @@ document.addEventListener('input', e => {
 const forms = { 'f-register': doRegister, 'f-login': doLogin, 'f-reset': doReset, 'f-complete': doCompleteProfile, 'f-need': doNeedDetails, 'f-create': handleCreate,
   'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-notif': submitNotif, 'f-deputy': f => setDeputy(f.uid.value), 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete, 'f-wish': submitWish, 'f-chat': sendChat, 'f-create-family': handleCreateFamily, 'f-fampay': submitFamilyPay, 'f-famself': submitSelfContrib, 'f-addguest': submitAddGuest, 'f-famguest': submitGuestPay, 'f-pledge': submitPledge, 'f-famedit': submitFamilyEdit, 'f-share': submitShare, 'f-swap': submitSwap, 'f-lock': submitLock, 'f-lockoff': submitLockOff };
 Object.assign(forms, ADMIN_FORMS);
+Object.assign(forms, QT_FORMS);
 document.addEventListener('submit', e => { const fn = forms[e.target.id]; if (fn) { e.preventDefault(); fn(e.target); } });
 
 watchSettings(); trackVisit();
