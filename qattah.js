@@ -10,7 +10,7 @@
      qattahInvites/{qid}__p{جوال}   دعوات بانتظار القبول (أو {qid}__{بريد})
 */
 
-const QT = { list: [], invites: [], q: null, qid: null, members: [], expenses: [], invAdmin: [], invFor: null, tab: 'overview', unsubs: [], dUnsubs: [], seen: {}, pend: false, shareText: '' };
+const QT = { list: [], invites: [], q: null, qid: null, members: [], expenses: [], invAdmin: [], invFor: null, subFor: null, claims: [], reqs: [], tab: 'overview', unsubs: [], dUnsubs: [], seen: {}, pend: false, shareText: '' };
 const QT_COL = 'qattahs', QT_INV = 'qattahInvites';
 
 /* ---------- أدوات مساعدة ---------- */
@@ -57,8 +57,10 @@ const qtRemindText = (q, m, due) => `السلام عليكم ${m.name || ''}،\n
 /* ---------- الاشتراك في البيانات ---------- */
 function qtLeave() {
   QT.dUnsubs.forEach(u => u()); QT.dUnsubs = [];
-  QT.q = null; QT.qid = null; QT.members = []; QT.expenses = []; QT.invAdmin = []; QT.invFor = null;
+  QT.q = null; QT.qid = null; QT.members = []; QT.expenses = []; QT.invAdmin = [];
+  QT.invFor = null; QT.subFor = null; QT.claims = []; QT.reqs = [];
 }
+
 function stopQattah() {
   QT.unsubs.forEach(u => u()); QT.unsubs = [];
   qtLeave(); QT.list = []; QT.invites = []; QT.seen = {};
@@ -106,16 +108,25 @@ function qtOpen(id) {
   QT.qid = id; QT.tab = 'overview'; state.view = 'qattah'; render();
   const ref = qtRef(id), uid = state.user.uid;
   const gone = () => { if (QT.qid !== id) return; qtLeave(); toast('لم تعد تملك صلاحية عرض هذه القطة', 'info'); state.view = 'home'; render(); };
+  const byDate = (a, b) => qtTs(b.createdAt) - qtTs(a.createdAt);
   QT.dUnsubs.push(ref.onSnapshot(d => {
     if (QT.qid !== id) return;
     if (!d.exists) return gone();
     QT.q = { id: d.id, ...d.data() };
-    if (qtAdminOf(QT.q) && QT.invFor !== id) {
+    const isA = qtAdminOf(QT.q);
+    if (isA && QT.invFor !== id) {
       QT.invFor = id;
       QT.dUnsubs.push(db.collection(QT_INV).where('qid', '==', id).where('adminUid', '==', uid).where('status', '==', 'pending').onSnapshot(s => {
         if (QT.qid !== id) return;
         QT.invAdmin = s.docs.map(x => ({ id: x.id, ...x.data() })); qtRepaint();
       }, () => {}));
+    }
+    if (QT.subFor !== id) {
+      QT.subFor = id;
+      const cq = isA ? ref.collection('claims') : ref.collection('claims').where('uid', '==', uid);
+      const rq = isA ? ref.collection('expReqs') : ref.collection('expReqs').where('uid', '==', uid);
+      QT.dUnsubs.push(cq.onSnapshot(s => { if (QT.qid !== id) return; QT.claims = s.docs.map(x => ({ id: x.id, ...x.data() })).sort(byDate); qtRepaint(); }, () => {}));
+      QT.dUnsubs.push(rq.onSnapshot(s => { if (QT.qid !== id) return; QT.reqs = s.docs.map(x => ({ id: x.id, ...x.data() })).sort(byDate); qtRepaint(); }, () => {}));
     }
     qtRepaint();
   }, gone));
@@ -199,7 +210,10 @@ function qtView() {
   if (!q) return vLoading();
   const admin = qtAdminOf(q), staff = qtStaffOf(q), st = qtStatus(q);
   const coll = qtNum(q.collected), tg = qtNum(q.target), pct = qtPct(coll, tg), share = qtShare(q);
-  const mine = QT.members.find(m => m.uid === state.user.uid), myDue = mine ? Math.max(0, share - qtNum(mine.paid)) : 0;
+  const mine = QT.members.find(m => m.uid === state.user.uid), myDue = mine ? qtDue(q, mine) : 0;
+  const memberBtns = !admin && mine ? `<div class="grid grid-cols-2 gap-2">
+      <button type="button" class="btn b-white" data-act="qt-claim-modal"><i class="fa-solid fa-circle-check"></i> تأكيد السداد</button>
+      <button type="button" class="btn bg-white/20 text-white" data-act="qt-req-modal"><i class="fa-solid fa-receipt"></i> طلب إضافة مصروف</button></div>` : '';
 
   const hero = `<div class="rounded-3xl p-5 text-white shadow-lg space-y-4" style="background:linear-gradient(135deg,#047857,#059669 55%,#34d399)">
     <div class="flex justify-between items-start gap-3"><div class="min-w-0"><p class="text-[11px] text-emerald-100 font-bold">القطة</p>
@@ -211,9 +225,11 @@ function qtView() {
       <div class="rounded-2xl bg-white/15 py-2"><span class="text-[10px] text-emerald-100 block">موعد الفعالية</span><b class="text-xs">${qtFmtDate(q.eventStart)}</b></div></div>
     ${mine && myDue > 0 ? `<div class="rounded-2xl bg-white p-3 text-slate-800 flex items-center justify-between gap-3"><div class="text-xs"><span class="text-slate-500">المتبقي عليك</span><b class="block text-base text-rose-600">${fmtNum(myDue)} ريال</b></div></div>` : ''}
     ${mine && myDue <= 0 && share > 0 ? '<div class="rounded-2xl bg-white/15 p-3 text-center text-xs font-bold">تم تسديد حصتك ✓</div>' : ''}
+    ${memberBtns}
   </div>`;
 
-  const tabs = [['overview', 'fa-house', 'الرئيسية', 0], ['people', 'fa-users', 'المشاركون', QT.invAdmin.length], ['expenses', 'fa-receipt', 'المصروفات', 0], ['more', 'fa-ellipsis', 'المزيد', 0]];
+  const pendN = admin ? qtPendingCount() + QT.invAdmin.length : 0;
+  const tabs = [['overview', 'fa-house', 'الرئيسية', 0], ['people', 'fa-users', 'المشاركون', pendN], ['expenses', 'fa-receipt', 'المصروفات', 0], ['more', 'fa-ellipsis', 'المزيد', 0]];
   const bar = `<div class="grid grid-cols-4 gap-1.5 p-1.5 bg-white/95 backdrop-blur rounded-2xl border border-slate-100 shadow-sm sticky top-2 z-10">${tabs.map(([k, ic, lb, n]) => `<button type="button" class="relative py-2 rounded-xl text-[11px] font-bold flex flex-col items-center gap-0.5 ${QT.tab === k ? 'bg-emerald-600 text-white' : 'text-slate-500'}" data-act="qt-tab" data-v="${k}"><i class="fa-solid ${ic}"></i>${lb}${n ? `<span class="absolute -top-1 -left-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] flex items-center justify-center">${n}</span>` : ''}</button>`).join('')}</div>`;
 
   const body = QT.tab === 'people' ? qtPeopleTab(q, admin)
@@ -232,7 +248,7 @@ function qtOverviewTab(q, admin, st, hero) {
   const tg = qtNum(q.target), share = qtShare(q);
   const info = [['الهدف', fmtNum(tg) + ' ريال'], ['حصة الفرد', fmtNum(share) + ' ريال'], ['عدد الأفراد', q.participants + ' شخصاً'],
     ['بداية الجمع', qtFmtDate(q.collectStart)], ['آخر موعد للجمع', qtFmtDate(q.collectEnd)], ['الفعالية', qtFmtDate(q.eventStart) + ' – ' + qtFmtDate(q.eventEnd)]];
-  return hero
+  return hero + (admin ? '' : qtMyBox())
     + qtBox('<i class="fa-solid fa-lightbulb text-amber-500"></i> الحالة الآن', `<p class="text-xs text-slate-600 leading-relaxed">${qtAdvice(q, st)}</p>`)
     + qtBox('<i class="fa-solid fa-circle-info text-emerald-600"></i> تفاصيل القطة', `<div class="grid grid-cols-2 gap-2">${info.map(([t, v]) => qtTile(t, esc(v))).join('')}</div>`)
     + qtBox('<i class="fa-solid fa-user-tie text-indigo-600"></i> الإدارة', `<div class="grid grid-cols-2 gap-2">${qtTile('المشرف', esc(q.adminName || '—'))}${qtTile('النائب', q.deputyUid ? esc(q.deputyName || '—') : 'لم يُعيّن')}</div>`);
@@ -241,22 +257,23 @@ function qtOverviewTab(q, admin, st, hero) {
 function qtPeopleTab(q, admin) {
   const share = qtShare(q), me = state.user.uid;
   const rows = QT.members.map((m, i) => {
-    const paid = qtNum(m.paid), full = share > 0 && paid >= share, part = paid > 0 && !full;
+    const paid = qtNum(m.paid), cr = qtNum(m.credit), cov = paid + cr;
+    const full = share > 0 && cov >= share, part = cov > 0 && !full;
     const roleTag = m.uid === q.adminUid ? '<span class="text-[10px] text-indigo-600">(مشرف)</span>' : m.uid === q.deputyUid ? '<span class="text-[10px] text-amber-600">(نائب المشرف)</span>' : '';
     const pay = full ? ['تم السداد', 'bg-emerald-100 text-emerald-700'] : part ? ['سداد جزئي', 'bg-orange-100 text-orange-700'] : ['لم يسدد', 'bg-rose-100 text-rose-700'];
     const contact = m.phone ? `<p class="text-[10px] text-slate-500"><span dir="ltr">${esc(m.phone)}</span></p>` : '';
-    const tools = admin ? `<button type="button" data-act="qt-paid" data-uid="${esc(m.uid)}" class="${full ? 'px-2 py-1 bg-slate-100 text-slate-600 rounded-lg' : 'px-2 py-1 bg-emerald-600 text-white rounded-lg font-bold'}">${full ? 'إلغاء السداد' : 'تأكيد السداد'}</button>
-      <button type="button" data-act="qt-pay" data-uid="${esc(m.uid)}" class="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg" aria-label="تسجيل مبلغ"><i class="fa-solid fa-pen"></i></button>
-      ${!full && m.phone && m.uid !== me ? `<a href="${waLink(m.phone, qtRemindText(q, m, share - paid))}" target="_blank" rel="noopener" class="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg" aria-label="تذكير عبر واتساب"><i class="fa-brands fa-whatsapp"></i></a>` : ''}
+    const tools = admin ? `<button type="button" data-act="qt-paid" data-uid="${esc(m.uid)}" class="${full ? 'px-2 py-1 bg-slate-100 text-slate-600 rounded-lg' : 'px-2 py-1 bg-emerald-600 text-white rounded-lg font-bold'}">${full ? 'إلغاء السداد النقدي' : 'تسجيل سداد نقدي'}</button>
+      <button type="button" data-act="qt-pay" data-uid="${esc(m.uid)}" class="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg" aria-label="تعديل المدفوع"><i class="fa-solid fa-pen"></i></button>
+      ${!full && m.phone && m.uid !== me ? `<a href="${waLink(m.phone, qtRemindText(q, m, share - cov))}" target="_blank" rel="noopener" class="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg" aria-label="تذكير عبر واتساب"><i class="fa-brands fa-whatsapp"></i></a>` : ''}
       ${m.uid !== q.adminUid ? `<button type="button" data-act="qt-rm" data-uid="${esc(m.uid)}" class="px-2 py-1 bg-rose-50 text-rose-600 rounded-lg" aria-label="إزالة المشارك"><i class="fa-solid fa-user-minus"></i></button>` : ''}` : '';
     return `<div class="p-3 bg-slate-50 border border-slate-100 rounded-xl flex flex-wrap justify-between items-center gap-2 text-xs">
       <div class="flex items-center gap-3 min-w-0"><span class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center">${i + 1}</span>
         <div class="min-w-0"><p class="font-bold">${esc(m.name || '—')} ${roleTag}${m.uid === me ? ' <span class="text-[10px] text-emerald-600">(أنت)</span>' : ''}</p>${contact}
-          <p class="text-[10px] text-slate-500">مدفوع ${fmtNum(paid)} من ${fmtNum(share)} ريال</p></div></div>
+          <p class="text-[10px] text-slate-500">مدفوع ${fmtNum(paid)}${cr ? ' • مصروف معتمد ' + fmtNum(cr) : ''} من ${fmtNum(share)} ريال</p></div></div>
       <div class="flex items-center gap-2 flex-wrap"><span class="px-2 py-1 rounded-lg font-bold ${pay[1]}">${pay[0]}</span>${tools}</div></div>`;
   }).join('');
   const head = `<div class="flex justify-between items-center"><span><i class="fa-solid fa-users text-emerald-600"></i> المشاركون</span><span class="text-xs bg-slate-100 px-2 py-1 rounded-lg font-semibold">${QT.members.length}/${q.participants}</span></div>`;
-  return qtBox(head, `<div class="space-y-2">${rows || qtEmpty('لا يوجد مشاركون بعد')}</div>`) + (admin ? qtAdminPanels(q) : '');
+  return (admin ? qtReviewCard(q) : '') + qtBox(head, `<div class="space-y-2">${rows || qtEmpty('لا يوجد مشاركون بعد')}</div>`) + (admin ? qtAdminPanels(q) : '');
 }
 
 function qtAdminPanels(q) {
@@ -340,13 +357,14 @@ async function qtEditSubmit(f) {
 }
 async function qtDelete() {
   const q = QT.q; if (!q || !qtAdminOf(q)) return;
-  if (!confirm(`حذف القطة «${q.name}» نهائياً مع مشاركيها ومصروفاتها؟`)) return;
+  if (!confirm(`حذف القطة «${q.name}» نهائياً مع مشاركيها ومصروفاتها وطلباتها؟`)) return;
   try {
     const me = state.user.uid, base = qtRef(q.id), refs = [];
-    const [m, e, iv] = await Promise.all([
+    const [m, e, iv, cl, rq] = await Promise.all([
       base.collection('members').get(), base.collection('expenses').get(),
-      db.collection(QT_INV).where('qid', '==', q.id).where('adminUid', '==', me).get()]);
-    m.docs.forEach(d => refs.push(d.ref)); e.docs.forEach(d => refs.push(d.ref)); iv.docs.forEach(d => refs.push(d.ref));
+      db.collection(QT_INV).where('qid', '==', q.id).where('adminUid', '==', me).get(),
+      base.collection('claims').get(), base.collection('expReqs').get()]);
+    [m, e, iv, cl, rq].forEach(s => s.docs.forEach(d => refs.push(d.ref)));
     refs.push(base); // الوثيقة الرئيسية آخراً، لأن قواعد الحذف للعناصر الفرعية تقرأها
     for (let i = 0; i < refs.length; i += 400) { const b = db.batch(); refs.slice(i, i + 400).forEach(r => b.delete(r)); await b.commit(); }
     qtLeave(); state.view = 'home'; render(); toast('حُذفت القطة', 'info');
@@ -442,9 +460,10 @@ async function qtSetPaid(uid, val) {
 }
 function qtTogglePaid(uid) {
   const q = QT.q, m = QT.members.find(x => x.uid === uid); if (!q || !m) return;
-  const share = qtShare(q), full = share > 0 && qtNum(m.paid) >= share;
-  qtSetPaid(uid, full ? 0 : share);
+  const share = qtShare(q), full = share > 0 && qtCovered(m) >= share;
+  qtSetPaid(uid, full ? 0 : r2(Math.max(0, share - qtNum(m.credit))));
 }
+
 function qtOpenPay(uid) {
   const q = QT.q, m = QT.members.find(x => x.uid === uid); if (!q || !m || !qtAdminOf(q)) return;
   showModal('تسجيل مبلغ: ' + esc(m.name || ''), `<form id="f-qt-pay" class="space-y-3"><input type="hidden" name="puid" value="${esc(uid)}">
@@ -483,6 +502,126 @@ async function qtDelExp(id) {
   catch (e) { toast('تعذر الحذف: ' + e.message, 'error'); }
 }
 
+/* ---------- تأكيد السداد وطلبات المصروف ---------- */
+const qtCovered = m => qtNum(m.paid) + qtNum(m.credit);
+const qtDue = (q, m) => Math.max(0, qtShare(q) - qtCovered(m));
+const qtPendingCount = () => QT.claims.filter(c => c.status === 'pending').length + QT.reqs.filter(r => r.status === 'pending').length;
+const qtStLabel = s => ({ pending: ['بانتظار المراجعة', 'bg-sky-100 text-sky-700'], confirmed: ['مؤكد', 'bg-emerald-100 text-emerald-700'], approved: ['معتمد', 'bg-emerald-100 text-emerald-700'], rejected: ['مرفوض', 'bg-rose-100 text-rose-700'] })[s] || ['—', 'bg-slate-100 text-slate-500'];
+
+// قسم العضو: طلباته وحالتها
+function qtMyBox() {
+  const items = [
+    ...QT.claims.map(c => ({ k: 'claim', t: 'تأكيد سداد', title: 'سداد للقطة', a: c.amount, s: c.status, id: c.id, ts: c.createdAt })),
+    ...QT.reqs.map(r => ({ k: 'req', t: 'طلب مصروف', title: r.title, a: r.amount, s: r.status, id: r.id, ts: r.createdAt }))
+  ].sort((x, y) => qtTs(y.ts) - qtTs(x.ts));
+  const rows = items.map(it => {
+    const [lb, cl] = qtStLabel(it.s);
+    return `<div class="p-3 bg-slate-50 border border-slate-100 rounded-xl flex flex-wrap justify-between items-center gap-2 text-xs">
+      <div class="min-w-0"><p class="font-bold">${esc(it.title || '')} <span class="text-[10px] text-slate-500">• ${it.t}</span></p><p class="text-[10px] text-slate-500">${fmtNum(it.a)} ريال</p></div>
+      <div class="flex items-center gap-2"><span class="px-2 py-1 rounded-lg font-bold ${cl}">${lb}</span>
+        ${it.s === 'pending' ? `<button type="button" class="px-2 py-1 bg-rose-50 text-rose-600 rounded-lg" data-act="qt-item-cancel" data-k="${it.k}" data-id="${esc(it.id)}" aria-label="إلغاء الطلب"><i class="fa-solid fa-xmark"></i></button>` : ''}</div></div>`;
+  }).join('');
+  return qtBox('<i class="fa-solid fa-clipboard-list text-emerald-600"></i> طلباتي ومساهماتي', rows || qtEmpty('لم ترسل أي طلب بعد. استخدم الأزرار أعلاه لتأكيد سدادك أو طلب إضافة مصروف.'));
+}
+
+// قسم المشرف: الطلبات بانتظار المراجعة
+function qtReviewCard(q) {
+  const pc = QT.claims.filter(c => c.status === 'pending'), pr = QT.reqs.filter(r => r.status === 'pending');
+  const head = `<i class="fa-solid fa-inbox text-sky-600"></i> طلبات بانتظار المراجعة (${pc.length + pr.length})`;
+  if (!pc.length && !pr.length) return qtBox(head, qtEmpty('لا توجد طلبات بانتظار المراجعة 👌'));
+  const cRow = c => `<div class="p-3 bg-sky-50 border border-sky-100 rounded-xl text-xs flex flex-wrap justify-between items-center gap-2">
+      <div class="min-w-0"><p class="font-bold">${esc(c.name || '')} <span class="text-[10px] text-sky-700">• تأكيد سداد</span></p>
+        <p class="text-[10px] text-slate-500">${fmtNum(c.amount)} ريال${c.ref ? ' • مرجع: <span dir="ltr">' + esc(c.ref) + '</span>' : ''}</p></div>
+      <div class="flex gap-1.5"><button type="button" class="btn bg-emerald-600 text-white" data-act="qt-claim-ok" data-id="${esc(c.id)}"><i class="fa-solid fa-check"></i> تأكيد</button>
+        <button type="button" class="btn b-red" data-act="qt-claim-no" data-id="${esc(c.id)}">رفض</button></div></div>`;
+  const rRow = r => `<div class="p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs space-y-2">
+      <div class="flex flex-wrap justify-between items-center gap-2"><div class="min-w-0"><p class="font-bold">${esc(r.title || '')} <span class="text-[10px] text-amber-700">• طلب مصروف من ${esc(r.name || '')}</span></p>
+        <p class="text-[10px] text-slate-500">${fmtNum(r.amount)} ريال • ${qtFmtDate(r.date)}</p></div>
+        <div class="flex gap-1.5"><button type="button" class="btn bg-emerald-600 text-white" data-act="qt-req-ok" data-id="${esc(r.id)}"><i class="fa-solid fa-check"></i> اعتماد</button>
+          <button type="button" class="btn b-red" data-act="qt-req-no" data-id="${esc(r.id)}">رفض</button></div></div>
+      ${r.details ? `<p class="text-[11px] text-slate-600 leading-relaxed">${esc(r.details)}</p>` : ''}</div>`;
+  return qtBox(head, [...pc.map(cRow), ...pr.map(rRow)].join('<div class="h-px bg-slate-100"></div>'));
+}
+
+function qtOpenClaim() {
+  const q = QT.q, m = QT.members.find(x => x.uid === state.user.uid); if (!q || !m) return;
+  const due = qtDue(q, m);
+  showModal('تأكيد السداد', `<form id="f-qt-claim" class="space-y-3">
+    <p class="text-xs text-slate-500 leading-relaxed">أدخل المبلغ الذي حوّلته للمشرف. لا يُحتسب في القطة إلا بعد تأكيده.</p>
+    <div><label class="text-xs font-semibold block mb-1">المبلغ (ريال)</label><input name="camount" type="number" min="1" step="any" class="inp" required value="${due || ''}"></div>
+    <div><label class="text-xs font-semibold block mb-1">رقم المرجع (اختياري)</label><input name="cref" class="inp" maxlength="60" dir="ltr"></div>
+    <button class="btn b-pri w-full py-3" type="submit">إرسال للمشرف للتأكيد</button></form>`);
+}
+async function qtSaveClaim(f) {
+  const q = QT.q, m = QT.members.find(x => x.uid === state.user.uid); if (!q || !m) return;
+  const amount = r2(parseFloat(f.camount.value)), ref = f.cref.value.trim();
+  if (!(amount > 0)) return toast('المبلغ غير صحيح', 'error');
+  try {
+    await qtRef(q.id).collection('claims').add({ uid: state.user.uid, name: (m.name || '').slice(0, 60), amount, ref, status: 'pending', createdAt: FV.serverTimestamp() });
+    closeModal(); toast('أُرسل للمشرف للتأكيد');
+  } catch (e) { toast('تعذر الإرسال: ' + e.message, 'error'); }
+}
+function qtOpenReq() {
+  const q = QT.q; if (!q || !QT.members.some(m => m.uid === state.user.uid)) return;
+  const lbl = 'text-xs font-semibold block mb-1';
+  showModal('طلب إضافة مصروف', `<form id="f-qt-req" class="space-y-3">
+    <p class="text-xs text-slate-500 leading-relaxed">صرفت من مالك على بند من بنود القطة؟ أرسل التفاصيل للمشرف. عند اعتماده يُحتسب المبلغ مقدّماً منك ويُخصم من المتبقي عليك.</p>
+    <div><label class="${lbl}">البند</label><input name="rtitle" class="inp" required maxlength="80" placeholder="مثال: تذاكر، ضيافة، وقود"></div>
+    <div class="grid grid-cols-2 gap-3"><div><label class="${lbl}">المبلغ (ريال)</label><input name="ramount" type="number" min="0.01" step="any" class="inp" required></div>
+      <div><label class="${lbl}">التاريخ</label><input name="rdate" type="date" class="inp" required value="${qtDay()}"></div></div>
+    <div><label class="${lbl}">التفاصيل</label><textarea name="rdetails" rows="3" class="inp" maxlength="300" placeholder="ماذا اشتريت ولماذا؟"></textarea></div>
+    <button class="btn b-pri w-full py-3" type="submit">إرسال الطلب للمشرف</button></form>`);
+}
+async function qtSaveReq(f) {
+  const q = QT.q, m = QT.members.find(x => x.uid === state.user.uid); if (!q || !m) return;
+  const title = f.rtitle.value.trim(), amount = r2(parseFloat(f.ramount.value)), date = f.rdate.value, details = f.rdetails.value.trim();
+  if (!title) return toast('اكتب البند', 'error');
+  if (!(amount > 0)) return toast('المبلغ غير صحيح', 'error');
+  if (!qtDateOk(date)) return toast('حدد التاريخ', 'error');
+  try {
+    await qtRef(q.id).collection('expReqs').add({ uid: state.user.uid, name: (m.name || '').slice(0, 60), title, details, amount, date, status: 'pending', createdAt: FV.serverTimestamp() });
+    closeModal(); toast('أُرسل الطلب للمشرف');
+  } catch (e) { toast('تعذر الإرسال: ' + e.message, 'error'); }
+}
+
+// اعتماد سداد: يُضاف إلى مدفوع العضو والمحصّل، ويُغلق الطلب
+async function qtDecideClaim(id, ok) {
+  const q = QT.q, c = QT.claims.find(x => x.id === id);
+  if (!q || !c || !qtAdminOf(q) || c.status !== 'pending') return;
+  const ref = qtRef(q.id), b = db.batch(), amt = r2(qtNum(c.amount));
+  b.update(ref.collection('claims').doc(id), { status: ok ? 'confirmed' : 'rejected', decidedAt: FV.serverTimestamp() });
+  if (ok) {
+    if (!QT.members.some(m => m.uid === c.uid)) return toast('العضو لم يعد في القطة', 'error');
+    b.update(ref.collection('members').doc(c.uid), { paid: FV.increment(amt) });
+    b.update(ref, { collected: FV.increment(amt) });
+  }
+  try { await b.commit(); toast(ok ? 'تم تأكيد السداد' : 'رُفض طلب السداد', 'info'); }
+  catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
+}
+
+// اعتماد مصروف: يُسجَّل في المصروفات، ويُحتسب مقدّماً من العضو (يُخصم من المتبقي عليه)
+async function qtDecideReq(id, ok) {
+  const q = QT.q, r = QT.reqs.find(x => x.id === id);
+  if (!q || !r || !qtAdminOf(q) || r.status !== 'pending') return;
+  if (ok && !QT.members.some(m => m.uid === r.uid)) return toast('العضو لم يعد في القطة', 'error');
+  const ref = qtRef(q.id), b = db.batch(), amt = r2(qtNum(r.amount));
+  b.update(ref.collection('expReqs').doc(id), { status: ok ? 'approved' : 'rejected', decidedAt: FV.serverTimestamp() });
+  if (ok) {
+    b.set(ref.collection('expenses').doc(), { name: r.title, amount: amt, date: r.date, uid: state.user.uid, byName: dispName(state.profile), forUid: r.uid, byMember: (r.name || '').slice(0, 60), details: (r.details || '').slice(0, 300), createdAt: FV.serverTimestamp() });
+    b.update(ref.collection('members').doc(r.uid), { credit: FV.increment(amt) });
+    b.update(ref, { collected: FV.increment(amt) });
+  }
+  try { await b.commit(); toast(ok ? 'اعتُمد المصروف وخُصم من المتبقي على العضو' : 'رُفض طلب المصروف', 'info'); }
+  catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
+}
+
+async function qtCancelItem(k, id) {
+  const q = QT.q; if (!q) return;
+  if (!confirm('إلغاء هذا الطلب؟')) return;
+  try { await qtRef(q.id).collection(k === 'claim' ? 'claims' : 'expReqs').doc(id).delete(); toast('أُلغي الطلب', 'info'); }
+  catch (e) { toast('تعذر الإلغاء: ' + e.message, 'error'); }
+}
+
 /* ---------- ربط الأحداث بالتطبيق الرئيسي ---------- */
 const QT_ACTIONS = {
   'qt-new': () => { qtLeave(); state.createType = 'qattah'; state.view = 'create'; render(); },
@@ -499,7 +638,14 @@ const QT_ACTIONS = {
   'qt-exp-del': el => qtDelExp(el.dataset.id),
   'qt-inv-share': el => qtShowInvite(QT.invAdmin.find(x => x.id === el.dataset.id)),
   'qt-inv-cancel': el => qtCancelInvite(el.dataset.id),
-  'qt-copy': () => copyText(QT.shareText || '', 'تم نسخ نص الدعوة')
+  'qt-copy': () => copyText(QT.shareText || '', 'تم نسخ نص الدعوة'),
+  'qt-claim-modal': () => qtOpenClaim(),
+  'qt-req-modal': () => qtOpenReq(),
+  'qt-claim-ok': el => qtDecideClaim(el.dataset.id, true),
+  'qt-claim-no': el => qtDecideClaim(el.dataset.id, false),
+  'qt-req-ok': el => qtDecideReq(el.dataset.id, true),
+  'qt-req-no': el => qtDecideReq(el.dataset.id, false),
+  'qt-item-cancel': el => qtCancelItem(el.dataset.k, el.dataset.id)
 };
 const QT_FORMS = {
   'f-qat-create': qtCreate,
@@ -507,5 +653,7 @@ const QT_FORMS = {
   'f-qt-add': qtAddMember,
   'f-qt-pay': qtSavePay,
   'f-qt-exp': qtAddExpense,
-  'f-qt-deputy': qtSetDeputy
+  'f-qt-deputy': qtSetDeputy,
+  'f-qt-claim': qtSaveClaim,
+  'f-qt-req': qtSaveReq
 };
