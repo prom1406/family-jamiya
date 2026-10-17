@@ -149,15 +149,6 @@ function qtOpen(id) {
 const qtAcctOf = p => ({ adminBank: (p && p.bank) || '', adminIban: (p && p.iban) || '', adminPhone: (p && p.phone) || '' });
 
 function qtSyncCard() {
-  const ids = new Set(QT.list.map(x => x.id));
-  Object.keys(QT.expUnsubs).forEach(id => { if (!ids.has(id)) { QT.expUnsubs[id](); delete QT.expUnsubs[id]; delete QT.spent[id]; } });
-  QT.list.forEach(x => {
-    if (QT.expUnsubs[x.id]) return;
-    QT.expUnsubs[x.id] = qtRef(x.id).collection('expenses').onSnapshot(s => {
-      QT.spent[x.id] = r2(s.docs.reduce((t, d) => t + (Number(d.data().amount) || 0), 0));
-      qtRepaint();
-    }, () => {});
-  });
   const p = state.profile || {}, want = qtAcctOf(p);
   QT.list.filter(x => x.adminUid === state.user.uid && (
       (x.adminBank || '') !== want.adminBank || (x.adminIban || '') !== want.adminIban || (x.adminPhone || '') !== want.adminPhone))
@@ -166,36 +157,15 @@ function qtSyncCard() {
 
 /* ---------- العرض: الرئيسية ---------- */
 function qtCard(q) {
-  const t = qtDay(), st = qtStatus(q), coll = qtNum(q.collected), tg = qtNum(q.target), pct = qtPct(coll, tg);
-  const spent = QT.spent[q.id] || 0, left = r2(coll - spent);
+  const st = qtStatus(q), pct = qtPct(qtNum(q.collected), qtNum(q.target));
   const role = q.adminUid === state.user.uid ? ['مشرف', 'bg-indigo-100 text-indigo-700'] : q.deputyUid === state.user.uid ? ['نائب', 'bg-amber-100 text-amber-800'] : ['مشارك', 'bg-emerald-100 text-emerald-700'];
-  const evLeft = qtDaysBetween(t, q.eventStart), payLeft = qtDaysBetween(t, q.collectEnd);
-  const evTxt = t > q.eventEnd ? 'انتهت' : t >= q.eventStart ? 'جارية الآن' : `بعد ${evLeft} يوم`;
-  const payTxt = payLeft < 0 ? 'انتهى الموعد' : payLeft === 0 ? 'اليوم آخر يوم' : `متبقي ${payLeft} يوم`;
-  const tile = (l, v, sub, c = '') => `<div class="p-2.5 bg-slate-50 rounded-xl min-w-0"><p class="text-[10px] text-slate-500">${l}</p><b class="text-xs block truncate ${c}">${v}</b>${sub ? `<p class="text-[10px] text-slate-500 truncate">${sub}</p>` : ''}</div>`;
-  const copy = (v, lbl) => `<button type="button" data-act="qt-copy-text" data-v="${esc(v)}" class="flex-none px-2 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-bold text-teal-700" aria-label="نسخ ${lbl}"><i class="fa-regular fa-copy"></i> نسخ</button>`;
-  const bankName = q.adminBank ? (String(q.adminBank).startsWith('كاش') ? 'كاش' : q.adminBank) : '';
-  const acct = [
-    q.adminIban ? `<div class="flex items-center justify-between gap-2"><div class="min-w-0"><p class="text-[10px] text-slate-500">${esc(bankName || 'الآيبان')}</p><b class="text-[11px] truncate block" dir="ltr">${esc(q.adminIban)}</b></div>${copy(q.adminIban, 'الآيبان')}</div>` : '',
-    q.adminPhone ? `<div class="flex items-center justify-between gap-2"><div class="min-w-0"><p class="text-[10px] text-slate-500">الجوال</p><b class="text-[11px] block" dir="ltr">${esc(q.adminPhone)}</b></div>${copy(q.adminPhone, 'الجوال')}</div>` : ''
-  ].join('');
-  return `<div class="card p-4 space-y-3 cursor-pointer" data-act="qt-open" data-id="${esc(q.id)}" role="button" tabindex="0">
-    <div class="flex items-start gap-3 min-w-0"><div class="jicon"><i class="fa-solid fa-hand-holding-dollar"></i></div>
-      <div class="min-w-0 flex-1"><h4 class="font-black text-sm truncate">${esc(q.name)}</h4><p class="text-xs text-slate-500 truncate">${esc(q.reason || '')}</p></div>
-      <div class="flex flex-col items-end gap-1 flex-none"><span class="bdg ${st.c}">${st.l}</span><span class="bdg ${role[1]}">${role[0]}</span></div></div>
-    <div class="grid grid-cols-2 gap-2">
-      ${tile('تاريخ الفعالية', qtFmtDate(q.eventStart), evTxt)}
-      ${tile('آخر موعد للدفع', qtFmtDate(q.collectEnd), payTxt, payLeft < 0 ? 'text-rose-600' : '')}
-    </div>
-    <div class="grid grid-cols-3 gap-2">
-      ${tile('المحصّل', fmtNum(coll))}${tile('المصاريف', fmtNum(spent), '', 'text-rose-600')}${tile('المتبقي', fmtNum(left), 'بعد المصاريف', left < 0 ? 'text-rose-600' : 'text-emerald-700')}
-    </div>
-    <div class="flex items-center gap-2"><div class="bar flex-1"><i style="width:${pct}%"></i></div><span class="text-[11px] text-slate-500">${pct}% من ${fmtNum(tg)} ريال</span></div>
-    <div class="p-3 rounded-xl bg-teal-50/60 border border-teal-100 text-xs space-y-2">
-      <p class="text-slate-600"><i class="fa-solid fa-user-tie"></i> المشرف المسؤول: <b>${esc(q.adminName || '—')}</b></p>
-      ${acct || '<p class="text-[11px] text-slate-500">لم يضف المشرف حساب التحويل بعد</p>'}
-    </div>
-  </div>`;
+  return `<div class="jcard" data-act="qt-open" data-id="${esc(q.id)}" role="button" tabindex="0">
+    <div class="flex items-center gap-3 min-w-0"><div class="jicon"><i class="fa-solid fa-hand-holding-dollar"></i></div>
+      <div class="min-w-0 flex-1"><h4 class="font-black text-sm truncate">${esc(q.name)}</h4>
+        <p class="text-xs text-slate-500 mt-0.5 truncate">${esc(q.reason || '')}</p>
+        <div class="flex items-center gap-2 mt-1.5 flex-wrap"><div class="bar w-20"><i style="width:${pct}%"></i></div><span class="text-[11px] text-slate-500">${pct}%</span>
+          <span class="bdg ${st.c}">${st.l}</span><span class="bdg ${role[1]}">${role[0]}</span></div></div></div>
+    <i class="fa-solid fa-chevron-left text-slate-300"></i></div>`;
 }
 
 function qtInvitesHtml() {
@@ -262,8 +232,8 @@ function qtView() {
       <span class="flex-none px-2.5 py-1 rounded-full text-[10px] font-black bg-white/25"><i class="fa-solid ${st.i}"></i> ${st.l}</span></div>
     <div><div class="flex justify-between text-[11px] text-emerald-100 mb-1"><span>المحصّل ${fmtNum(coll)} ريال</span><span>من ${fmtNum(tg)} • ${pct}%</span></div>
       <div class="h-2.5 rounded-full bg-white/25 overflow-hidden"><div class="h-full rounded-full bg-white" style="width:${pct}%"></div></div></div>
-    <div class="grid grid-cols-2 gap-2 text-center"><div class="rounded-2xl bg-white/15 py-2"><span class="text-[10px] text-emerald-100 block">آخر موعد للجمع</span><b class="text-xs">${qtFmtDate(q.collectEnd)}</b></div>
-      <div class="rounded-2xl bg-white/15 py-2"><span class="text-[10px] text-emerald-100 block">موعد الفعالية</span><b class="text-xs">${qtFmtDate(q.eventStart)}</b></div></div>
+    <div class="grid grid-cols-2 gap-2 text-center"><div class="rounded-2xl bg-white/15 py-2"><span class="text-[10px] text-emerald-100 block">آخر موعد للجمع</span><b class="text-xs block">${qtFmtDate(q.collectEnd)}</b><span class="text-[10px] text-emerald-50 block">${qtLeftTxt(qtDaysBetween(qtDay(), q.collectEnd))}</span></div>
+      <div class="rounded-2xl bg-white/15 py-2"><span class="text-[10px] text-emerald-100 block">موعد الفعالية</span><b class="text-xs block">${qtFmtDate(q.eventStart)}</b><span class="text-[10px] text-emerald-50 block">${qtEvTxt(q)}</span></div></div>
     ${mine && myDue > 0 ? `<div class="rounded-2xl bg-white p-3 text-slate-800 flex items-center justify-between gap-3"><div class="text-xs"><span class="text-slate-500">المتبقي عليك</span><b class="block text-base text-rose-600">${fmtNum(myDue)} ريال</b></div></div>` : ''}
     ${mine && myDue <= 0 && share > 0 ? '<div class="rounded-2xl bg-white/15 p-3 text-center text-xs font-bold">تم تسديد حصتك ✓</div>' : ''}
     ${memberBtns}
@@ -285,12 +255,27 @@ function qtView() {
     ${bar}${body}</div>`;
 }
 
+const qtLeftTxt = d => d < 0 ? 'انتهى الموعد' : d === 0 ? 'اليوم آخر يوم' : `متبقي ${d} يوم`;
+const qtEvTxt = q => qtDay() > q.eventEnd ? 'انتهت' : qtDay() >= q.eventStart ? 'جارية الآن' : `بعد ${qtDaysBetween(qtDay(), q.eventStart)} يوم`;
+const qtCopyBtn = (v, lbl) => `<button type="button" data-act="qt-copy-text" data-v="${esc(v)}" class="flex-none px-2 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-bold text-teal-700" aria-label="نسخ ${lbl}"><i class="fa-regular fa-copy"></i> نسخ</button>`;
+
 function qtOverviewTab(q, admin, st, hero) {
-  const tg = qtNum(q.target), share = qtShare(q);
+  const tg = qtNum(q.target), coll = qtNum(q.collected), share = qtShare(q);
+  const spent = r2(QT.expenses.reduce((t, e) => t + qtNum(e.amount), 0)), left = r2(coll - spent);
   const info = [['الهدف', fmtNum(tg) + ' ريال'], ['حصة الفرد', fmtNum(share) + ' ريال'], ['عدد الأفراد', q.participants + ' شخصاً'],
     ['بداية الجمع', qtFmtDate(q.collectStart)], ['آخر موعد للجمع', qtFmtDate(q.collectEnd)], ['الفعالية', qtFmtDate(q.eventStart) + ' – ' + qtFmtDate(q.eventEnd)]];
+  const money = [['المحصّل', coll, ''], ['المصاريف', spent, 'text-rose-600'], ['المتبقي بعد المصاريف', left, left < 0 ? 'text-rose-600' : 'text-emerald-700']];
+  const bankName = q.adminBank ? (String(q.adminBank).startsWith('كاش') ? 'كاش' : q.adminBank) : '';
+  const acct = [
+    q.adminIban ? `<div class="flex items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl"><div class="min-w-0"><p class="text-[10px] text-slate-500">${esc(bankName || 'الآيبان')}</p><b class="text-xs block truncate" dir="ltr">${esc(q.adminIban)}</b></div>${qtCopyBtn(q.adminIban, 'الآيبان')}</div>` : '',
+    q.adminPhone ? `<div class="flex items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl"><div class="min-w-0"><p class="text-[10px] text-slate-500">الجوال</p><b class="text-xs block" dir="ltr">${esc(q.adminPhone)}</b></div>${qtCopyBtn(q.adminPhone, 'الجوال')}</div>` : ''
+  ].join('');
   return hero + (admin ? '' : qtMyBox())
     + qtBox('<i class="fa-solid fa-lightbulb text-amber-500"></i> الحالة الآن', `<p class="text-xs text-slate-600 leading-relaxed">${qtAdvice(q, st)}</p>`)
+    + qtBox('<i class="fa-solid fa-scale-balanced text-emerald-600"></i> المصاريف والمتبقي', `<div class="grid grid-cols-3 gap-2 text-center">${money.map(([t, v, c]) => `<div class="p-2.5 bg-slate-50 rounded-xl"><p class="text-[10px] text-slate-500">${t}</p><b class="text-sm block ${c}">${fmtNum(v)}</b></div>`).join('')}</div>
+      <div class="bar"><i style="width:${qtPct(spent, coll)}%;${spent > coll ? 'background:var(--loss)' : ''}"></i></div>
+      ${spent > coll ? `<p class="text-[11px] text-rose-600">المصروف تجاوز المحصّل بمقدار ${fmtNum(spent - coll)} ريال.</p>` : ''}`)
+    + qtBox('<i class="fa-solid fa-building-columns text-teal-700"></i> حساب المشرف للتحويل', acct || '<p class="text-xs text-slate-500">لم يضف المشرف حساب التحويل بعد.</p>')
     + qtBox('<i class="fa-solid fa-circle-info text-emerald-600"></i> تفاصيل القطة', `<div class="grid grid-cols-2 gap-2">${info.map(([t, v]) => qtTile(t, esc(v))).join('')}</div>`)
     + qtBox('<i class="fa-solid fa-user-tie text-indigo-600"></i> الإدارة', `<div class="grid grid-cols-2 gap-2">${qtTile('المشرف', esc(q.adminName || '—'))}${qtTile('النائب', q.deputyUid ? esc(q.deputyName || '—') : 'لم يُعيّن')}</div>`);
 }
