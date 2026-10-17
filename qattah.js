@@ -335,7 +335,7 @@ function qtExpensesTab(q, admin, staff) {
     <button class="btn b-pri w-full" type="submit">إضافة المصروف</button></form>`) : '';
   const rows = QT.expenses.map(e => `<div class="p-3 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center gap-2 text-xs">
       <div class="min-w-0"><p class="font-bold truncate">${esc(e.name)}</p><p class="text-[10px] text-slate-500">${qtFmtDate(e.date)} • ${esc(e.byName || '—')}</p></div>
-      <div class="flex items-center gap-2 flex-none"><b class="text-sm">${fmtNum(e.amount)} ريال</b>${staff ? `<button type="button" data-act="qt-exp-del" data-id="${esc(e.id)}" class="px-2 py-1 bg-rose-50 text-rose-600 rounded-lg" aria-label="حذف المصروف"><i class="fa-solid fa-trash-can"></i></button>` : ''}</div></div>`).join('');
+      <div class="flex items-center gap-2 flex-none"><b class="text-sm">${fmtNum(e.amount)} ريال</b>${(e.forUid ? admin : staff) ? `<button type="button" data-act="qt-exp-del" data-id="${esc(e.id)}" class="px-2 py-1 bg-rose-50 text-rose-600 rounded-lg" aria-label="حذف المصروف"><i class="fa-solid fa-trash-can"></i></button>` : ''}</div></div>`).join('');
   return summary + form + qtBox(`<i class="fa-solid fa-list text-slate-500"></i> المصروفات (${QT.expenses.length})`, `<div class="space-y-2">${rows || qtEmpty('لا توجد مصروفات مسجّلة بعد')}</div>`);
 }
 
@@ -462,7 +462,8 @@ async function qtRemove(uid) {
   if (!confirm(`إزالة ${m.name || 'المشارك'} من القطة؟` + (paid > 0 ? `\nسيُخصم ما سدده (${fmtNum(paid)} ريال) من المحصّل.` : ''))) return;
   const ref = qtRef(q.id), b = db.batch(), upd = { memberUids: FV.arrayRemove(uid) };
   if (q.deputyUid === uid) { upd.deputyUid = ''; upd.deputyName = ''; }
-  if (paid) upd.collected = FV.increment(-paid);
+  const cov = paid + qtNum(m.credit);
+  if (cov) upd.collected = FV.increment(-cov);
   b.update(ref, upd); b.delete(ref.collection('members').doc(uid));
   try { await b.commit(); toast('أُزيل المشارك', 'info'); }
   catch (e) { toast('تعذرت الإزالة: ' + e.message, 'error'); }
@@ -522,10 +523,19 @@ async function qtAddExpense(f) {
   } catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
 }
 async function qtDelExp(id) {
-  const q = QT.q; if (!q || !qtStaffOf(q)) return;
-  if (!confirm('حذف هذا المصروف؟')) return;
-  try { await qtRef(q.id).collection('expenses').doc(id).delete(); toast('حُذف المصروف', 'info'); }
-  catch (e) { toast('تعذر الحذف: ' + e.message, 'error'); }
+  const q = QT.q, e = QT.expenses.find(x => x.id === id);
+  if (!q || !e || !qtStaffOf(q)) return;
+  if (e.forUid && !qtAdminOf(q)) return toast('المصروف المعتمد لعضو لا يحذفه إلا المشرف', 'error');
+  if (!confirm(e.forUid ? 'حذف هذا المصروف؟ سيُعاد المبلغ إلى المتبقي على العضو وينقص من المحصّل.' : 'حذف هذا المصروف؟')) return;
+  const ref = qtRef(q.id), b = db.batch(), amt = r2(qtNum(e.amount));
+  b.delete(ref.collection('expenses').doc(id));
+  if (e.forUid && QT.members.some(m => m.uid === e.forUid)) {
+    // المصروف المعتمد كان محسوباً مقدّماً من العضو، فيُعاد احتسابه
+    b.update(ref.collection('members').doc(e.forUid), { credit: FV.increment(-amt) });
+    b.update(ref, { collected: FV.increment(-amt) });
+  }
+  try { await b.commit(); toast('حُذف المصروف', 'info'); }
+  catch (err) { toast('تعذر الحذف: ' + err.message, 'error'); }
 }
 
 /* ---------- تأكيد السداد وطلبات المصروف ---------- */
