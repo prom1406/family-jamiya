@@ -269,13 +269,14 @@ h1,h2,h3,.font-display{font-family:'Cairo',system-ui,sans-serif;letter-spacing:0
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.3.2<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.3.5<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
 <div id="toasts" class="toasts" aria-live="polite"></div>
 
 <script src="qattah.js"></script>
+<script src="diyun.js"></script>
 <script>
 
 /* ============ اللغة: عربي / English ============ */
@@ -533,7 +534,7 @@ const needsPay = (c, u) => (u !== c.recUid || sharesOf(c.turns, u) > 1) && c.acc
 /* ============ المصادقة ============ */
 auth.onAuthStateChanged(async user => { if (state._registering) return; await bootUser(user); });
 async function bootUser(user) {
-  cleanup(state.unsubs); cleanup(state.jUnsubs); stopPayListeners(); state.pays = {}; stopBlockWatch(); stopHeartbeat(); state._tv = null; stopQattah();
+  cleanup(state.unsubs); cleanup(state.jUnsubs); stopPayListeners(); state.pays = {}; stopBlockWatch(); stopHeartbeat(); state._tv = null; stopQattah(); stopDebts();
   state.user = user; state.profile = null; state.isAdmin = false; state._restoreTried = false;
   state.jamiyat = []; state.invites = [];
   if (!user) { unlock(); state.view = 'auth'; return render(); }
@@ -558,6 +559,7 @@ async function bootUser(user) {
   claimPhone(user.uid, state.profile.phone);
   startListeners();
   startQattahListeners();
+  startDebtListeners();
   if (state.isAdmin) { state.view = 'admin'; render(); loadAdmin(); toast('مرحباً بك في لوحة المالك', 'info'); return; }
   state.view = launchAction() || 'home'; render();
   checkPendingJoin();
@@ -2225,7 +2227,7 @@ function render() {
   syncPayListeners();
   renderNav();
   const v = state.view, app = $('app');
-  const views = { loading: vLoading, auth: vAuth, verify: vVerify, complete: vComplete, loaderr: vLoadErr, home: vHome, follow: vFollow, create: vCreate, jamiya: vJamiya, profile: vProfile, admin: vAdmin, qattah: qtView };
+  const views = { loading: vLoading, auth: vAuth, verify: vVerify, complete: vComplete, loaderr: vLoadErr, home: vHome, follow: vFollow, create: vCreate, jamiya: vJamiya, profile: vProfile, admin: vAdmin, qattah: qtView, debt: dbView, debtNew: dbNewView };
   if (maintOn()) { $('tabbar').classList.add('hide'); app.innerHTML = vMaint(); return; }
   app.innerHTML = `<div class="fade">${annHtml()}${(views[v] || vLoading)()}</div>`;
   trackView(v);
@@ -2245,7 +2247,7 @@ function renderNav() {
     <button class="btn b-sec" data-act="go-profile"><i class="fa-solid fa-user-gear"></i> حسابي</button>
     <button class="btn b-red" data-act="logout" aria-label="خروج"><i class="fa-solid fa-right-from-bracket"></i></button></div>`;
   const v = state.view, tab = (act, icon, label, on) => `<button class="tab ${on ? 'on' : ''}" data-act="${act}"><i class="fa-solid ${icon}"></i>${label}</button>`;
-  tb.innerHTML = tab('go-home', 'fa-house', 'جمعياتي', ['home', 'jamiya', 'follow', 'qattah'].includes(v)) + tab('go-create', 'fa-circle-plus', 'جديد', v === 'create')
+  tb.innerHTML = tab('go-home', 'fa-house', 'جمعياتي', ['home', 'jamiya', 'follow', 'qattah', 'debt', 'debtNew'].includes(v)) + tab('go-create', 'fa-circle-plus', 'جديد', v === 'create')
     + (state.isAdmin ? tab('go-admin', 'fa-shield-halved', 'المالك', v === 'admin') : '') + tab('go-profile', 'fa-user', 'حسابي', v === 'profile');
   tb.classList.remove('hide');
 }
@@ -2427,10 +2429,11 @@ function vHome() {
   const hero = `<div class="hero">
     <div class="min-w-0"><p class="text-xs text-emerald-100 font-semibold">السلام عليكم 👋</p><h2 class="text-2xl font-black mt-0.5 truncate">${esc(state.profile.name)}</h2>
       <p class="text-xs text-emerald-50/90 mt-1">جمعياتك وتعاوناتك وقطاتك في مكان واحد</p></div>
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-4">
       ${tile('fa-people-roof', 'الجمعيات', jamList.length)}
       ${tile('fa-handshake', 'التعاون', famList.length)}
       ${tile('fa-hand-holding-dollar', 'القطات', QT.list.length)}
+      ${tile('fa-scale-balanced', 'الديون', DB.list.filter(d => d.status === 'open').length)}
       <button type="button" class="stat text-right relative" data-act="alerts-open" aria-label="التنبيهات"><p class="text-[11px] text-emerald-50 flex items-center gap-1.5"><i class="fa-solid fa-bell"></i>التنبيهات</p><b class="text-2xl font-black">${nf(nAl)}</b>${nAl ? '<span class="absolute top-2 left-2 w-2 h-2 rounded-full bg-rose-400"></span>' : ''}</button>
     </div></div>`;
   return `<div class="space-y-5">
@@ -2439,9 +2442,11 @@ function vHome() {
     ${staffJams().length ? (() => { const D = followData(); return `<button class="w-full text-right card p-4 flex items-center justify-between gap-3" data-act="go-follow"><span class="flex items-center gap-3 min-w-0"><span class="jicon"><i class="fa-solid fa-list-check"></i></span><span class="min-w-0"><b class="text-sm block">متابعة الأعضاء</b><span class="text-[11px] ${D.nLate ? 'text-rose-600' : 'text-slate-500'}">${D.list.length ? nf(D.list.length) + ' عضو عليهم مبالغ' + (D.nLate ? ' • ' + nf(D.nLate) + ' متأخر' : '') : 'كل شيء مسدد حالياً ✓'}</span></span></span><i class="fa-solid fa-chevron-left text-slate-300"></i></button>`; })() : ''}
     ${inv ? `<div class="space-y-2"><h3 class="font-black text-sm"><i class="fa-solid fa-envelope-open-text text-amber-500"></i> دعوات بانتظارك</h3>${inv}</div>` : ''}
     ${qtInvitesHtml()}
+    ${dbInvitesHtml()}
     <div class="space-y-2.5">${secHead('fa-people-roof', 'الجمعيات', 'go-create', 'جمعية جديدة')}${jamList.map(jamCard).join('') || empty('لا توجد جمعيات بعد. أنشئ جمعيتك الأولى أو انتظر دعوة.', '<button type="button" class="btn b-pri mt-4" data-act="go-create">ابدأ مجاناً الآن</button>')}</div>
     <div class="space-y-2.5">${secHead('fa-handshake', 'التعاون', 'go-create-family', 'تعاون جديد')}${famList.map(famCard).join('') || empty('لا توجد تعاونات عائلية بعد.')}</div>
     ${qtHomeBlock()}
+    ${dbHomeBlock()}
   </div>`;
 }
 function dayLabels(freq) {
@@ -3751,7 +3756,7 @@ renderBanner();
 
 const actions = {
   'go-follow': () => { state.fMem = {}; state.view = 'follow'; render(); loadFollowMembers(); }, 'follow-open': el => openJamiya(el.dataset.id), 'follow-wa': el => followWa(el.dataset.uid),
-  'go-home': () => { cleanup(state.jUnsubs); qtLeave(); state.view = state.user && state.profile ? 'home' : state.view; render(); },
+  'go-home': () => { cleanup(state.jUnsubs); qtLeave(); dbLeave(); state.view = state.user && state.profile ? 'home' : state.view; render(); },
   'go-create': () => { state.createType = 'jamiya'; state.view = 'create'; render(); },
   'growth-create': () => { logEvent('growth_create_click'); lsSet(GK.create, String(Date.now())); state.createType = 'jamiya'; state.view = 'create'; render(); },
   'growth-dismiss': el => { const k = el && el.dataset && el.dataset.k; if (GK[k]) { lsSet(GK[k], String(Date.now())); logEvent('growth_dismiss_' + k); } render(); },
@@ -3818,6 +3823,7 @@ const actions = {
   'swap-modal': el => openSwapModal(+el.dataset.i), 'swap-yes': el => approveSwap(el.dataset.id), 'swap-no': el => rejectSwap(el.dataset.id, false), 'swap-cancel': el => rejectSwap(el.dataset.id, true)
 };
 Object.assign(actions, QT_ACTIONS);
+Object.assign(actions, DB_ACTIONS);
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
   const fn = actions[el.dataset.act]; if (fn) fn(el);
@@ -3843,6 +3849,7 @@ const forms = { 'f-register': doRegister, 'f-login': doLogin, 'f-reset': doReset
   'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-notif': submitNotif, 'f-deputy': f => setDeputy(f.uid.value), 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete, 'f-wish': submitWish, 'f-chat': sendChat, 'f-create-family': handleCreateFamily, 'f-fampay': submitFamilyPay, 'f-famself': submitSelfContrib, 'f-addguest': submitAddGuest, 'f-famguest': submitGuestPay, 'f-pledge': submitPledge, 'f-famedit': submitFamilyEdit, 'f-share': submitShare, 'f-swap': submitSwap, 'f-lock': submitLock, 'f-lockoff': submitLockOff };
 Object.assign(forms, ADMIN_FORMS);
 Object.assign(forms, QT_FORMS);
+Object.assign(forms, DB_FORMS);
 document.addEventListener('submit', e => { const fn = forms[e.target.id]; if (fn) { e.preventDefault(); fn(e.target); } });
 
 watchSettings(); trackVisit();
