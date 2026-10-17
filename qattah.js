@@ -163,13 +163,10 @@ function qtInvitesHtml() {
 // يُدرج في الصفحة الرئيسية قبل قائمة الجمعيات
 function qtHomeBlock() {
   const cards = QT.list.map(qtCard).join('');
-  return `${qtInvitesHtml()}<div class="space-y-2.5">
-    <div class="flex items-center justify-between gap-2"><h3 class="font-black text-sm"><i class="fa-solid fa-hand-holding-dollar text-amber-600"></i> القطة</h3>
+  return `<div class="space-y-2.5"><div class="flex items-center justify-between gap-2"><h3 class="font-black text-sm"><i class="fa-solid fa-hand-holding-dollar text-teal-700"></i> القطة</h3>
       <button type="button" class="btn b-pri" data-act="qt-new"><i class="fa-solid fa-plus"></i> قطة جديدة</button></div>
-    ${cards || '<div class="card p-5 text-center text-xs text-slate-500"><p>لا توجد قطة بعد. أنشئ صندوقاً مشتركاً لفعالية أو رحلة، وأضف الأفراد مباشرة أو بالدعوة.</p></div>'}</div>`;
+    ${cards || '<div class="card p-6 text-center text-xs text-slate-500">لا توجد قطة بعد. أنشئ صندوقاً مشتركاً لفعالية أو رحلة.</div>'}</div>`;
 }
-
-/* ---------- العرض: إنشاء القطة وتعديلها ---------- */
 function qtFormHtml(q, mode) {
   const v = k => esc(q && q[k] != null ? q[k] : '');
   const lbl = 'text-xs font-semibold block mb-1', today = qtDay(), minAttr = mode === 'create' ? `min="${today}"` : '';
@@ -624,6 +621,7 @@ async function qtCancelItem(k, id) {
 
 /* ---------- ربط الأحداث بالتطبيق الرئيسي ---------- */
 const QT_ACTIONS = {
+  'go-create-family': () => { state.createType = 'family'; state.view = 'create'; render(); },
   'qt-new': () => { qtLeave(); state.createType = 'qattah'; state.view = 'create'; render(); },
   'qt-open': el => qtOpen(el.dataset.id),
   'qt-tab': el => { QT.tab = el.dataset.v; render(); window.scrollTo({ top: 0 }); },
