@@ -17,6 +17,8 @@ const DB = { list: [], d: null, did: null, pays: [], tab: 'overview', unsubs: []
 const DB_COL = 'debts';
 
 /* ---------- أدوات ---------- */
+const dbJid = id => 'db:' + id;
+const dbOther = d => d.creatorUid === state.user.uid ? d.counterUid : d.creatorUid; // الطرف الآخر (قد يكون غير مسجّل)
 const dbRef = id => db.collection(DB_COL).doc(id);
 const dbDay = () => isoDay(new Date());
 const dbN = v => Number(v) || 0;
@@ -207,8 +209,9 @@ async function dbCreate(f) {
     createdAt: FV.serverTimestamp(), updatedAt: FV.serverTimestamp()
   };
   try {
-    await db.collection(DB_COL).add(data);
+    const nref = await db.collection(DB_COL).add(data);
     toast(counterUid ? 'أُرسل الدين للطرف الآخر ليقبله' : 'سُجّل الدين', 'info');
+    if (counterUid) sendNotifs([counterUid], 'طلب دين جديد', `${data.creatorName} سجّل دَيناً بينكما بمبلغ ${fmtNum(amount)} ريال`, dbJid(nref.id), 'debt', 'dbinv_' + nref.id);
     state.view = 'home'; render();
   } catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
 }
@@ -335,7 +338,7 @@ async function dbSavePay(f) {
     status: confirmed ? 'confirmed' : 'pending', createdAt: FV.serverTimestamp()
   });
   if (confirmed) dbApplyPaid(b, ref, d, amount);
-  try { await b.commit(); closeModal(); toast(confirmed ? 'سُجّل المبلغ' : 'أُرسلت الدفعة للدائن للتأكيد'); }
+  try { await b.commit(); closeModal(); toast(confirmed ? 'سُجّل المبلغ' : 'أُرسلت الدفعة للدائن للتأكيد'); const o = dbOther(d); if (o) sendNotifs([o], confirmed ? 'سُجّلت دفعة على الدين' : 'دفعة جديدة بانتظار تأكيدك', `${dispName(state.profile)} — ${fmtNum(amount)} ريال`, dbJid(d.id), 'debt'); }
   catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
 }
 async function dbDecidePay(pid, ok) {
@@ -345,7 +348,7 @@ async function dbDecidePay(pid, ok) {
   const ref = dbRef(d.id), b = db.batch();
   b.update(ref.collection('payments').doc(pid), { status: ok ? 'confirmed' : 'rejected', decidedAt: FV.serverTimestamp() });
   if (ok) dbApplyPaid(b, ref, d, dbN(p.amount));
-  try { await b.commit(); toast(ok ? 'تم تأكيد الدفعة' : 'رُفضت الدفعة', 'info'); }
+  try { await b.commit(); toast(ok ? 'تم تأكيد الدفعة' : 'رُفضت الدفعة', 'info'); if (p.byUid) sendNotifs([p.byUid], ok ? 'تم تأكيد دفعتك ✓' : 'لم تُقبل دفعتك', `${fmtNum(dbN(p.amount))} ريال — ${dispName(state.profile)}`, dbJid(d.id), 'debt'); }
   catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
 }
 async function dbUndoPay(pid) {
@@ -367,13 +370,13 @@ async function dbCancelPay(pid) {
 
 /* ---------- القبول والرفض والإدارة ---------- */
 async function dbRespond(id, status) {
-  try { await dbRef(id).update({ status, updatedAt: FV.serverTimestamp() }); toast(status === 'open' ? 'تم قبول الدين' : 'تم رفض الدين', 'info'); }
+  try { await dbRef(id).update({ status, updatedAt: FV.serverTimestamp() }); toast(status === 'open' ? 'تم قبول الدين' : 'تم رفض الدين', 'info'); const dd = DB.list.find(x => x.id === id); if (dd) sendNotifs([dd.creatorUid], status === 'open' ? 'قُبل الدين ✓' : 'رُفض الدين', `${dispName(state.profile)} ${status === 'open' ? 'قبل' : 'رفض'} الدين المسجّل بمبلغ ${fmtNum(dbN(dd.amount))} ريال`, dbJid(id), 'debt'); }
   catch (e) { toast('تعذر التحديث: ' + e.message, 'error'); }
 }
 async function dbSetClosed(closed) {
   const d = DB.d; if (!d || !dbIsLender(d, state.user.uid)) return;
   if (closed && !confirm('إغلاق الدين وإعفاء الطرف الآخر من المتبقي؟')) return;
-  try { await dbRef(d.id).update({ status: closed ? 'closed' : 'open', updatedAt: FV.serverTimestamp() }); toast(closed ? 'أُغلق الدين' : 'أُعيد فتح الدين', 'info'); }
+  try { await dbRef(d.id).update({ status: closed ? 'closed' : 'open', updatedAt: FV.serverTimestamp() }); toast(closed ? 'أُغلق الدين' : 'أُعيد فتح الدين', 'info'); const o = dbOther(d); if (o) sendNotifs([o], closed ? 'أُغلق الدين' : 'أُعيد فتح الدين', `${dispName(state.profile)} — ${fmtNum(dbN(d.amount))} ريال`, dbJid(d.id), 'debt'); }
   catch (e) { toast('تعذر التحديث: ' + e.message, 'error'); }
 }
 function dbOpenEdit() {

@@ -360,7 +360,7 @@ main img,.sheet img,main table,.sheet table{max-width:100%}
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.3.6<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.3.7<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -2190,12 +2190,34 @@ function pushLocal(title, body, tag, jid) {
   else return; // تنبيهات المواعيد تنتظر حتى يصبح التطبيق في الخلفية
   seen.push(tag); lsSet(seenKey(), JSON.stringify(seen.slice(-300)));
 }
+// فتح من أيقونة تطبيق مثبّت (أندرويد) لكن الصفحة خارج نطاقه: يحدث لمن ثبّت التطبيق على الدومين القديم
+const fromStaleApp = () => !isStandalone() && /^android-app:/.test(document.referrer || '');
+const NEW_HOST = new URL(APP_URL).hostname;
+function notifHelp(reason) {
+  const ios = isIOS(), denied = notifSupported() && Notification.permission === 'denied';
+  const why = denied ? 'الإشعارات محظورة لهذا الموقع في إعدادات جوالك.' : reason === 'ios' ? 'على الآيفون لا تعمل الإشعارات إلا من التطبيق المثبّت على الشاشة الرئيسية.' : 'تعذّر تفعيل الإشعارات من هذه النافذة.';
+  const steps = denied
+    ? [ios ? 'افتح <b>الإعدادات ← الإشعارات ← الجمعية الذكية</b> وفعّل «السماح بالإشعارات».' : 'اضغط أيقونة القفل بجانب الرابط ← <b>الأذونات ← الإشعارات ← السماح</b>، أو من إعدادات التطبيق ← الإشعارات.', 'ارجع للتطبيق واضغط «إعادة تسجيل الجهاز».']
+    : ['احذف أيقونة <b>الجمعية الذكية</b> القديمة من شاشتك الرئيسية (التي ثبّتّها قبل تغيير الرابط). بياناتك محفوظة في حسابك ولن تضيع.',
+       ios ? `افتح <b dir="ltr">${NEW_HOST}</b> في Safari ← زر المشاركة ← <b>إضافة إلى الشاشة الرئيسية</b>.` : `افتح <b dir="ltr">${NEW_HOST}</b> في كروم ← القائمة ⋮ ← <b>تثبيت التطبيق</b>.`,
+       'افتح التطبيق من الأيقونة الجديدة وسجّل الدخول بنفس بريدك، ثم اضغط <b>تفعيل الإشعارات</b>.'];
+  showModal('تفعيل الإشعارات', `<div class="space-y-3 text-xs leading-relaxed">
+    <p class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">${why} ${denied ? '' : 'تم نقل الجمعية الذكية إلى رابطها الجديد <b dir="ltr">' + NEW_HOST + '</b>، والإشعارات مرتبطة بالرابط الذي ثبّتّ التطبيق منه، لذلك يلزم تثبيته من جديد مرة واحدة.'}</p>
+    <ol class="space-y-2.5">${steps.map((t, i) => `<li class="flex gap-3 items-center"><span class="jicon !w-9 !h-9 !text-sm">${i + 1}</span><span>${t}</span></li>`).join('')}</ol>
+    <a class="btn b-pri w-full" href="${APP_URL}" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> فتح الرابط الجديد</a>
+    <button type="button" class="btn b-sec w-full" data-act="reg-push"><i class="fa-solid fa-rotate"></i> إعادة تسجيل الجهاز</button></div>`);
+}
 async function enableNotifs() {
-  if (!notifSupported()) return toast('هذا المتصفح لا يدعم الإشعارات' + (isIOS() ? ' — على الآيفون ثبّت التطبيق على الشاشة الرئيسية أولاً' : ''), 'error');
-  if (isIOS() && !isStandalone()) return toast('على الآيفون ثبّت التطبيق على الشاشة الرئيسية ثم افتحه وفعّل الإشعارات', 'error');
-  let p = Notification.permission; if (p === 'default') p = await Notification.requestPermission();
-  if (p === 'granted') { lsSet('jm_notif', '1'); toast('تم تفعيل الإشعارات'); registerPush(); showSysNotif('الجمعية الذكية', 'الإشعارات مفعّلة ✓', 'welcome_' + Date.now()); }
-  else toast('لم يُسمح بالإشعارات. فعّلها من إعدادات المتصفح للموقع', 'error');
+  if (!notifSupported()) return notifHelp('ios');
+  if (isIOS() && !isStandalone()) return notifHelp('ios');
+  let p = Notification.permission;
+  if (p === 'default') { try { p = await Notification.requestPermission(); } catch (e) { p = 'default'; } }
+  if (p === 'granted') {
+    lsSet('jm_notif', '1');
+    const r = await registerPush(true);
+    if (r && r.ok) { toast('تم تفعيل الإشعارات'); showSysNotif('الجمعية الذكية', 'الإشعارات مفعّلة ✓', 'welcome_' + Date.now()); }
+    else { toast('سُمح بالإشعارات لكن تعذّر تسجيل الجهاز، جرّب «إعادة تسجيل الجهاز»', 'error'); console.warn('push reg', r && r.err); }
+  } else notifHelp(p === 'denied' ? 'denied' : 'stale'); // «default» بعد الطلب = لم تظهر النافذة (غالباً تطبيق قديم مثبّت على الدومين السابق)
   renderBanner(); if (state.view === 'profile') render();
 }
 function testNotif() { if (!notifOn()) return toast('فعّل الإشعارات أولاً', 'error'); showSysNotif('الجمعية الذكية', 'هذا إشعار تجريبي. أغلق التطبيق أو انتقل لتطبيق آخر لتجربة ظهوره خارج الصفحة.', 'test_' + Date.now()); toast('أُرسل إشعار تجريبي', 'info'); }
@@ -2311,7 +2333,14 @@ async function sendAdminBroadcast(f) {
 }
 setInterval(notifyAlerts, 10 * 60 * 1000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') setTimeout(notifyAlerts, 1500); });
-if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { const d = e.data; if (d && d.type === 'open-jamiya' && d.jid) openJamiya(d.jid); });
+// هدف الإشعار: معرّف جمعية/تعاون، أو qt:ID للقطة، أو db:ID للدين
+function openNotifTarget(id) {
+  if (!id || !state.user || !state.profile) return;
+  if (id.startsWith('qt:')) return qtOpen(id.slice(3));
+  if (id.startsWith('db:')) return dbOpen(id.slice(3));
+  openJamiya(id);
+}
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { const d = e.data; if (d && d.type === 'open-jamiya' && d.jid) openNotifTarget(d.jid); });
 
 /* ============ الواجهات ============ */
 function render() {
@@ -2678,7 +2707,7 @@ function vProfile() {
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-chart-simple text-teal-600"></i> نشاطي في الجمعيات</h4>${state.stats ? statsTiles(state.stats) : '<p class="text-xs text-slate-400">جارٍ حساب إحصاءاتك…</p>'}</div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-bell text-amber-500"></i> إشعارات الجوال</h4>
       <p class="text-xs text-slate-500 leading-relaxed">${!notifSupported() ? 'هذا المتصفح لا يدعم الإشعارات.' : Notification.permission === 'denied' ? 'الإشعارات محظورة لهذا الموقع، فعّلها من إعدادات المتصفح.' : notifOn() ? 'الإشعارات مفعّلة ✓ ستصلك تنبيهات الدعوات والإيصالات والأعضاء الجدد وطلبات التعديل ورسائل الإدارة ومواعيد السداد.' : 'فعّلها لتصلك تنبيهات الدعوات والإيصالات ومواعيد السداد خارج التطبيق.'}${isIOS() && !isStandalone() ? ' على الآيفون يلزم تثبيت التطبيق أولاً.' : ''}</p>
-      <div class="flex flex-wrap gap-2">${notifOn() ? '<button class="btn b-sec" data-act="test-notif"><i class="fa-solid fa-paper-plane"></i> إشعار تجريبي</button><button class="btn b-sec" data-act="reg-push"><i class="fa-solid fa-rotate"></i> إعادة تسجيل الجهاز</button>' : '<button class="btn b-pri" data-act="enable-notif"><i class="fa-solid fa-bell"></i> تفعيل الإشعارات</button>'}</div></div>
+      <div class="flex flex-wrap gap-2">${notifOn() ? '<button class="btn b-sec" data-act="test-notif"><i class="fa-solid fa-paper-plane"></i> إشعار تجريبي</button><button class="btn b-sec" data-act="reg-push"><i class="fa-solid fa-rotate"></i> إعادة تسجيل الجهاز</button>' : '<button class="btn b-pri" data-act="enable-notif"><i class="fa-solid fa-bell"></i> تفعيل الإشعارات</button>'}<button class="btn b-sec" data-act="notif-help"><i class="fa-solid fa-circle-question"></i> الإشعارات لا تعمل؟</button></div></div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-brands fa-whatsapp text-emerald-600"></i> تنبيهات واتساب</h4>
       <label class="flex items-start gap-2 text-xs leading-relaxed"><input type="checkbox" data-wa-optin class="mt-0.5 w-4 h-4 accent-teal-600" ${p.waOptIn !== false ? 'checked' : ''}> <span>أوافق على استلام تذكيرات السداد والاستلام عبر واتساب على رقم جوالي المسجّل. يمكنك إيقافها في أي وقت.</span></label></div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-lock text-slate-700"></i> قفل التطبيق</h4>
@@ -3791,13 +3820,16 @@ function renderBanner() {
   const bar = (title, text, btn, closable = false, closeAct = 'dismiss-ib') => `<div class="ibar fade"><img src="icon-192.png" alt=""><div class="flex-1 min-w-0"><p class="text-sm font-black">${title}</p><p class="text-[11px] text-slate-300 leading-snug">${text}</p></div>${btn}${closable ? `<button class="x" data-act="${closeAct}" aria-label="إخفاء"><i class="fa-solid fa-xmark"></i></button>` : ''}</div>`;
   let h = '';
   if (isStandalone()) lsSet('jm_installed', '1');
+  const nbOk = state.user && state.profile && Date.now() - Number(lsGet('jm_nb_dismiss') || 0) > 7 * 86400000;
   if (state.updateReady) h = bar('يتوفر تحديث جديد', 'أعد تحميل التطبيق للحصول على آخر التحسينات', '<button class="btn b-pri" data-act="reload-app">تحديث</button>', true);
+  else if (fromStaleApp()) // فُتح من أيقونة قديمة مثبّتة على الدومين السابق: لا تعمل الإشعارات فيها
+    h = bar('هذه أيقونة التطبيق القديمة', 'انتقلنا إلى ' + NEW_HOST + ' — ثبّت التطبيق من جديد لتعمل الإشعارات', '<button class="btn b-pri" data-act="notif-help">الخطوات</button>');
+  else if (nbOk && notifCanAsk()) // الإشعارات لجميع الأنظمة (الجمعيات والتعاون والقطة والديون)
+    h = bar('فعّل الإشعارات', 'تصلك تنبيهات الجمعيات والتعاون والقطة والديون حتى والتطبيق في الخلفية', '<button class="btn b-pri" data-act="enable-notif">تفعيل</button>', true, 'dismiss-nb');
   else if (!isStandalone() && instFlag()) // مثبّت لديه لكنه يتصفح من المتصفح: يبقى الطلب حتى يفتح من التطبيق
     h = bar('افتح التطبيق من أيقونته', 'أنت تتصفح من المتصفح. افتح «الجمعية الذكية» من شاشتك الرئيسية لتعمل الإشعارات والروابط كما يجب', '<button class="btn b-pri" data-act="open-app-help">كيف؟</button>');
   else if (!isStandalone() && (deferredPrompt || isMobileUA())) // غير مثبّت: يبقى الطلب حتى يثبّت
     h = bar('ثبّت التطبيق لفتح الرابط كتطبيق', 'مطلوب لتصلك الإشعارات وتُفتح الدعوات والجمعيات داخل التطبيق مباشرة', deferredPrompt ? '<button class="btn b-pri" data-act="install-app">تثبيت</button>' : '<button class="btn b-pri" data-act="install-app">كيف؟</button>');
-  else if (state.user && state.profile && notifCanAsk() && Date.now() - Number(lsGet('jm_nb_dismiss') || 0) > 7 * 86400000)
-    h = bar('فعّل الإشعارات', 'تصلك تنبيهات السداد والدعوات حتى والتطبيق في الخلفية', '<button class="btn b-pri" data-act="enable-notif">تفعيل</button>', true, 'dismiss-nb');
   el.innerHTML = h;
   document.body.classList.toggle('has-ibar', !!h);
 }
@@ -3884,7 +3916,7 @@ const actions = {
   'export-csv': exportCsv,
   'export-print': exportPrint,
   'alerts-open': () => showAlertsModal(), 'alerts-tab': (el) => showAlertsModal(el.dataset.v), 'inbox-clear': clearInbox,
-  'inbox-go': (el) => { closeModal(); const id = el.dataset.id; if (id && state.jamiyat.some(j => j.id === id)) openJamiya(id); },
+  'inbox-go': (el) => { closeModal(); const id = el.dataset.id; if (id && (/^(qt|db):/.test(id) || state.jamiyat.some(j => j.id === id))) openNotifTarget(id); },
   'alert-go': (el) => { closeModal(); openJamiya(el.dataset.id); },
   'alert-remind': (el) => { closeModal(); state.afterOpen = { id: el.dataset.id, act: 'wa-remind' }; openJamiya(el.dataset.id); },
   'cancel-inv': (el) => cancelInvite(el.dataset.id),
@@ -3895,7 +3927,7 @@ const actions = {
   'od-shuffle': orderShuffle, 'od-save': orderSave,
   'view-proof': (el) => viewProof(el.dataset.id),
   'rm-member': (el) => removeMember(el.dataset.uid), 'self-join': creatorJoin, 'self-leave': creatorLeave, 'full-note': () => toast('اكتمل عدد الأعضاء. احذف عضواً (زر «حذف» بجانب اسمه) لتتمكن من دعوة بديل', 'info'),
-  'enable-notif': enableNotifs, 'test-notif': testNotif, 'dismiss-nb': () => { lsSet('jm_nb_dismiss', String(Date.now())); renderBanner(); },
+  'enable-notif': enableNotifs, 'notif-help': () => notifHelp('stale'), 'test-notif': testNotif, 'dismiss-nb': () => { lsSet('jm_nb_dismiss', String(Date.now())); renderBanner(); },
   'refresh-admin': () => loadAdmin(true), 'test-mail': testMail, ...ADMIN_ACTIONS,
   'copy-invite': () => navigator.clipboard.writeText(inviteText(state.lastInvite)).then(() => toast('تم نسخ نص الدعوة')).catch(() => toast('تعذر النسخ', 'error')),
   'install-app': installApp, 'reload-app': () => location.reload(), 'install-done': markInstalled, 'open-app-help': openAppHelp,

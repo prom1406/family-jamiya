@@ -29,6 +29,8 @@ const qtDaysBetween = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date
 const qtMemberDoc = (uid, name, phone, direct) => ({ uid, name, phone: phone || '', paid: 0, direct: !!direct, addedBy: state.user.uid, joinedAt: FV.serverTimestamp() });
 
 /* الحالة المرئية للقطة: تُحسب من التواريخ والمبلغ المحصّل */
+const qtStaffUids = q => [q.adminUid, q.deputyUid].filter(Boolean);
+const qtJid = id => 'qt:' + id;
 function qtStatus(q) {
   const t = qtDay(), c = qtNum(q.collected), tg = qtNum(q.target);
   if (t > q.eventEnd) return { k: 'done', l: 'مكتملة', c: 'bg-slate-100 text-slate-600', i: 'fa-flag-checkered' };
@@ -415,7 +417,7 @@ async function qtAddMember(f) {
       const ref = qtRef(q.id), b = db.batch();
       b.update(ref, { memberUids: FV.arrayUnion(uid) });
       b.set(ref.collection('members').doc(uid), qtMemberDoc(uid, name, phone, true));
-      try { await b.commit(); f.reset(); toast(`أُضيف ${name} مباشرة، وسيرى القطة في حسابه عند دخوله`); }
+      try { await b.commit(); f.reset(); toast(`أُضيف ${name} مباشرة، وسيرى القطة في حسابه عند دخوله`); sendNotifs([uid], 'أُضفت إلى قطة', `${dispName(state.profile)} أضافك إلى قطة «${q.name}»`, qtJid(q.id), 'qattah'); }
       catch (e) { toast('تعذرت الإضافة: ' + e.message, 'error'); }
       return;
     }
@@ -444,7 +446,7 @@ async function qtAccept(iid) {
   b.update(ref, { memberUids: FV.arrayUnion(uid) });
   b.set(ref.collection('members').doc(uid), qtMemberDoc(uid, dispName(p), p.phone, false));
   b.update(db.collection(QT_INV).doc(iid), { status: 'accepted' });
-  try { await b.commit(); toast('تم قبول الدعوة'); qtOpen(i.qid); }
+  try { await b.commit(); toast('تم قبول الدعوة'); sendNotifs([i.adminUid], 'مشارك جديد في القطة', `${dispName(p)} انضم إلى قطة «${i.qName || ''}»`, qtJid(i.qid), 'qattah'); qtOpen(i.qid); }
   catch (e) { toast('تعذر القبول: ' + e.message, 'error'); }
 }
 async function qtDecline(iid) {
@@ -482,7 +484,7 @@ async function qtSetPaid(uid, val) {
   const delta = r2(val - qtNum(m.paid)), ref = qtRef(q.id), b = db.batch();
   b.update(ref.collection('members').doc(uid), { paid: val });
   if (delta) b.update(ref, { collected: FV.increment(delta) });
-  try { await b.commit(); }
+  try { await b.commit(); if (delta > 0) sendNotifs([uid], 'تم تسجيل سدادك ✓', `قطة «${q.name}» — ${fmtNum(delta)} ريال`, qtJid(q.id), 'qattah', 'qp_' + q.id + '_' + uid + '_' + Date.now()); }
   catch (e) { toast('تعذر حفظ السداد: ' + e.message, 'error'); }
 }
 function qtTogglePaid(uid) {
@@ -506,7 +508,7 @@ async function qtSavePay(f) {
 }
 async function qtToggleUnlock() {
   const q = QT.q; if (!q || !qtAdminOf(q)) return;
-  try { await qtRef(q.id).update({ expOpen: !q.expOpen }); toast(q.expOpen ? 'أُقفلت المصروفات' : 'فُتحت المصروفات', 'info'); }
+  try { await qtRef(q.id).update({ expOpen: !q.expOpen }); toast(q.expOpen ? 'أُقفلت المصروفات' : 'فُتحت المصروفات', 'info'); if (!q.expOpen) sendNotifs(q.memberUids, 'فُتحت مصروفات القطة', `يمكنك إرسال طلب مصروف في قطة «${q.name}»`, qtJid(q.id), 'qattah'); }
   catch (e) { toast('تعذر التحديث: ' + e.message, 'error'); }
 }
 
@@ -519,7 +521,7 @@ async function qtAddExpense(f) {
   if (!qtDateOk(date)) return toast('حدد التاريخ', 'error');
   try {
     await qtRef(q.id).collection('expenses').add({ name, amount, date, uid: state.user.uid, byName: dispName(state.profile), createdAt: FV.serverTimestamp() });
-    f.reset(); f.edate.value = qtDay(); toast('أُضيف المصروف');
+    f.reset(); f.edate.value = qtDay(); toast('أُضيف المصروف'); sendNotifs(q.memberUids, 'مصروف جديد في القطة', `قطة «${q.name}» — ${name}: ${fmtNum(amount)} ريال`, qtJid(q.id), 'qattah');
   } catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
 }
 async function qtDelExp(id) {
@@ -594,7 +596,7 @@ async function qtSaveClaim(f) {
   if (!(amount > 0)) return toast('المبلغ غير صحيح', 'error');
   try {
     await qtRef(q.id).collection('claims').add({ uid: state.user.uid, name: (m.name || '').slice(0, 60), amount, ref, status: 'pending', createdAt: FV.serverTimestamp() });
-    closeModal(); toast('أُرسل للمشرف للتأكيد');
+    closeModal(); toast('أُرسل للمشرف للتأكيد'); sendNotifs(qtStaffUids(q), 'طلب تأكيد سداد في القطة', `${(m.name || dispName(state.profile))} — قطة «${q.name}» — ${fmtNum(amount)} ريال`, qtJid(q.id), 'qattah');
   } catch (e) { toast('تعذر الإرسال: ' + e.message, 'error'); }
 }
 function qtOpenReq() {
@@ -616,7 +618,7 @@ async function qtSaveReq(f) {
   if (!qtDateOk(date)) return toast('حدد التاريخ', 'error');
   try {
     await qtRef(q.id).collection('expReqs').add({ uid: state.user.uid, name: (m.name || '').slice(0, 60), title, details, amount, date, status: 'pending', createdAt: FV.serverTimestamp() });
-    closeModal(); toast('أُرسل الطلب للمشرف');
+    closeModal(); toast('أُرسل الطلب للمشرف'); sendNotifs(qtStaffUids(q), 'طلب مصروف جديد في القطة', `${(m.name || dispName(state.profile))} — قطة «${q.name}» — ${title}: ${fmtNum(amount)} ريال`, qtJid(q.id), 'qattah');
   } catch (e) { toast('تعذر الإرسال: ' + e.message, 'error'); }
 }
 
@@ -631,7 +633,7 @@ async function qtDecideClaim(id, ok) {
     b.update(ref.collection('members').doc(c.uid), { paid: FV.increment(amt) });
     b.update(ref, { collected: FV.increment(amt) });
   }
-  try { await b.commit(); toast(ok ? 'تم تأكيد السداد' : 'رُفض طلب السداد', 'info'); }
+  try { await b.commit(); toast(ok ? 'تم تأكيد السداد' : 'رُفض طلب السداد', 'info'); sendNotifs([c.uid], ok ? 'تم تأكيد سدادك ✓' : 'لم يُقبل طلب السداد', `قطة «${q.name}» — ${fmtNum(amt)} ريال`, qtJid(q.id), 'qattah'); }
   catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
 }
 
@@ -647,7 +649,7 @@ async function qtDecideReq(id, ok) {
     b.update(ref.collection('members').doc(r.uid), { credit: FV.increment(amt) });
     b.update(ref, { collected: FV.increment(amt) });
   }
-  try { await b.commit(); toast(ok ? 'اعتُمد المصروف وخُصم من المتبقي على العضو' : 'رُفض طلب المصروف', 'info'); }
+  try { await b.commit(); toast(ok ? 'اعتُمد المصروف وخُصم من المتبقي على العضو' : 'رُفض طلب المصروف', 'info'); sendNotifs([r.uid], ok ? 'اعتُمد طلب مصروفك ✓' : 'لم يُقبل طلب المصروف', `قطة «${q.name}» — ${r.title}: ${fmtNum(amt)} ريال`, qtJid(q.id), 'qattah'); }
   catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
 }
 
