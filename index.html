@@ -360,7 +360,7 @@ main img,.sheet img,main table,.sheet table{max-width:100%}
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">سِواء • الإصدار 1.3.7<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">سِواء • الإصدار 1.3.8<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -510,7 +510,7 @@ function authErr(e) {
   return m[e.code] || e.message;
 }
 async function sendMail(to, name, subject, message) {
-  return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, { to_email: to, to_name: name, subject, message, app_url: shareUrl(), app_name: 'سِواء' });
+  return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, { to_email: to, to_name: name, subject, message: withRegLink(message), app_url: shareUrl(), app_name: 'سِواء' });
 }
 function mailErrHint(e) {
   const raw = String((e && (e.text || e.message)) || e || 'خطأ غير معروف');
@@ -1456,7 +1456,10 @@ async function saveProfile(f) {
 
 /* ===== واتساب (روابط wa.me الجاهزة) وزر المشاركة ===== */
 function waNumber(phone) { const d = String(phone || '').replace(/\D/g, ''); return d.startsWith('05') ? '966' + d.slice(1) : d.startsWith('5') && d.length === 9 ? '966' + d : d; }
-function waLink(phone, text) { const n = phone ? waNumber(phone) : ''; return `https://wa.me/${n}?text=${encodeURIComponent(text)}`; }
+// كل رسالة تذكير أو تنبيه أو دعوة تحمل سطر التسجيل، ما لم يكن الرابط موجوداً فيها أصلاً
+function regLine() { return `سجّل في سِواء من هنا إن لم تكن مسجّلاً: ${shareUrl()}`; }
+function withRegLink(text) { const t = String(text || ''); return t.includes(shareUrl()) ? t : t + '\n\n' + regLine(); }
+function waLink(phone, text) { const n = phone ? waNumber(phone) : ''; return `https://wa.me/${n}?text=${encodeURIComponent(withRegLink(text))}`; }
 function openWaReminders() {
   const c = ctx(); if (!c || !c.canManage) return;
   const due = fmtDate(dayIn(c.j, c.cur, c.j.lastDay));
@@ -2107,7 +2110,7 @@ async function waBcSend(uid) {
   const A = state.admin, u = A.users.find(x => x.id === uid); if (!u) return;
   const txt = waText().trim(); if (!txt) return toast('اكتب نص الرسالة أولاً', 'error');
   const link = admWa(u.phone); if (!link) return toast('رقم الجوال غير صالح', 'error');
-  const w = window.open(link + '?text=' + encodeURIComponent(waFill(txt, u)), '_blank');
+  const w = window.open(link + '?text=' + encodeURIComponent(withRegLink(waFill(txt, u))), '_blank');
   if (!w) return toast('منع المتصفح فتح واتساب، اسمح بالنوافذ المنبثقة لهذا الموقع', 'error');
   try { w.opener = null; } catch (e) {}
   const prev = waDoc();
