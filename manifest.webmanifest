@@ -1,81 +1,31 @@
 {
-  "id": "/",
-  "name": "الجمعية الذكية",
-  "short_name": "الجمعية",
-  "description": "أدر جمعيتك العائلية: دعوات، ترتيب القبض، متابعة السداد والتنبيهات.",
+  "name": "سِواء — منصة الجمعيات العائلية",
+  "short_name": "سِواء",
+  "description": "سِواء — أدر جمعيتك العائلية: دعوات، ترتيب القبض، متابعة السداد والتنبيهات.",
   "lang": "ar",
   "dir": "rtl",
-  "start_url": "./?source=pwa",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "display_override": [
-    "standalone",
-    "minimal-ui"
-  ],
   "orientation": "portrait",
-  "background_color": "#F1F4F2",
-  "theme_color": "#0B2E33",
-  "categories": [
-    "finance",
-    "productivity",
-    "lifestyle"
-  ],
+  "background_color": "#F5F7F5",
+  "theme_color": "#0F4C3A",
   "icons": [
     {
       "src": "icon-192.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
+      "type": "image/png"
     },
     {
       "src": "icon-512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
+      "type": "image/png"
     },
     {
       "src": "icon-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "جمعياتي",
-      "short_name": "جمعياتي",
-      "url": "./?action=home&source=shortcut",
-      "icons": [
-        {
-          "src": "icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "إنشاء جمعية جديدة",
-      "short_name": "جمعية جديدة",
-      "url": "./?action=create&source=shortcut",
-      "icons": [
-        {
-          "src": "icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
-    }
-  ],
-  "handle_links": "preferred",
-  "launch_handler": {
-    "client_mode": [
-      "navigate-existing",
-      "auto"
-    ]
-  },
-  "prefer_related_applications": false,
-  "related_applications": [
-    {
-      "platform": "webapp",
-      "url": "https://aljameyah.com/manifest.webmanifest"
     }
   ]
 }

@@ -228,7 +228,7 @@ function qtView() {
       <button type="button" class="btn b-white" data-act="qt-claim-modal"><i class="fa-solid fa-circle-check"></i> تأكيد السداد</button>
       <button type="button" class="btn bg-white/20 text-white" data-act="qt-req-modal"><i class="fa-solid fa-receipt"></i> طلب إضافة مصروف</button></div>` : '';
 
-  const hero = `<div class="rounded-3xl p-5 text-white shadow-lg space-y-4" style="background:linear-gradient(135deg,#047857,#059669 55%,#34d399)">
+  const hero = `<div class="rounded-3xl p-5 text-white shadow-lg space-y-4" style="background:linear-gradient(135deg,#0f4c3a,#1e5a46 55%,#0fb16b)">
     <div class="flex justify-between items-start gap-3"><div class="min-w-0"><p class="text-[11px] text-emerald-100 font-bold">القطة</p>
       <h3 class="text-xl font-black leading-snug">${esc(q.name)}</h3>${q.reason ? `<p class="text-xs text-emerald-50/90 mt-1 leading-relaxed">${esc(q.reason)}</p>` : ''}</div>
       <span class="flex-none px-2.5 py-1 rounded-full text-[10px] font-black bg-white/25"><i class="fa-solid ${st.i}"></i> ${st.l}</span></div>

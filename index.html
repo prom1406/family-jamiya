@@ -6,20 +6,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="الجمعية">
+<meta name="apple-mobile-web-app-title" content="سِواء">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="application-name" content="الجمعية الذكية">
+<meta name="application-name" content="سِواء">
 <meta name="format-detection" content="telephone=no">
-<title>الجمعية الذكية</title>
-<meta name="theme-color" content="#0B2E33">
-<meta name="description" content="الجمعية الذكية — منصة الجمعيات العائلية">
+<title>سِواء</title>
+<meta name="theme-color" content="#0f4c3a">
+<meta name="description" content="سِواء — منصة الجمعيات العائلية">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="الجمعية الذكية">
-<meta property="og:title" content="الجمعية الذكية — منصة الجمعيات العائلية">
+<meta property="og:site_name" content="سِواء">
+<meta property="og:title" content="سِواء — منصة الجمعيات العائلية">
 <meta property="og:description" content="أدر جمعيتك العائلية: دعوات، ترتيب القبض، متابعة السداد والتنبيهات.">
 <meta property="og:image" content="https://aljameyah.com/icon-512.png">
 <meta property="og:url" content="https://aljameyah.com/">
@@ -33,7 +33,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 <style>
-:root{--brand:#0d9488;--brand-2:#059669;--ink:#0f172a;--bg:#f3f6f5;--tab-h:64px;--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px)}
+:root{--brand:#1e5a46;--brand-2:#1e5a46;--ink:#0f172a;--bg:#f5f7f5;--tab-h:64px;--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px)}
 *{-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
 body{font-family:'Cairo',system-ui,-apple-system,sans-serif;color:var(--ink);min-height:100vh;min-height:100dvh;overscroll-behavior-y:none;
@@ -46,7 +46,7 @@ img{-webkit-user-drag:none}
 
 /* الرأس */
 .app-header{position:sticky;top:0;z-index:40;padding-top:var(--sat);background:rgba(255,255,255,.82);-webkit-backdrop-filter:saturate(180%) blur(14px);backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid rgba(226,232,240,.7)}
-.app-header .logo{width:38px;height:38px;border-radius:12px;box-shadow:0 2px 10px rgba(13,148,136,.25);object-fit:cover}
+.app-header .logo{width:38px;height:38px;border-radius:12px;box-shadow:0 2px 10px rgba(30,90,70,.25);object-fit:cover}
 
 /* البطاقات */
 .card{background:rgba(255,255,255,.94);border:1px solid rgba(226,232,240,.9);border-radius:1.4rem;box-shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px -12px rgba(15,23,42,.12)}
@@ -56,27 +56,27 @@ img{-webkit-user-drag:none}
 
 /* الحقول والأزرار */
 .inp{width:100%;min-height:48px;padding:.7rem 1rem;border:1.5px solid #e2e8f0;border-radius:.95rem;font-size:16px;background:#f8fafc;transition:.15s;font-family:inherit}
-.inp:focus{outline:none;border-color:#10b981;background:#fff;box-shadow:0 0 0 4px rgba(16,185,129,.15)}
+.inp:focus{outline:none;border-color:#0fb16b;background:#fff;box-shadow:0 0 0 4px rgba(15,177,107,.15)}
 textarea.inp{min-height:96px}
 .btn{min-height:42px;padding:.55rem 1rem;border-radius:.95rem;font-weight:800;font-size:.8rem;transition:transform .12s,filter .15s,background .15s;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:.4rem;font-family:inherit;border:0;white-space:nowrap}
 .btn:active{transform:scale(.96)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .hide{display:none!important}
-.b-pri{background:linear-gradient(135deg,#059669,#0d9488);color:#fff;box-shadow:0 6px 16px -6px rgba(5,150,105,.55)}.b-pri:hover{filter:brightness(.95)}
+.b-pri{background:linear-gradient(135deg,#1e5a46,#1e5a46);color:#fff;box-shadow:0 6px 16px -6px rgba(30,90,70,.55)}.b-pri:hover{filter:brightness(.95)}
 .b-sec{background:#eef2f6;color:#334155}.b-sec:hover{background:#e2e8f0}
 .b-red{background:#fff1f2;color:#e11d48}.b-red:hover{background:#ffe4e6}
-.b-white{background:#fff;color:#047857;box-shadow:0 6px 16px -8px rgba(0,0,0,.35)}
+.b-white{background:#fff;color:#0f4c3a;box-shadow:0 6px 16px -8px rgba(0,0,0,.35)}
 
 /* الواجهة الرئيسية */
-.hero{position:relative;overflow:hidden;color:#fff;border-radius:1.6rem;padding:1.4rem;background:linear-gradient(135deg,#059669 0%,#0d9488 55%,#0f766e 100%);box-shadow:0 16px 36px -16px rgba(13,148,136,.65)}
+.hero{position:relative;overflow:hidden;color:#fff;border-radius:1.6rem;padding:1.4rem;background:linear-gradient(135deg,#1e5a46 0%,#1e5a46 55%,#0f4c3a 100%);box-shadow:0 16px 36px -16px rgba(30,90,70,.65)}
 .hero::before,.hero::after{content:"";position:absolute;border-radius:50%;background:rgba(255,255,255,.1);pointer-events:none}
 .hero::before{width:180px;height:180px;top:-70px;left:-50px}.hero::after{width:120px;height:120px;bottom:-50px;right:30%}
 .hero>*{position:relative;z-index:1}
 .stat{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);border-radius:1rem;padding:.6rem .9rem;min-width:5.5rem}
 .jcard{display:flex;justify-content:space-between;align-items:center;gap:.75rem;padding:1rem;background:#fff;border:1px solid #e8edf2;border-radius:1.3rem;box-shadow:0 6px 18px -14px rgba(15,23,42,.35);transition:transform .15s,box-shadow .15s;cursor:pointer}
 .jcard:active{transform:scale(.985)}
-.jicon{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex:none;font-size:1.15rem;color:#fff;background:linear-gradient(135deg,#10b981,#0d9488)}
-.bar{height:6px;border-radius:99px;background:#e2e8f0;overflow:hidden}.bar>i{display:block;height:100%;background:linear-gradient(90deg,#10b981,#14b8a6);border-radius:99px}
+.jicon{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex:none;font-size:1.15rem;color:#fff;background:linear-gradient(135deg,#0fb16b,#1e5a46)}
+.bar{height:6px;border-radius:99px;background:#e2e8f0;overflow:hidden}.bar>i{display:block;height:100%;background:linear-gradient(90deg,#0fb16b,#0fb16b);border-radius:99px}
 
 /* شرائط الأزرار القابلة للتمرير في الجوال */
 .chips{display:flex;flex-wrap:wrap;gap:.45rem}
@@ -104,7 +104,7 @@ textarea.inp{min-height:96px}
 /* التنبيهات */
 .toasts{position:fixed;z-index:80;left:50%;transform:translateX(-50%);top:calc(var(--sat) + 66px);width:min(92vw,24rem);display:flex;flex-direction:column;gap:.5rem;pointer-events:none}
 .toast{color:#fff;padding:.8rem 1rem;border-radius:1rem;box-shadow:0 14px 30px -10px rgba(0,0,0,.4);font-size:.8rem;font-weight:700;pointer-events:auto;transition:opacity .3s}
-.toast.success{background:#059669}.toast.error{background:#e11d48}.toast.info{background:#1e293b}
+.toast.success{background:#1e5a46}.toast.error{background:#e11d48}.toast.info{background:#1e293b}
 
 /* شريط التثبيت */
 .ibar{position:fixed;z-index:44;left:.75rem;right:.75rem;bottom:calc(var(--tab-h) + var(--sab) + 10px);display:flex;align-items:center;gap:.75rem;padding:.7rem .8rem;background:#0f172a;color:#fff;border-radius:1.2rem;box-shadow:0 18px 40px -12px rgba(0,0,0,.55)}
@@ -126,75 +126,75 @@ body.has-ibar{padding-bottom:calc(var(--tab-h) + var(--sab) + 104px)}
 @media print{body>*:not(#print-root){display:none!important}#print-root{display:block!important}@page{margin:12mm}}
 
 /* ===== ثيم عصري: ألوان هادئة وأزرار وبطاقات أنعم ===== */
-:root{--brand:#0f9d8f;--brand-2:#10b981;--accent:#6366f1;--tab-h:80px;--bg:#f4f8f8}
-body{background:radial-gradient(700px 360px at 100% -6%,rgba(94,234,212,.38) 0,transparent 62%),radial-gradient(640px 340px at -8% 4%,rgba(165,180,252,.30) 0,transparent 58%),var(--bg);background-attachment:fixed}
+:root{--brand:#1e5a46;--brand-2:#0fb16b;--accent:#6366f1;--tab-h:80px;--bg:#f5f7f5}
+body{background:radial-gradient(700px 360px at 100% -6%,rgba(15,177,107,.38) 0,transparent 62%),radial-gradient(640px 340px at -8% 4%,rgba(165,180,252,.30) 0,transparent 58%),var(--bg);background-attachment:fixed}
 .app-header{background:rgba(255,255,255,.72);border-bottom:1px solid rgba(255,255,255,.6);box-shadow:0 8px 28px -20px rgba(15,23,42,.35)}
-.app-header .logo{border-radius:14px;box-shadow:0 6px 16px -6px rgba(15,157,143,.55)}
+.app-header .logo{border-radius:14px;box-shadow:0 6px 16px -6px rgba(30,90,70,.55)}
 .card{border:1px solid rgba(255,255,255,.8);border-radius:1.6rem;background:rgba(255,255,255,.86);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 1px 1px rgba(15,23,42,.03),0 14px 34px -18px rgba(15,60,70,.28)}
 .inp{border-radius:1.1rem;border:1.5px solid #e3ebee;background:rgba(248,251,251,.9)}
-.inp:focus{border-color:var(--brand);box-shadow:0 0 0 4px rgba(15,157,143,.16)}
+.inp:focus{border-color:var(--brand);box-shadow:0 0 0 4px rgba(30,90,70,.16)}
 .btn{border-radius:999px;min-height:44px;padding:.55rem 1.15rem;letter-spacing:.1px}
-.b-pri{background:linear-gradient(135deg,#14b8a6 0%,#0f9d8f 45%,#10b981 100%);box-shadow:0 10px 22px -10px rgba(15,157,143,.75),inset 0 1px 0 rgba(255,255,255,.28)}
+.b-pri{background:linear-gradient(135deg,#0fb16b 0%,#1e5a46 45%,#0fb16b 100%);box-shadow:0 10px 22px -10px rgba(30,90,70,.75),inset 0 1px 0 rgba(255,255,255,.28)}
 .b-pri:hover{filter:brightness(1.05)}
-.b-sec{background:rgba(255,255,255,.85);color:#1e4e57;border:1px solid #dbe8ea;box-shadow:0 4px 12px -8px rgba(15,60,70,.3)}.b-sec:hover{background:#fff;border-color:#bcd6da}
+.b-sec{background:rgba(255,255,255,.85);color:#1e5a46;border:1px solid #dbe8ea;box-shadow:0 4px 12px -8px rgba(15,60,70,.3)}.b-sec:hover{background:#fff;border-color:#bcd6da}
 .b-red{background:#fff1f3;color:#e11d48;border:1px solid #ffd5dc}
 .b-white{box-shadow:0 10px 22px -12px rgba(0,0,0,.4)}
-.hero{border-radius:1.9rem;background:linear-gradient(135deg,#0f766e 0%,#0f9d8f 42%,#14b8c4 100%);box-shadow:0 22px 44px -22px rgba(15,157,143,.8)}
+.hero{border-radius:1.9rem;background:linear-gradient(135deg,#0f4c3a 0%,#1e5a46 42%,#14b8c4 100%);box-shadow:0 22px 44px -22px rgba(30,90,70,.8)}
 .hero::before{background:rgba(255,255,255,.13)}.hero::after{background:rgba(129,140,248,.35)}
 .stat{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);border-radius:1.15rem;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .jcard{border:1px solid rgba(255,255,255,.85);border-radius:1.5rem;background:rgba(255,255,255,.9);box-shadow:0 14px 30px -20px rgba(15,60,70,.4);animation:fade .4s cubic-bezier(.2,.8,.2,1) both}
 .jcard:hover{transform:translateY(-2px);box-shadow:0 18px 36px -18px rgba(15,60,70,.45)}
 .jcard:nth-child(2){animation-delay:.05s}.jcard:nth-child(3){animation-delay:.1s}.jcard:nth-child(4){animation-delay:.15s}
-.jicon{border-radius:16px;box-shadow:0 8px 16px -8px rgba(15,157,143,.6)}
+.jicon{border-radius:16px;box-shadow:0 8px 16px -8px rgba(30,90,70,.6)}
 .jcard:nth-child(4n+2) .jicon{background:linear-gradient(135deg,#818cf8,#6366f1);box-shadow:0 8px 16px -8px rgba(99,102,241,.6)}
 .jcard:nth-child(4n+3) .jicon{background:linear-gradient(135deg,#fbbf24,#f59e0b);box-shadow:0 8px 16px -8px rgba(245,158,11,.6)}
 .jcard:nth-child(4n+4) .jicon{background:linear-gradient(135deg,#fb7185,#e11d48);box-shadow:0 8px 16px -8px rgba(225,29,72,.55)}
-.bar{height:8px;background:#e4edf0}.bar>i{background:linear-gradient(90deg,#14b8a6,#10b981)}
+.bar{height:8px;background:#e4edf0}.bar>i{background:linear-gradient(90deg,#0fb16b,#0fb16b)}
 .tabbar{left:12px;right:12px;bottom:calc(var(--sab) + 10px);height:66px;padding-bottom:0;border-radius:26px;background:rgba(255,255,255,.88);border:1px solid rgba(255,255,255,.9);box-shadow:0 18px 40px -14px rgba(15,60,70,.45)}
 .tab{color:#7a8c92;z-index:0}
 .tab.on{color:var(--brand)}
-.tab.on::before{top:8px;width:54px;height:32px;border-radius:99px;background:rgba(15,157,143,.14);z-index:-1}
+.tab.on::before{top:8px;width:54px;height:32px;border-radius:99px;background:rgba(30,90,70,.14);z-index:-1}
 .sheet{border-radius:1.9rem}
 @media(max-width:639px){.sheet{border-radius:1.9rem 1.9rem 0 0}.sheet::before{background:#d3dfe2}}
-.toast{border-radius:1.2rem}.toast.success{background:linear-gradient(135deg,#0f9d8f,#10b981)}.toast.info{background:#223641}
+.toast{border-radius:1.2rem}.toast.success{background:linear-gradient(135deg,#1e5a46,#0fb16b)}.toast.info{background:#223641}
 .ibar{border-radius:1.5rem;background:linear-gradient(135deg,#0f2f3a,#16424a)}
 .emo{width:40px;height:40px;border-radius:12px;background:#f1f5f9;font-size:1.2rem;border:1.5px solid transparent;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
 .emo.on{border-color:var(--brand);background:#ccfbf1}
 
 .atabs{display:flex;gap:.4rem;overflow-x:auto;padding:.2rem 0 .4rem;scrollbar-width:none}.atabs::-webkit-scrollbar{display:none}
-.achip{flex:none;padding:.5rem .95rem;border-radius:999px;font-size:.75rem;font-weight:800;background:rgba(255,255,255,.9);color:#1e4e57;border:1px solid #dbe8ea;cursor:pointer;font-family:inherit;display:inline-flex;gap:.4rem;align-items:center;white-space:nowrap}
-.achip.on{background:linear-gradient(135deg,#14b8a6,#0f9d8f);color:#fff;border-color:transparent}
-.bar{border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,#14b8a6,#0f9d8f);min-height:2px}.bar.z{background:#e2e8f0}
-.hbar{height:7px;border-radius:99px;background:#e2e8f0;overflow:hidden}.hbar>i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#14b8a6,#10b981)}
+.achip{flex:none;padding:.5rem .95rem;border-radius:999px;font-size:.75rem;font-weight:800;background:rgba(255,255,255,.9);color:#1e5a46;border:1px solid #dbe8ea;cursor:pointer;font-family:inherit;display:inline-flex;gap:.4rem;align-items:center;white-space:nowrap}
+.achip.on{background:linear-gradient(135deg,#0fb16b,#1e5a46);color:#fff;border-color:transparent}
+.bar{border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,#0fb16b,#1e5a46);min-height:2px}.bar.z{background:#e2e8f0}
+.hbar{height:7px;border-radius:99px;background:#e2e8f0;overflow:hidden}.hbar>i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#0fb16b,#0fb16b)}
 .bdg{display:inline-flex;align-items:center;gap:.25rem;padding:.1rem .5rem;border-radius:99px;font-size:10px;font-weight:800}
-.dot-on{display:inline-block;width:9px;height:9px;border-radius:50%;background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.25)}
+.dot-on{display:inline-block;width:9px;height:9px;border-radius:50%;background:#0fb16b;box-shadow:0 0 0 3px rgba(15,177,107,.25)}
 
 /* ===== الهوية المالية: زجاجية زمردية (Advanced Glassmorphism) ===== */
-:root{--brand:#0f766e;--brand-2:#059669;--ink:#0f172a;--bg:#f8fafc;--loss:#e11d48}
+:root{--brand:#0f4c3a;--brand-2:#1e5a46;--ink:#0f172a;--bg:#f8fafc;--loss:#e11d48}
 body{font-family:'Cairo',system-ui,sans-serif;color:var(--ink);
-  background:radial-gradient(900px 420px at 100% -8%,rgba(110,231,183,.35) 0,transparent 60%),radial-gradient(800px 380px at -10% 0,rgba(94,234,212,.28) 0,transparent 55%),linear-gradient(160deg,#f8fafc 0%,#e2e8f0 100%);background-attachment:fixed}
+  background:radial-gradient(900px 420px at 100% -8%,rgba(15,177,107,.35) 0,transparent 60%),radial-gradient(800px 380px at -10% 0,rgba(15,177,107,.28) 0,transparent 55%),linear-gradient(160deg,#f8fafc 0%,#e2e8f0 100%);background-attachment:fixed}
 .app-header{background:rgba(255,255,255,.28);-webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);border-bottom:1px solid rgba(255,255,255,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 12px 28px -18px rgba(15,23,42,.25)}
-.app-header .logo{border-radius:14px;box-shadow:0 8px 18px -8px rgba(5,150,105,.6)}
-.card{background:rgba(255,255,255,.94);border:1px solid rgba(255,255,255,.85);border-radius:1.6rem;box-shadow:0 2px 4px rgba(15,23,42,.04),0 12px 24px -10px rgba(15,23,42,.14),0 30px 60px -28px rgba(5,150,105,.22)}
-.b-pri{background:linear-gradient(135deg,#059669 0%,#0f766e 100%);box-shadow:0 12px 24px -10px rgba(5,150,105,.7),inset 0 1px 0 rgba(255,255,255,.3)}
+.app-header .logo{border-radius:14px;box-shadow:0 8px 18px -8px rgba(30,90,70,.6)}
+.card{background:rgba(255,255,255,.94);border:1px solid rgba(255,255,255,.85);border-radius:1.6rem;box-shadow:0 2px 4px rgba(15,23,42,.04),0 12px 24px -10px rgba(15,23,42,.14),0 30px 60px -28px rgba(30,90,70,.22)}
+.b-pri{background:linear-gradient(135deg,#1e5a46 0%,#0f4c3a 100%);box-shadow:0 12px 24px -10px rgba(30,90,70,.7),inset 0 1px 0 rgba(255,255,255,.3)}
 .b-pri:hover{filter:brightness(1.04)}
-.hero{background:linear-gradient(135deg,#047857 0%,#0f766e 100%);border-radius:2rem;padding:1rem;box-shadow:0 24px 48px -20px rgba(4,120,87,.6)}
-.hero::before{background:rgba(110,231,183,.45);filter:blur(40px)}
-.hero::after{background:rgba(94,234,212,.4);filter:blur(40px)}
+.hero{background:linear-gradient(135deg,#0f4c3a 0%,#0f4c3a 100%);border-radius:2rem;padding:1rem;box-shadow:0 24px 48px -20px rgba(15,76,58,.6)}
+.hero::before{background:rgba(15,177,107,.45);filter:blur(40px)}
+.hero::after{background:rgba(15,177,107,.4);filter:blur(40px)}
 .hero>*{position:relative;z-index:1;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
 .stat{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);border-radius:1.1rem;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:inset 0 1px 0 rgba(255,255,255,.45)}
-.tabbar{background:rgba(255,255,255,.3);-webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);border:1px solid rgba(255,255,255,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 24px 48px -16px rgba(5,150,105,.35)}
+.tabbar{background:rgba(255,255,255,.3);-webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);border:1px solid rgba(255,255,255,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 24px 48px -16px rgba(30,90,70,.35)}
 .tab{font-weight:700}
 .tab.on{color:var(--brand)}
-.tab.on::before{background:rgba(15,157,143,.14)}
-.jicon{background:linear-gradient(135deg,#10b981,#0f766e);box-shadow:0 8px 16px -8px rgba(5,150,105,.55)}
-.jcard:nth-child(n) .jicon{background:linear-gradient(135deg,#10b981,#0f766e)}
+.tab.on::before{background:rgba(30,90,70,.14)}
+.jicon{background:linear-gradient(135deg,#0fb16b,#0f4c3a);box-shadow:0 8px 16px -8px rgba(30,90,70,.55)}
+.jcard:nth-child(n) .jicon{background:linear-gradient(135deg,#0fb16b,#0f4c3a)}
 .jcard:hover{transform:translateY(-2px)}
-.bar>i,.hbar>i{background:linear-gradient(90deg,#059669,#0f766e)}
-.toast.success{background:linear-gradient(135deg,#059669,#0f766e)}
+.bar>i,.hbar>i{background:linear-gradient(90deg,#1e5a46,#0f4c3a)}
+.toast.success{background:linear-gradient(135deg,#1e5a46,#0f4c3a)}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /* ===== تصميم v7 — «دفتر الثقة»: بترولي هادئ، ذهبي للمال، بلا زجاج ولا تدرجات زخرفية ===== */
-:root{--petrol:#0B2E33;--petrol-2:#144B51;--brand:#135D62;--brand-2:#1B7A74;--ink:#0E1F22;--muted:#5B6E71;--bg:#F1F4F2;--surface:#fff;--line:#DCE4E1;--line-2:#C7D4CF;--gold:#C8912B;--gold-soft:#F8EFDC;--ok:#2E7D5B;--loss:#B42F34;--r-card:18px;--r-ctl:12px;--shadow:0 1px 2px rgba(11,46,51,.05),0 8px 20px -14px rgba(11,46,51,.22)}
+:root{--petrol:#0f4c3a;--petrol-2:#1e5a46;--brand:#1e5a46;--brand-2:#0fb16b;--ink:#212c26;--muted:#5B6E71;--bg:#f5f7f5;--surface:#fff;--line:#DCE4E1;--line-2:#C7D4CF;--gold:#e65a2c;--gold-soft:#fbebe4;--ok:#2E7D5B;--loss:#B42F34;--r-card:18px;--r-ctl:12px;--shadow:0 1px 2px rgba(11,46,51,.05),0 8px 20px -14px rgba(11,46,51,.22)}
 body{font-family:'Cairo',system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg);line-height:1.7}
 h1,h2,h3,.font-display{font-family:'Cairo',system-ui,sans-serif;letter-spacing:0;color:var(--petrol)}
 :focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:6px}
@@ -216,7 +216,7 @@ h1,h2,h3,.font-display{font-family:'Cairo',system-ui,sans-serif;letter-spacing:0
 
 /* الحقول */
 .inp{border:1px solid var(--line-2);border-radius:var(--r-ctl);background:#fff;min-height:46px}
-.inp:focus{border-color:var(--brand-2);background:#fff;box-shadow:0 0 0 3px rgba(27,122,116,.16)}
+.inp:focus{border-color:var(--brand-2);background:#fff;box-shadow:0 0 0 3px rgba(30,90,70,.16)}
 
 /* البطل: مساحة بترولية صلبة مع الأرقام بارزة */
 .hero{background:var(--petrol);color:#fff;border-radius:22px;box-shadow:var(--shadow);padding:1.25rem}
@@ -256,9 +256,9 @@ h1,h2,h3,.font-display{font-family:'Cairo',system-ui,sans-serif;letter-spacing:0
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 /* ===== v8 — Modern Light UI: فاتح وهادئ (طبقة أنماط فقط، بلا تغيير في HTML أو JavaScript) ===== */
-:root{--bg:#F6F9FC;--surface:#FFFFFF;--brand:#0D9488;--brand-dark:#0F766E;--brand-soft:#E6F7F4;--brand-line:#CDEBE6;--ink:#17324D;--muted:#647A8B;--line:#E4EBF1;--line-2:#D3DEE7;
+:root{--bg:#f5f7f5;--surface:#FFFFFF;--brand:#1e5a46;--brand-dark:#0f4c3a;--brand-soft:#eaf0eb;--brand-line:#c5ddd0;--ink:#212c26;--muted:#647A8B;--line:#E4EBF1;--line-2:#D3DEE7;
   /* إعادة توجيه متغيرات الإصدارات السابقة إلى لوحة الألوان الجديدة */
-  --petrol:#17324D;--petrol-2:#0F766E;--brand-2:#0D9488;--gold:#0D9488;--gold-soft:#E6F7F4;--r-card:20px;--r-ctl:14px;
+  --petrol:#0f4c3a;--petrol-2:#0f4c3a;--brand-2:#1e5a46;--gold:#e65a2c;--gold-soft:#fbebe4;--r-card:20px;--r-ctl:14px;
   --shadow:0 1px 2px rgba(23,50,77,.04),0 8px 22px -14px rgba(23,50,77,.14)}
 body{background:var(--bg);background-image:none;color:var(--ink)}
 h1,h2,h3,.font-display{color:var(--ink)}
@@ -275,9 +275,9 @@ h1,h2,h3,.font-display{color:var(--ink)}
 
 /* الأزرار */
 .btn{border-radius:var(--r-ctl);min-height:46px;font-weight:700;font-size:.875rem;padding:.6rem 1.1rem}
-.btn:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(13,148,136,.28)}
+.btn:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(30,90,70,.28)}
 .btn:disabled,.btn[disabled]{opacity:.5;cursor:not-allowed;box-shadow:none}
-.b-pri{background:var(--brand);color:#fff;box-shadow:0 1px 2px rgba(15,118,110,.25)}
+.b-pri{background:var(--brand);color:#fff;box-shadow:0 1px 2px rgba(15,76,58,.25)}
 .b-pri:hover{background:var(--brand-dark);filter:none}
 .b-pri:active{background:var(--brand-dark)}
 .b-sec{background:var(--brand-soft);color:var(--brand-dark);border:1px solid transparent;box-shadow:none}
@@ -290,7 +290,7 @@ h1,h2,h3,.font-display{color:var(--ink)}
 .inp{min-height:48px;background:#fff;border:1.5px solid var(--line-2);border-radius:var(--r-ctl);color:var(--ink)}
 .inp::placeholder{color:#9AABB8}
 .inp:hover{border-color:#C3D2DD}
-.inp:focus{border-color:var(--brand);background:#fff;box-shadow:0 0 0 4px rgba(13,148,136,.14)}
+.inp:focus{border-color:var(--brand);background:#fff;box-shadow:0 0 0 4px rgba(30,90,70,.14)}
 .inp:disabled,.inp[disabled],.inp[readonly]{background:#F1F5F9;color:var(--muted);cursor:not-allowed}
 
 /* لوحة المعلومات: بطل صلب بلا تدرجات */
@@ -327,7 +327,7 @@ h1,h2,h3,.font-display{color:var(--ink)}
 .achip:hover{border-color:var(--brand-line);background:var(--brand-soft)}
 .achip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
 .emo.on{border-color:var(--brand);background:var(--brand-soft)}
-.dot-on{background:var(--brand);box-shadow:0 0 0 3px rgba(13,148,136,.22)}
+.dot-on{background:var(--brand);box-shadow:0 0 0 3px rgba(30,90,70,.22)}
 #lock-screen{background:var(--ink)!important}
 
 /* توحيد ألوان Tailwind المستخدمة في الواجهة مع اللوحة الجديدة (الحالات: أحمر/كهرماني/أزرق تبقى كما هي) */
@@ -352,15 +352,15 @@ main img,.sheet img,main table,.sheet table{max-width:100%}
 <header class="app-header">
   <div class="max-w-4xl mx-auto px-4 h-14 flex justify-between items-center gap-2">
     <div class="flex items-center gap-2.5 cursor-pointer min-w-0" data-act="go-home">
-      <img src="icon-192.png" alt="شعار الجمعية الذكية" width="38" height="38" class="logo">
-      <div class="leading-tight min-w-0"><h1 class="font-black text-[15px] text-slate-900">الجمعية الذكية</h1><p class="text-[11px] text-slate-500 truncate max-w-[9.5rem] sm:max-w-xs" id="hdrSub">منصة التعاون العائلي</p></div>
+      <img src="icon-192.png" alt="شعار سِواء" width="38" height="38" class="logo">
+      <div class="leading-tight min-w-0"><h1 class="font-black text-[15px] text-slate-900">سِواء</h1><p class="text-[11px] text-slate-500 truncate max-w-[9.5rem] sm:max-w-xs" id="hdrSub">منصة التعاون العائلي</p></div>
     </div>
     <div class="flex items-center gap-1.5" id="nav"></div>
   </div>
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">الجمعية الذكية • الإصدار 1.3.7<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">سِواء • الإصدار 1.3.7<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -510,7 +510,7 @@ function authErr(e) {
   return m[e.code] || e.message;
 }
 async function sendMail(to, name, subject, message) {
-  return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, { to_email: to, to_name: name, subject, message, app_url: shareUrl(), app_name: 'الجمعية الذكية' });
+  return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, { to_email: to, to_name: name, subject, message, app_url: shareUrl(), app_name: 'سِواء' });
 }
 function mailErrHint(e) {
   const raw = String((e && (e.text || e.message)) || e || 'خطأ غير معروف');
@@ -1164,7 +1164,7 @@ function exportPrint() {
        ['', 'الإجمالي', '', fmtNum(d.totals.owed), fmtNum(d.totals.confirmed), fmtNum(d.totals.pending), fmtNum(d.totals.remaining), '']])}
     <h2 style="font-size:15px;margin:0">الدفعات</h2>
     ${d.pays.length ? tbl(['العضو', 'الدورة', 'المبلغ', 'الحالة', 'المرجع', 'التاريخ'], d.pays.map(p => [p.name, p.cycle, fmtNum(p.amount), p.status, p.ref, p.date ? fmtDate(p.date) : ''])) : '<p style="font-size:12px;color:#64748b">لا توجد دفعات مسجّلة.</p>'}
-    <p style="font-size:10px;color:#94a3b8;margin-top:16px">صدر من تطبيق الجمعية الذكية. لا يتضمن الكشف أرقام الحسابات أو الجوالات.</p></div>`;
+    <p style="font-size:10px;color:#94a3b8;margin-top:16px">صدر من تطبيق سِواء. لا يتضمن الكشف أرقام الحسابات أو الجوالات.</p></div>`;
   closeModal(); setTimeout(() => window.print(), 200);
 }
 function openExportModal() {
@@ -1470,9 +1470,9 @@ function openWaReminders() {
     <p class="text-[11px] text-slate-500">يفتح الزر محادثة واتساب جاهزة بالرسالة، وتضغط إرسال بنفسك.</p>`);
 }
 async function shareApp() {
-  const text = 'الجمعية الذكية — منصة الجمعيات العائلية: أدر جمعيتك العائلية، تابع السداد وترتيب القبض بسهولة.';
+  const text = 'سِواء — منصة الجمعيات العائلية: أدر جمعيتك العائلية، تابع السداد وترتيب القبض بسهولة.';
   if (navigator.share) {
-    try { await navigator.share({ title: 'الجمعية الذكية', text, url: shareUrl() }); return; }
+    try { await navigator.share({ title: 'سِواء', text, url: shareUrl() }); return; }
     catch (e) { if (e && e.name === 'AbortError') return; }
   }
   state.shareText = `${text}\n${shareUrl()}`;
@@ -1484,7 +1484,7 @@ async function shareApp() {
 }
 
 async function testMail() {
-  try { await sendMail(state.user.email, state.profile.name, 'اختبار البريد - الجمعية الذكية', 'هذه رسالة اختبار. إذا وصلتك فإعدادات EmailJS سليمة.'); toast('✉️ أُرسلت رسالة الاختبار إلى بريدك، تحقق من الوارد والمزعج'); }
+  try { await sendMail(state.user.email, state.profile.name, 'اختبار البريد - سِواء', 'هذه رسالة اختبار. إذا وصلتك فإعدادات EmailJS سليمة.'); toast('✉️ أُرسلت رسالة الاختبار إلى بريدك، تحقق من الوارد والمزعج'); }
   catch (e) { const { raw, hint } = mailErrHint(e); showModal('فشل إرسال رسالة الاختبار', `<div class="space-y-3 text-xs"><div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800" dir="ltr">${esc(raw)}</div>${hint ? `<div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">${esc(hint)}</div>` : ''}</div>`); }
 }
 
@@ -1615,7 +1615,7 @@ async function isBlockedNow() {
 function watchSettings() {
   db.collection('settings').doc('app').onSnapshot(s => {
     state.settings = s.exists ? s.data() : {};
-    if (state.settings.annActive && state.settings.annText && state.user && !state.isAdmin) pushLocal('إعلان من الجمعية الذكية', state.settings.annText, 'ann_' + state.settings.annVer);
+    if (state.settings.annActive && state.settings.annText && state.user && !state.isAdmin) pushLocal('إعلان من سِواء', state.settings.annText, 'ann_' + state.settings.annVer);
     const st = state.settings, key = [st.maintenance ? 1 : 0, st.regClosed ? 1 : 0, st.annActive ? st.annVer : 0].join('|');
     if (key !== setKey) { setKey = key; render(); }
   }, () => {});
@@ -2197,12 +2197,12 @@ function notifHelp(reason) {
   const ios = isIOS(), denied = notifSupported() && Notification.permission === 'denied';
   const why = denied ? 'الإشعارات محظورة لهذا الموقع في إعدادات جوالك.' : reason === 'ios' ? 'على الآيفون لا تعمل الإشعارات إلا من التطبيق المثبّت على الشاشة الرئيسية.' : 'تعذّر تفعيل الإشعارات من هذه النافذة.';
   const steps = denied
-    ? [ios ? 'افتح <b>الإعدادات ← الإشعارات ← الجمعية الذكية</b> وفعّل «السماح بالإشعارات».' : 'اضغط أيقونة القفل بجانب الرابط ← <b>الأذونات ← الإشعارات ← السماح</b>، أو من إعدادات التطبيق ← الإشعارات.', 'ارجع للتطبيق واضغط «إعادة تسجيل الجهاز».']
-    : ['احذف أيقونة <b>الجمعية الذكية</b> القديمة من شاشتك الرئيسية (التي ثبّتّها قبل تغيير الرابط). بياناتك محفوظة في حسابك ولن تضيع.',
+    ? [ios ? 'افتح <b>الإعدادات ← الإشعارات ← سِواء</b> وفعّل «السماح بالإشعارات».' : 'اضغط أيقونة القفل بجانب الرابط ← <b>الأذونات ← الإشعارات ← السماح</b>، أو من إعدادات التطبيق ← الإشعارات.', 'ارجع للتطبيق واضغط «إعادة تسجيل الجهاز».']
+    : ['احذف أيقونة <b>سِواء</b> القديمة من شاشتك الرئيسية (التي ثبّتّها قبل تغيير الرابط). بياناتك محفوظة في حسابك ولن تضيع.',
        ios ? `افتح <b dir="ltr">${NEW_HOST}</b> في Safari ← زر المشاركة ← <b>إضافة إلى الشاشة الرئيسية</b>.` : `افتح <b dir="ltr">${NEW_HOST}</b> في كروم ← القائمة ⋮ ← <b>تثبيت التطبيق</b>.`,
        'افتح التطبيق من الأيقونة الجديدة وسجّل الدخول بنفس بريدك، ثم اضغط <b>تفعيل الإشعارات</b>.'];
   showModal('تفعيل الإشعارات', `<div class="space-y-3 text-xs leading-relaxed">
-    <p class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">${why} ${denied ? '' : 'تم نقل الجمعية الذكية إلى رابطها الجديد <b dir="ltr">' + NEW_HOST + '</b>، والإشعارات مرتبطة بالرابط الذي ثبّتّ التطبيق منه، لذلك يلزم تثبيته من جديد مرة واحدة.'}</p>
+    <p class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">${why} ${denied ? '' : 'تم نقل سِواء إلى رابطها الجديد <b dir="ltr">' + NEW_HOST + '</b>، والإشعارات مرتبطة بالرابط الذي ثبّتّ التطبيق منه، لذلك يلزم تثبيته من جديد مرة واحدة.'}</p>
     <ol class="space-y-2.5">${steps.map((t, i) => `<li class="flex gap-3 items-center"><span class="jicon !w-9 !h-9 !text-sm">${i + 1}</span><span>${t}</span></li>`).join('')}</ol>
     <a class="btn b-pri w-full" href="${APP_URL}" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> فتح الرابط الجديد</a>
     <button type="button" class="btn b-sec w-full" data-act="reg-push"><i class="fa-solid fa-rotate"></i> إعادة تسجيل الجهاز</button></div>`);
@@ -2215,12 +2215,12 @@ async function enableNotifs() {
   if (p === 'granted') {
     lsSet('jm_notif', '1');
     const r = await registerPush(true);
-    if (r && r.ok) { toast('تم تفعيل الإشعارات'); showSysNotif('الجمعية الذكية', 'الإشعارات مفعّلة ✓', 'welcome_' + Date.now()); }
+    if (r && r.ok) { toast('تم تفعيل الإشعارات'); showSysNotif('سِواء', 'الإشعارات مفعّلة ✓', 'welcome_' + Date.now()); }
     else { toast('سُمح بالإشعارات لكن تعذّر تسجيل الجهاز، جرّب «إعادة تسجيل الجهاز»', 'error'); console.warn('push reg', r && r.err); }
   } else notifHelp(p === 'denied' ? 'denied' : 'stale'); // «default» بعد الطلب = لم تظهر النافذة (غالباً تطبيق قديم مثبّت على الدومين السابق)
   renderBanner(); if (state.view === 'profile') render();
 }
-function testNotif() { if (!notifOn()) return toast('فعّل الإشعارات أولاً', 'error'); showSysNotif('الجمعية الذكية', 'هذا إشعار تجريبي. أغلق التطبيق أو انتقل لتطبيق آخر لتجربة ظهوره خارج الصفحة.', 'test_' + Date.now()); toast('أُرسل إشعار تجريبي', 'info'); }
+function testNotif() { if (!notifOn()) return toast('فعّل الإشعارات أولاً', 'error'); showSysNotif('سِواء', 'هذا إشعار تجريبي. أغلق التطبيق أو انتقل لتطبيق آخر لتجربة ظهوره خارج الصفحة.', 'test_' + Date.now()); toast('أُرسل إشعار تجريبي', 'info'); }
 function notifyPays(j, pays) {
   const uid = state.user.uid;
   pays.forEach(p => {
@@ -2303,7 +2303,7 @@ function flushNotifs() {
   fresh.sort((a, b) => nSecs(a) - nSecs(b));
   const show = (title, body, tag, jid) => hidden ? showSysNotif(title, body, tag, jid) : toast(title + ' — ' + body, 'info');
   fresh.slice(0, 3).forEach(n => show(n.title, n.body, tg(n), n.jid));
-  if (fresh.length > 3) show('الجمعية الذكية', 'لديك ' + nf(fresh.length - 3) + ' إشعارات أخرى جديدة', 'more_' + Date.now(), '');
+  if (fresh.length > 3) show('سِواء', 'لديك ' + nf(fresh.length - 3) + ' إشعارات أخرى جديدة', 'more_' + Date.now(), '');
   fresh.forEach(n => seen.push(tg(n))); lsSet(seenKey(), JSON.stringify(seen.slice(-300)));
   q.forEach(n => db.collection('notifs').doc(n.id).update({ ack: FV.arrayUnion(...devKeys()) }).catch(() => {}));
 }
@@ -2420,7 +2420,7 @@ function vAuth() {
   const seg = m === 'reset' ? '' : `<div class="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-2xl mb-4">${[['register', 'حساب جديد'], ['login', 'دخول']].map(([k, l]) => `<button type="button" data-act="auth-${k}" class="py-2 rounded-xl text-sm font-bold ${m === k ? 'bg-white shadow text-emerald-700' : 'text-slate-500'}">${l}</button>`).join('')}</div>`;
   const pass = `<div><label class="${lb}">كلمة المرور</label><div class="relative"><input name="password" type="password" autocomplete="${reg ? 'new-password' : 'current-password'}" class="inp pl-12" required minlength="6" placeholder="${reg ? '6 أحرف على الأقل' : ''}"><button type="button" data-act="toggle-pass" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" aria-label="إظهار كلمة المرور"><i class="fa-regular fa-eye"></i></button></div></div>`;
   return `<div class="max-w-md mx-auto card p-6 sm:p-8">
-    <div class="text-center mb-4"><img src="logo-full.jpg" alt="الجمعية الذكية - منصة الجمعيات العائلية" width="112" height="112" class="w-24 h-24 mx-auto mb-1 object-contain"><h2 class="text-xl font-black">${title}</h2></div>
+    <div class="text-center mb-4"><img src="logo-full.jpg" alt="سِواء - منصة الجمعيات العائلية" width="112" height="112" class="w-24 h-24 mx-auto mb-1 object-contain"><h2 class="text-xl font-black">${title}</h2></div>
     ${invite}${trustStrip()}${seg}
     ${m !== 'reset' ? `<button data-act="google" class="w-full mb-4 py-3.5 border-2 border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center justify-center gap-3"><img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="">${reg ? 'التسجيل بحساب جوجل (بضغطة واحدة)' : 'الدخول بحساب جوجل'}</button>
     <div class="flex items-center my-4"><div class="flex-grow border-t"></div><span class="px-3 text-xs text-slate-400">أو بالبريد</span><div class="flex-grow border-t"></div></div>` : ''}
@@ -2621,7 +2621,7 @@ function vJamiya() {
     }
   }
   const recBox = c.finished ? `<div class="rounded-3xl p-6 text-white shadow-lg" style="background:linear-gradient(135deg,#1e293b,#334155)"><h3 class="text-lg font-black">اكتملت الجمعية 🎉</h3><p class="text-xs text-slate-300 mt-1">استلم جميع الأعضاء أدوارهم.</p></div>`
-    : `<div class="rounded-3xl p-5 text-white shadow-lg space-y-4" style="background:linear-gradient(135deg,#047857,#059669 55%,#34d399)">
+    : `<div class="rounded-3xl p-5 text-white shadow-lg space-y-4" style="background:linear-gradient(135deg,#0f4c3a,#1e5a46 55%,#0fb16b)">
       <div class="flex justify-between items-start gap-3"><div class="min-w-0"><p class="text-[11px] text-emerald-100 font-bold">${c.started ? 'مستلم دفعة ' + periodLabel(j, c.cur) : 'أول مستلم (لم تبدأ الجمعية بعد)'}</p>
         <h3 class="text-xl font-black leading-snug">${c.rec ? esc(dispName(c.rec)) : 'لم يكتمل ترتيب الأعضاء'}</h3></div>
         <span class="flex-none px-2.5 py-1 rounded-full text-[10px] font-black bg-white/25">${c.started ? 'الدورة ' + (c.cur + 1) + ' من ' + j.count : 'لم تبدأ'}</span></div>
@@ -2714,7 +2714,7 @@ function vProfile() {
       <p class="text-xs text-slate-500 leading-relaxed">${lockCfg() ? 'القفل مفعّل على هذا الجهاز ✓ يُطلب الرمز عند فتح التطبيق أو العودة إليه بعد دقيقة.' : 'احمِ بياناتك المالية برمز من 4 إلى 6 أرقام يُطلب عند فتح التطبيق على هذا الجهاز.'}</p>
       <div class="flex flex-wrap gap-2">${lockCfg() ? '<button class="btn b-sec" data-act="lock-change">تغيير الرمز</button><button class="btn b-red" data-act="lock-off">إيقاف القفل</button>' : '<button class="btn b-pri" data-act="lock-on"><i class="fa-solid fa-lock"></i> تفعيل القفل</button>'}</div></div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-mobile-screen-button text-emerald-600"></i> التطبيق</h4>
-      <p class="text-xs text-slate-500 leading-relaxed">${inst ? 'أنت تستخدم التطبيق المثبّت على جهازك ✓' : 'ثبّت الجمعية الذكية على شاشتك الرئيسية لتعمل كتطبيق كامل وبسرعة أكبر.'}</p>
+      <p class="text-xs text-slate-500 leading-relaxed">${inst ? 'أنت تستخدم التطبيق المثبّت على جهازك ✓' : 'ثبّت سِواء على شاشتك الرئيسية لتعمل كتطبيق كامل وبسرعة أكبر.'}</p>
       <div class="flex flex-wrap gap-2">${inst ? '' : '<button class="btn b-pri" data-act="install-app"><i class="fa-solid fa-download"></i> تثبيت التطبيق</button>'}<button class="btn b-sec" data-act="share-app"><i class="fa-solid fa-share-nodes"></i> مشاركة التطبيق</button></div></div>
     <button class="btn b-red w-full py-3 md:hidden" data-act="logout"><i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج</button></div>`;
 }
@@ -3289,7 +3289,7 @@ function printMemberStatement(uid) {
     ${tbl(['المستحق', 'المؤكد', 'بانتظار التأكيد', 'المتبقي', 'الالتزام بالمواعيد'], [[fmtNum(d.a.owed || 0), fmtNum(d.a.confirmed || 0), fmtNum(d.a.pending || 0), fmtNum(d.a.remaining || 0), d.rate ? d.rate.pct + '%' : '—']])}
     <h2 style="font-size:15px;margin:0">أدوار القبض</h2>${tbl(['الدور', 'الفترة', 'الحالة'], d.turnsOf.map(k => [k + 1, periodLabel(j, k), turnState(c, k)]))}
     <h2 style="font-size:15px;margin:0">الدفعات</h2>${d.pays.length ? tbl(['الدورة', 'المبلغ', 'الحالة', 'المرجع', 'التاريخ'], d.pays.map(p => [periodLabel(j, p.month), fmtNum(p.amount), p.status === 'confirmed' ? 'مؤكدة' : 'بانتظار التأكيد', p.ref || '', tsd(p.createdAt) ? fmtDate(tsd(p.createdAt)) : ''])) : '<p style="font-size:12px;color:#64748b">لا توجد دفعات.</p>'}
-    <p style="font-size:10px;color:#94a3b8;margin-top:16px">صدر من تطبيق الجمعية الذكية. لا يتضمن الكشف أرقام الحسابات أو الجوالات.</p></div>`;
+    <p style="font-size:10px;color:#94a3b8;margin-top:16px">صدر من تطبيق سِواء. لا يتضمن الكشف أرقام الحسابات أو الجوالات.</p></div>`;
   closeModal(); setTimeout(() => window.print(), 200);
 }
 
@@ -3827,7 +3827,7 @@ function renderBanner() {
   else if (nbOk && notifCanAsk()) // الإشعارات لجميع الأنظمة (الجمعيات والتعاون والقطة والديون)
     h = bar('فعّل الإشعارات', 'تصلك تنبيهات الجمعيات والتعاون والقطة والديون حتى والتطبيق في الخلفية', '<button class="btn b-pri" data-act="enable-notif">تفعيل</button>', true, 'dismiss-nb');
   else if (!isStandalone() && instFlag()) // مثبّت لديه لكنه يتصفح من المتصفح: يبقى الطلب حتى يفتح من التطبيق
-    h = bar('افتح التطبيق من أيقونته', 'أنت تتصفح من المتصفح. افتح «الجمعية الذكية» من شاشتك الرئيسية لتعمل الإشعارات والروابط كما يجب', '<button class="btn b-pri" data-act="open-app-help">كيف؟</button>');
+    h = bar('افتح التطبيق من أيقونته', 'أنت تتصفح من المتصفح. افتح «سِواء» من شاشتك الرئيسية لتعمل الإشعارات والروابط كما يجب', '<button class="btn b-pri" data-act="open-app-help">كيف؟</button>');
   else if (!isStandalone() && (deferredPrompt || isMobileUA())) // غير مثبّت: يبقى الطلب حتى يثبّت
     h = bar('ثبّت التطبيق لفتح الرابط كتطبيق', 'مطلوب لتصلك الإشعارات وتُفتح الدعوات والجمعيات داخل التطبيق مباشرة', deferredPrompt ? '<button class="btn b-pri" data-act="install-app">تثبيت</button>' : '<button class="btn b-pri" data-act="install-app">كيف؟</button>');
   el.innerHTML = h;
@@ -3840,7 +3840,7 @@ function openAppHelp() {
     <p class="text-slate-600">فتح الرابط من المتصفح لا يعطيك مزايا التطبيق (الإشعارات والتحديث السريع). افتح التطبيق من الشاشة الرئيسية:</p>
     <ol class="space-y-2.5">
       <li class="flex gap-3 items-center"><span class="jicon !w-9 !h-9 !text-sm">1</span><span>اخرج من المتصفح وارجع للشاشة الرئيسية في جوالك.</span></li>
-      <li class="flex gap-3 items-center"><span class="jicon !w-9 !h-9 !text-sm">2</span><span>اضغط أيقونة <b>الجمعية الذكية</b> (ابحث عنها في التطبيقات إن لم تجدها).</span></li>
+      <li class="flex gap-3 items-center"><span class="jicon !w-9 !h-9 !text-sm">2</span><span>اضغط أيقونة <b>سِواء</b> (ابحث عنها في التطبيقات إن لم تجدها).</span></li>
       <li class="flex gap-3 items-center"><span class="jicon !w-9 !h-9 !text-sm">3</span><span>ستجد حسابك وجمعياتك ودعواتك كما هي.</span></li></ol>
     ${ios ? '<p class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">على الآيفون لا تفتح الروابط المشاركة داخل التطبيق تلقائياً، لذلك افتح التطبيق من أيقونته دائماً.</p>' : '<p class="p-3 bg-sky-50 border border-sky-200 rounded-xl text-sky-900">في كروم يمكنك أيضاً: القائمة ⋮ ثم «فتح في التطبيق» إن ظهر الخيار.</p>'}
     <button class="btn b-sec w-full" data-act="app-uninstalled">لم أعد أملك التطبيق على جوالي</button></div>`);
