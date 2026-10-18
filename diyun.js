@@ -175,8 +175,8 @@ function dbHomeBlock() {
   const me = state.user.uid;
   const L = DB.list.filter(d => !((d.status === 'proposed' || d.status === 'requested') && d.counterUid === me));
   return `<div class="space-y-2.5">
-    <div class="flex items-center justify-between gap-2"><h3 class="font-black text-sm"><i class="fa-solid fa-scale-balanced text-teal-700"></i> الديون</h3>
-      <button type="button" class="btn b-pri" data-act="go-create-debt"><i class="fa-solid fa-plus"></i> دين جديد</button></div>
+    <div class="sw-sec"><h3>الديون</h3>
+      <button type="button" class="sw-add" data-act="go-create-debt"><i class="fa-solid fa-plus"></i> دين جديد</button></div>
     ${L.length ? dbSummaryHtml() : ''}
     ${L.map(dbCard).join('') || '<div class="card p-6 text-center text-xs text-slate-500">لا توجد ديون مسجّلة. سجّل ما لك أو عليك لتتابعه هنا.</div>'}</div>`;
 }

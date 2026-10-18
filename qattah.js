@@ -179,8 +179,8 @@ function qtInvitesHtml() {
 // يُدرج في الصفحة الرئيسية قبل قائمة الجمعيات
 function qtHomeBlock() {
   const cards = QT.list.map(qtCard).join('');
-  return `<div class="space-y-2.5"><div class="flex items-center justify-between gap-2"><h3 class="font-black text-sm"><i class="fa-solid fa-hand-holding-dollar text-teal-700"></i> القطة</h3>
-      <button type="button" class="btn b-pri" data-act="qt-new"><i class="fa-solid fa-plus"></i> قطة جديدة</button></div>
+  return `<div class="space-y-2.5"><div class="sw-sec"><h3>القطة</h3>
+      <button type="button" class="sw-add" data-act="qt-new"><i class="fa-solid fa-plus"></i> قطة جديدة</button></div>
     ${cards || '<div class="card p-6 text-center text-xs text-slate-500">لا توجد قطة بعد. أنشئ صندوقاً مشتركاً لفعالية أو رحلة.</div>'}</div>`;
 }
 function qtFormHtml(q, mode) {

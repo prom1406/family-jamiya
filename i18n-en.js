@@ -1,5 +1,10 @@
 /* English dictionary: Arabic UI text -> English, applied at runtime by index.html when the language is English */
 window.I18N_EN = {
+"إجمالي التزاماتك النشطة": "Your active commitments",
+"قطّة": "Pot",
+"ديون": "Debts",
+"تعاونية": "Cooperative",
+"السلام عليكم 👋": "Peace be upon you 👋",
 "الجمعية": "Association",
 "سِواء": "Siwaa",
 "سِواء — منصة التكافل والحلول المالية التشاركية": "Siwaa — Takaful and participatory financial solutions platform",

@@ -415,6 +415,63 @@ h1,h2,h3,.font-display{color:var(--ink);font-weight:800}
 .achip.on{background:var(--g800);border-color:var(--g800);color:#fff}
 .bdg{font-weight:700;border-radius:99px}
 .emo.on{border-color:var(--g700);background:var(--g100)}
+/* ===== v10 — الشاشة الرئيسية بنمط تطبيقات البنوك (مطابقة للتصميم المعتمد) ===== */
+body .sw-hero{position:relative;overflow:hidden;color:#fff;background:linear-gradient(160deg,#0a3a2c 0%,#0f4c3a 55%,#1e5a46 100%);border-radius:28px;padding:1.5rem 1.5rem 4.6rem;box-shadow:0 18px 36px -18px rgba(10,58,44,.55)}
+body .sw-hero::before{content:"";position:absolute;width:260px;height:260px;border-radius:50%;background:rgba(15,177,107,.18);top:-90px;left:-70px;pointer-events:none}
+body .sw-hero::after{content:"";position:absolute;width:180px;height:180px;border-radius:50%;background:rgba(230,90,44,.14);bottom:-70px;right:-40px;pointer-events:none}
+.sw-hero>*{position:relative;z-index:1}
+.sw-hl{font-size:13px;font-weight:500;opacity:.8;margin-top:.4rem}
+.sw-big{font-size:40px;font-weight:800;line-height:1.2;letter-spacing:-.5px;margin-top:2px;color:#fff}
+.sw-big span{font-size:16px;font-weight:600;opacity:.8;margin-right:6px}
+.sw-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.sw-chip{font-family:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:99px;background:rgba(255,255,255,.14);color:#fff;border:0;cursor:default}
+button.sw-chip{cursor:pointer}
+.sw-chip.up{background:rgba(15,177,107,.28);color:#c9f5df}
+
+body .sw-quick{position:relative;z-index:3;margin:-3.4rem 1.25rem 0!important;background:#fff;border-radius:22px;box-shadow:0 1px 2px rgba(10,58,44,.05),0 10px 24px -12px rgba(10,58,44,.18);display:grid;grid-template-columns:repeat(4,1fr);padding:16px 6px 12px}
+.sw-act{display:flex;flex-direction:column;align-items:center;gap:8px;font-family:inherit;font-size:12px;font-weight:700;color:#14211c;background:none;border:0;cursor:pointer;padding:0}
+.sw-act:active{transform:scale(.96)}
+.sw-ic{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;font-size:20px;flex:none}
+.sw-ic.sm{width:44px;height:44px;font-size:18px;border-radius:14px}
+.sw-ic.i1{background:#e6f4ed;color:#0f4c3a}.sw-ic.i2{background:#fdeee8;color:#e65a2c}.sw-ic.i3{background:#eaf0fb;color:#2f5fc4}.sw-ic.i4{background:#f3ecfb;color:#7a45c2}
+
+.sw-sec{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 2px 2px}
+.sw-sec h3{font-size:16px;font-weight:800;color:#14211c}
+.sw-add{font-family:inherit;font-size:13px;font-weight:700;color:#1e5a46;background:none;border:0;cursor:pointer;padding:4px 2px}
+
+body .sw-card{display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:#fff;border:1px solid #e6ece9;border-radius:20px;padding:14px 16px;box-shadow:0 1px 2px rgba(10,58,44,.05),0 10px 24px -12px rgba(10,58,44,.18);cursor:pointer}
+.sw-card .sw-t{flex:1;min-width:0}
+.sw-card .sw-t b{display:block;font-size:14.5px;font-weight:700;color:#14211c;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sw-card .sw-t small{display:block;font-size:12px;color:#6b7c75}
+.sw-amt{text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+.sw-amt b{font-size:15px;font-weight:800;color:#14211c}
+.sw-bdg{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px}
+.sw-bdg.or{background:#fdeee8;color:#e65a2c}.sw-bdg.g{background:#e6f4ed;color:#0f4c3a}.sw-bdg.gr{background:#eef1f0;color:#6b7c75}
+.sw-prog{flex-basis:100%;height:6px;border-radius:99px;background:#e6f4ed;overflow:hidden}
+.sw-prog i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#0fb16b,#1e5a46)}
+
+/* شريط التنقل: كبسولة خضراء خلف أيقونة الصفحة الحالية */
+body .tabbar{--tab-h:76px;background:rgba(255,255,255,.97);border-top:1px solid #e6ece9;box-shadow:0 -8px 24px -18px rgba(10,58,44,.35)}
+body .tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px;font-weight:700;color:#93a19b}
+body .tab::before{display:none}
+body .tab.on::before{display:none}
+body .tab .pill{width:52px;height:30px;border-radius:99px;display:grid;place-items:center;transition:background .15s ease}
+body .tab i{font-size:18px;transform:none}
+body .tab.on{color:#0f4c3a}
+body .tab.on .pill{background:#e6f4ed}
+body .tab.on i{transform:none}
+
+/* الجوال: الهيدر شفاف فوق البطاقة الخضراء في الرئيسية */
+@media(max-width:767px){
+  body.sw-home .app-header{position:relative;background:transparent;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;z-index:41}
+  body.sw-home .app-header h1{color:#fff;font-size:12px;font-weight:500;opacity:.85}
+  body.sw-home #hdrSub{color:#fff;font-size:16px;font-weight:700;max-width:14rem}
+  body.sw-home .app-header .logo{background:#fff;padding:3px;object-fit:contain;width:42px;height:42px;border-radius:14px;box-shadow:none}
+  body.sw-home .app-header .btn{background:rgba(255,255,255,.14);color:#fff;border:0;box-shadow:none;min-height:42px;min-width:42px;padding:0 .7rem;border-radius:14px}
+  body.sw-home .app-header .btn .text-rose-500{color:#ff9b7a}
+  body.sw-home main{padding-top:0}
+  body.sw-home .sw-hero{margin:calc(-56px - var(--sat)) -1rem 0;border-radius:0 0 32px 32px;padding:calc(56px + var(--sat) + 14px) 1.5rem 4.6rem}
+}
 </style>
 </head>
 <body class="text-slate-800 antialiased">
@@ -2432,14 +2489,18 @@ function renderNav() {
   const canInst = !isStandalone() && !instFlag() && (deferredPrompt || isIOS());
   const instBtn = canInst ? '<button class="btn b-pri" data-act="install-app" aria-label="تثبيت التطبيق"><i class="fa-solid fa-download"></i><span class="hidden sm:inline"> تثبيت</span></button>' : '';
   const shareBtn = '<button class="btn b-sec" data-act="share-app" aria-label="مشاركة التطبيق"><i class="fa-solid fa-share-nodes"></i><span class="hidden sm:inline"> مشاركة</span></button>';
-  if (!state.user || !state.profile) { nav.innerHTML = langBtn() + instBtn + shareBtn; sub.textContent = 'منصة التكافل والحلول المالية التشاركية'; tb.classList.add('hide'); return; }
+  const hh = document.querySelector('.app-header h1');
+  if (!state.user || !state.profile) { nav.innerHTML = langBtn() + instBtn + shareBtn; sub.textContent = 'منصة التكافل والحلول المالية التشاركية'; tb.classList.add('hide'); document.body.classList.remove('sw-home'); if (hh) hh.textContent = 'سِواء'; return; }
   sub.textContent = state.profile.name;
+  const swHome = state.view === 'home' && !maintOn();
+  document.body.classList.toggle('sw-home', swHome);
+  if (hh) hh.textContent = swHome ? 'السلام عليكم 👋' : 'سِواء';
   const nAl = bellCount(), bellBtn = `<button class="btn b-sec bellbtn" data-act="alerts-open" aria-label="التنبيهات"><i class="fa-solid fa-bell ${nAl ? 'text-rose-500' : ''}"></i>${nAl ? `<span class="cnt">${nf(nAl)}</span>` : ''}</button>`;
   nav.innerHTML = `${langBtn()}${instBtn}${bellBtn}${shareBtn}<div class="dnav">${state.isAdmin ? '<button class="btn b-pri" data-act="go-admin"><i class="fa-solid fa-shield-halved"></i> لوحة المالك</button>' : ''}
     <button class="btn b-sec" data-act="go-home"><i class="fa-solid fa-house"></i> جمعياتي</button>
     <button class="btn b-sec" data-act="go-profile"><i class="fa-solid fa-user-gear"></i> حسابي</button>
     <button class="btn b-red" data-act="logout" aria-label="خروج"><i class="fa-solid fa-right-from-bracket"></i></button></div>`;
-  const v = state.view, tab = (act, icon, label, on) => `<button class="tab ${on ? 'on' : ''}" data-act="${act}"><i class="fa-solid ${icon}"></i>${label}</button>`;
+  const v = state.view, tab = (act, icon, label, on) => `<button class="tab ${on ? 'on' : ''}" data-act="${act}"><span class="pill"><i class="fa-solid ${icon}"></i></span>${label}</button>`;
   tb.innerHTML = tab('go-home', 'fa-house', 'جمعياتي', ['home', 'jamiya', 'follow', 'qattah', 'debt', 'debtNew'].includes(v)) + tab('go-create', 'fa-circle-plus', 'جديد', v === 'create')
     + (state.isAdmin ? tab('go-admin', 'fa-shield-halved', 'المالك', v === 'admin') : '') + tab('go-profile', 'fa-user', 'حسابي', v === 'profile');
   tb.classList.remove('hide');
@@ -2608,27 +2669,24 @@ function vHome() {
   const jamList = state.jamiyat.filter(j => j.type !== 'family'), famList = state.jamiyat.filter(j => j.type === 'family');
   const jamCard = j => {
     const pct = Math.min(100, Math.round(filledOf(j) / j.count * 100)), mine = j.creatorUid === state.user.uid;
-    return `<div class="jcard" data-act="open" data-id="${j.id}">
-      <div class="flex items-center gap-3 min-w-0"><div class="jicon">${iconHtml(j)}</div>
-        <div class="min-w-0"><h4 class="font-black text-sm truncate">${esc(j.name)}</h4><p class="text-xs text-slate-500 mt-0.5">${money(j.amount)} ${freqOf(j).every}</p>
-        <div class="flex items-center gap-2 mt-1.5"><div class="bar w-20"><i style="width:${pct}%"></i></div><span class="text-[11px] text-slate-500">${filledOf(j)}/${j.count}</span>
-        <span class="text-[10px] ${mine ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'} px-2 py-0.5 rounded-md font-bold">${mine ? ((j.memberUids || []).includes(state.user.uid) ? 'مشرف وعضو' : 'مشرف فقط') : 'عضو'}</span></div></div></div>
-      <i class="fa-solid fa-chevron-left text-slate-300"></i></div>`;
+    return `<div class="jcard sw-card" data-act="open" data-id="${j.id}">
+      <div class="sw-ic i1 sm">${iconHtml(j)}</div>
+      <div class="sw-t"><b>${esc(j.name)}</b><small>${money(j.amount)} ${freqOf(j).every}</small></div>
+      <div class="sw-amt"><b>${filledOf(j)}/${j.count}</b><span class="sw-bdg ${mine ? 'or' : 'g'}">${mine ? ((j.memberUids || []).includes(state.user.uid) ? 'مشرف وعضو' : 'مشرف فقط') : 'عضو'}</span></div>
+      <div class="sw-prog"><i style="width:${pct}%"></i></div></div>`;
   };
-  const secHead = (ico, title, act, label) => `<div class="flex items-center justify-between gap-2"><h3 class="font-black text-sm"><i class="fa-solid ${ico} text-teal-700"></i> ${title}</h3><button type="button" class="btn b-pri" data-act="${act}"><i class="fa-solid fa-plus"></i> ${label}</button></div>`;
+  const secHead = (ico, title, act, label) => `<div class="sw-sec"><h3>${title}</h3><button type="button" class="sw-add" data-act="${act}"><i class="fa-solid fa-plus"></i> ${label}</button></div>`;
   const empty = (t, extra = '') => `<div class="card p-6 text-center text-xs text-slate-500">${t}${extra}</div>`;
   const tile = (ico, label, val) => `<div class="stat"><p class="text-[11px] text-emerald-50 flex items-center gap-1.5"><i class="fa-solid ${ico}"></i>${label}</p><b class="text-2xl font-black">${nf(val)}</b></div>`;
   const nAl = bellCount();
-  const hero = `<div class="hero">
-    <div class="min-w-0"><p class="text-xs text-emerald-100 font-semibold">السلام عليكم 👋</p><h2 class="text-2xl font-black mt-0.5 truncate">${esc(state.profile.name)}</h2>
-      <p class="text-xs text-emerald-50/90 mt-1">جمعياتك وتعاوناتك وقطاتك في مكان واحد</p></div>
-    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-4">
-      ${tile('fa-people-roof', 'الجمعيات', jamList.length)}
-      ${tile('fa-handshake', 'التعاون', famList.length)}
-      ${tile('fa-hand-holding-dollar', 'القطات', QT.list.length)}
-      ${tile('fa-scale-balanced', 'الديون', DB.list.filter(d => d.status === 'open').length)}
-      <button type="button" class="stat text-right relative" data-act="alerts-open" aria-label="التنبيهات"><p class="text-[11px] text-emerald-50 flex items-center gap-1.5"><i class="fa-solid fa-bell"></i>التنبيهات</p><b class="text-2xl font-black">${nf(nAl)}</b>${nAl ? '<span class="absolute top-2 left-2 w-2 h-2 rounded-full bg-rose-400"></span>' : ''}</button>
-    </div></div>`;
+  const nActive = jamList.length + famList.length + QT.list.length + DB.list.filter(d => d.status === 'open').length;
+  const swAct = (cls, ico, label, act) => `<button type="button" class="sw-act" data-act="${act}"><span class="sw-ic ${cls}"><i class="fa-solid ${ico}"></i></span>${label}</button>`;
+  const hero = `<div class="sw-hero">
+    <p class="sw-hl">إجمالي التزاماتك النشطة</p>
+    <p class="sw-big">${nf(nActive)}<span>التزام</span></p>
+    <div class="sw-chips"><span class="sw-chip up">${nf(jamList.length)} الجمعيات</span><span class="sw-chip">${nf(QT.list.length)} القطات</span><button type="button" class="sw-chip" data-act="alerts-open">${nf(nAl)} التنبيهات</button></div>
+  </div>
+  <div class="sw-quick">${swAct('i1', 'fa-people-roof', 'جمعية', 'go-create')}${swAct('i2', 'fa-hand-holding-dollar', 'قطّة', 'qt-new')}${swAct('i3', 'fa-scale-balanced', 'ديون', 'go-create-debt')}${swAct('i4', 'fa-handshake', 'تعاونية', 'go-create-family')}</div>`;
   return `<div class="space-y-5">
     ${hero}
     ${verifyBanner()}${detailsNudge()}${growthCards()}
@@ -3543,11 +3601,10 @@ function famStats() {
 }
 function famCard(j) {
   const mine = j.creatorUid === state.user.uid, fs = famState(j);
-  return `<div class="jcard" data-act="open" data-id="${j.id}"><div class="flex items-center gap-3 min-w-0"><div class="jicon">${iconHtml(j)}</div>
-    <div class="min-w-0"><h4 class="font-black text-sm truncate">${esc(j.name)}</h4><p class="text-xs text-slate-500 mt-0.5 truncate">${esc(j.goal || '')}</p>
-    <div class="flex items-center gap-1.5 mt-1.5 flex-wrap"><span class="text-[10px] bg-violet-100 text-violet-700 px-2 py-0.5 rounded-md font-bold">تعاون عائلي</span>
-    <span class="text-[10px] ${fs.open ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'} px-2 py-0.5 rounded-md font-bold">${fs.monthly ? (fs.open ? 'مستمر شهرياً' : (fs.reached ? 'اكتمل الهدف' : 'مغلق')) : fs.open ? 'متبقٍ ' + fs.left + ' يوم' : 'مغلق'}</span>
-    <span class="text-[10px] ${mine ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'} px-2 py-0.5 rounded-md font-bold">${mine ? 'المستفيد' : 'مشارك'}</span></div></div></div><i class="fa-solid fa-chevron-left text-slate-300"></i></div>`;
+  return `<div class="jcard sw-card" data-act="open" data-id="${j.id}">
+    <div class="sw-ic i4 sm">${iconHtml(j)}</div>
+    <div class="sw-t"><b>${esc(j.name)}</b><small>${esc(j.goal || 'تعاون عائلي')}</small></div>
+    <div class="sw-amt"><span class="sw-bdg ${fs.open ? 'g' : 'gr'}">${fs.monthly ? (fs.open ? 'مستمر شهرياً' : (fs.reached ? 'اكتمل الهدف' : 'مغلق')) : fs.open ? 'متبقٍ ' + fs.left + ' يوم' : 'مغلق'}</span><span class="sw-bdg ${mine ? 'or' : 'g'}">${mine ? 'المستفيد' : 'مشارك'}</span></div></div>`;
 }
 function famPayRow(p, staff) {
   const t = tsd(p.createdAt), pend = p.status === 'pending', who = staff ? (state.members[p.uid] ? dispName(state.members[p.uid]) : (p.name || '—')) : 'مساهمتك';
