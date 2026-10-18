@@ -7,7 +7,8 @@
      counterName, counterPhone          الطرف الآخر
      counterUid                         '' إن لم يكن مسجلاً في التطبيق
      amount, reason, startDate, dueDate ('' إن لم يُحدد)
-     status                             'proposed' | 'open' | 'closed' | 'declined'
+     status                             'requested' (استلاف: بانتظار تحويل المُقرض) | 'proposed' | 'open' | 'closed' | 'declined'
+  type                               'loan' للاستلاف (kind='borrowed' والدائن هو الطرف الآخر)
      paid                               مجموع الدفعات المؤكدة (يُحدَّث بـ increment)
    debts/{id}/payments/{pid}
      amount, date, note, byUid, byName, status ('pending' | 'confirmed' | 'rejected')
@@ -38,6 +39,7 @@ const dbEmpty = t => `<p class="text-xs text-slate-400 text-center py-3">${t}</p
 function dbStatus(d) {
   const left = dbLeft(d);
   if (d.status === 'proposed') return { k: 'proposed', l: 'بانتظار القبول', c: 'bg-sky-100 text-sky-700' };
+  if (d.status === 'requested') return { k: 'requested', l: 'بانتظار التحويل', c: 'bg-sky-100 text-sky-700' };
   if (d.status === 'declined') return { k: 'declined', l: 'مرفوض', c: 'bg-slate-100 text-slate-600' };
   if (d.status === 'closed') return left > 0 ? { k: 'closed', l: 'مُعفى', c: 'bg-slate-100 text-slate-600' } : { k: 'closed', l: 'مسدد', c: 'bg-emerald-100 text-emerald-700' };
   if (left === 0) return { k: 'closed', l: 'مسدد', c: 'bg-emerald-100 text-emerald-700' };
@@ -93,14 +95,22 @@ function startDebtListeners() {
   DB.unsubs.push(db.collection(DB_COL).where('counterUid', '==', uid).onSnapshot(s => {
     asCounter = s.docs.map(d => ({ id: d.id, ...d.data() })); merge();
   }, warn('counter')));
+  // استلاف أُرسل لجوالي وأنا غير مسجّل حينها: نربطه بحسابي الآن
+  const myPh = normPhone(state.profile.phone || '');
+  if (validPhone(myPh)) {
+    DB.unsubs.push(db.collection('loanReqs').doc(myPh).collection('items').onSnapshot(s => {
+      s.docs.forEach(x => dbClaimLoan(x.id, myPh));
+    }, warn('claim')));
+  }
 }
 // إشعار عند وصول طلب دين جديد لم يُر من قبل
 function dbNotify() {
   const me = state.user.uid;
-  DB.list.filter(d => d.status === 'proposed' && d.counterUid === me).forEach(d => {
+  DB.list.filter(d => (d.status === 'proposed' || d.status === 'requested') && d.counterUid === me).forEach(d => {
     if (DB.seen[d.id]) return;
     DB.seen[d.id] = 1;
-    pushLocal('طلب دين جديد', `${d.creatorName || ''} سجّل دَيناً بينكما`, 'dbinv_' + d.id);
+    if (d.status === 'requested') pushLocal('طلب استلاف جديد', `${d.creatorName || ''} يطلب منك استلافاً ${fmtNum(dbN(d.amount))} ريال`, 'dbinv_' + d.id);
+    else pushLocal('طلب دين جديد', `${d.creatorName || ''} سجّل دَيناً بينكما`, 'dbinv_' + d.id);
   });
 }
 
@@ -137,14 +147,21 @@ function dbCard(d) {
     <div class="bar"><i style="width:${dbPct(d)}%"></i></div></div>`;
 }
 function dbInvitesHtml() {
-  const me = state.user.uid, I = DB.list.filter(d => d.status === 'proposed' && d.counterUid === me);
+  const me = state.user.uid, I = DB.list.filter(d => (d.status === 'proposed' || d.status === 'requested') && d.counterUid === me);
   if (!I.length) return '';
-  return `<div class="space-y-2"><h3 class="font-black text-sm"><i class="fa-solid fa-envelope-open-text text-amber-500"></i> طلبات ديون بانتظار قبولك</h3>
-    ${I.map(d => `<div class="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-wrap justify-between items-center gap-3 text-xs">
-      <div class="min-w-0"><p class="font-bold text-sm">${esc(d.creatorName || '')} ${d.kind === 'lent' ? 'سجّل أنه أقرضك' : 'سجّل أنه اقترض منك'} ${fmtNum(d.amount)} ريال</p>
-        <p class="text-slate-500">${esc(d.reason || '')}</p></div>
-      <div class="flex gap-2"><button type="button" class="btn b-pri" data-act="db-accept" data-id="${esc(d.id)}">قبول</button>
-        <button type="button" class="btn b-red" data-act="db-decline" data-id="${esc(d.id)}">رفض</button></div></div>`).join('')}</div>`;
+  return `<div class="space-y-2"><h3 class="font-black text-sm"><i class="fa-solid fa-envelope-open-text text-amber-500"></i> طلبات بانتظار ردك</h3>
+    ${I.map(d => d.status === 'requested'
+      ? `<div class="p-4 bg-sky-50 border border-sky-200 rounded-2xl flex flex-wrap justify-between items-center gap-3 text-xs">
+        <div class="min-w-0"><p class="font-bold text-sm">${esc(d.creatorName || '')} يطلب منك استلافاً ${fmtNum(d.amount)} ريال</p>
+          <p class="text-slate-500">${esc(d.reason || '')}</p>
+          <p class="text-slate-500 mt-1">حوّل المبلغ ثم أكّد التحويل، فيثبت القرض على المستلف وتتابعانه من هنا.</p></div>
+        <div class="flex flex-wrap gap-2"><button type="button" class="btn b-pri" data-act="db-loan-confirm" data-id="${esc(d.id)}">أكدت التحويل</button>
+          <button type="button" class="btn b-red" data-act="db-decline" data-id="${esc(d.id)}">رفض</button></div></div>`
+      : `<div class="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-wrap justify-between items-center gap-3 text-xs">
+        <div class="min-w-0"><p class="font-bold text-sm">${esc(d.creatorName || '')} ${d.kind === 'lent' ? 'سجّل أنه أقرضك' : 'سجّل أنه اقترض منك'} ${fmtNum(d.amount)} ريال</p>
+          <p class="text-slate-500">${esc(d.reason || '')}</p></div>
+        <div class="flex gap-2"><button type="button" class="btn b-pri" data-act="db-accept" data-id="${esc(d.id)}">قبول</button>
+          <button type="button" class="btn b-red" data-act="db-decline" data-id="${esc(d.id)}">رفض</button></div></div>`).join('')}</div>`;
 }
 function dbSummaryHtml() {
   const t = dbTotals();
@@ -156,7 +173,7 @@ function dbSummaryHtml() {
 // قسم الديون في الصفحة الرئيسية: عنوان وزر بجواره، ثم الملخص والقائمة
 function dbHomeBlock() {
   const me = state.user.uid;
-  const L = DB.list.filter(d => !(d.status === 'proposed' && d.counterUid === me));
+  const L = DB.list.filter(d => !((d.status === 'proposed' || d.status === 'requested') && d.counterUid === me));
   return `<div class="space-y-2.5">
     <div class="flex items-center justify-between gap-2"><h3 class="font-black text-sm"><i class="fa-solid fa-scale-balanced text-teal-700"></i> الديون</h3>
       <button type="button" class="btn b-pri" data-act="go-create-debt"><i class="fa-solid fa-plus"></i> دين جديد</button></div>
@@ -172,10 +189,10 @@ function dbNewView() {
     <div class="flex items-center gap-3"><button type="button" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex-none" data-act="go-home" aria-label="رجوع"><i class="fa-solid fa-arrow-right"></i></button>
       <div class="jicon"><i class="fa-solid fa-scale-balanced"></i></div><h2 class="font-black text-lg">دين جديد</h2></div>
     <form id="f-db-new" class="card p-5 space-y-4">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${opt('lent', 'أنا أقرضت (لي عند الطرف الآخر)', true)}${opt('borrowed', 'أنا اقترضت (عليّ للطرف الآخر)', false)}</div>
+      <div class="grid grid-cols-1 gap-2">${opt('lent', 'أنا أقرضت (لي عند الطرف الآخر)', true)}${opt('borrowed', 'أنا اقترضت (عليّ للطرف الآخر)', false)}${opt('loan', 'استلاف: أطلب من شخص مسجّل أن يقرضني (يثبت بعد تأكيده التحويل)', false)}</div>
       <div class="grid md:grid-cols-2 gap-3">
         <div><label class="${lb}">اسم الطرف الآخر</label><input name="cname" class="inp" required maxlength="40" placeholder="مثال: خالد"></div>
-        <div><label class="${lb}">جواله (اختياري، إن كان مسجلاً يرى الدين ويقبله)</label><input name="cphone" class="inp" dir="ltr" placeholder="05xxxxxxxx"></div>
+        <div><label class="${lb}">جواله (إن كان مسجلاً يرى الدين ويقبله، وإجباري في الاستلاف)</label><input name="cphone" class="inp" dir="ltr" placeholder="05xxxxxxxx"></div>
       </div>
       <div class="grid md:grid-cols-2 gap-3">
         <div><label class="${lb}">المبلغ (ريال)</label><input name="amount" type="number" min="0.01" step="any" class="inp" required></div>
@@ -188,12 +205,18 @@ function dbNewView() {
       <button class="btn b-pri w-full py-3" type="submit">حفظ الدين</button>
     </form></div>`;
 }
+const loanReqRef = (phone, did) => db.collection('loanReqs').doc(phone).collection('items').doc(did);
+function loanReqText(name, amount, reason) {
+  return `السلام عليكم ${name || ''}،\nأطلب منك استلاف ${fmtNum(amount)} ريال${reason ? ' — ' + reason : ''}.\nإن وافقت فحوّل المبلغ، ثم أكّد التحويل في التطبيق ليُسجَّل القرض بعد تأكيدك. شكراً لك.`;
+}
 async function dbCreate(f) {
-  const kind = f.kind.value, name = f.cname.value.trim(), rawPhone = f.cphone.value.trim();
+  const choice = f.kind.value, isLoan = choice === 'loan', kind = isLoan ? 'borrowed' : choice;
+  const name = f.cname.value.trim(), rawPhone = f.cphone.value.trim();
   const phone = rawPhone ? normPhone(rawPhone) : '';
   const amount = r2(parseFloat(f.amount.value)), reason = f.reason.value.trim(), start = f.start.value, due = f.due.value || '';
   if (name.length < 2) return toast('اكتب اسم الطرف الآخر', 'error');
   if (rawPhone && !validPhone(phone)) return toast('الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
+  if (isLoan && !phone) return toast('أدخل جوال المُقرض ليصله الطلب ورابط التسجيل', 'error');
   if (phone && phone === normPhone(state.profile.phone)) return toast('لا يمكن تسجيل دين على نفسك', 'error');
   if (!(amount > 0)) return toast('المبلغ غير صحيح', 'error');
   if (!dbDateOk(start) || (due && (!dbDateOk(due) || due < start))) return toast('تحقق من التواريخ', 'error');
@@ -205,13 +228,28 @@ async function dbCreate(f) {
   const data = {
     creatorUid: state.user.uid, creatorName: dispName(state.profile).slice(0, 60), kind,
     counterName: name.slice(0, 40), counterPhone: phone, counterUid, amount, reason: reason.slice(0, 200),
-    startDate: start, dueDate: due, status: counterUid ? 'proposed' : 'open', paid: 0,
+    startDate: start, dueDate: due,
+    status: isLoan ? 'requested' : (counterUid ? 'proposed' : 'open'), paid: 0,
     createdAt: FV.serverTimestamp(), updatedAt: FV.serverTimestamp()
   };
+  if (isLoan) data.type = 'loan';
   try {
-    const nref = await db.collection(DB_COL).add(data);
-    toast(counterUid ? 'أُرسل الدين للطرف الآخر ليقبله' : 'سُجّل الدين', 'info');
-    if (counterUid) sendNotifs([counterUid], 'طلب دين جديد', `${data.creatorName} سجّل دَيناً بينكما بمبلغ ${fmtNum(amount)} ريال`, dbJid(nref.id), 'debt', 'dbinv_' + nref.id);
+    const nref = db.collection(DB_COL).doc(), b = db.batch();
+    b.set(nref, data);
+    // المُقرض غير مسجّل: نفهرس الطلب بجواله ليظهر له بعد التسجيل
+    if (isLoan && !counterUid) b.set(loanReqRef(phone, nref.id), { debtId: nref.id, creatorUid: state.user.uid, creatorName: data.creatorName, amount, reason: data.reason, createdAt: FV.serverTimestamp() });
+    await b.commit();
+    if (isLoan && !counterUid) {
+      state.view = 'home'; render();
+      showModal('أُرسل طلب الاستلاف', `<div class="space-y-3 text-sm">
+        <p class="text-xs text-slate-600 leading-relaxed">المُقرض غير مسجّل بعد. أرسل له الطلب عبر واتساب، وفيه رابط التسجيل. سيظهر الطلب له بعد تسجيله بنفس الجوال.</p>
+        <a class="btn b-pri w-full" target="_blank" rel="noopener" href="${waLink(phone, loanReqText(data.counterName, amount, reason))}"><i class="fa-brands fa-whatsapp"></i> إرسال الطلب عبر واتساب</a></div>`);
+      return;
+    }
+    toast(isLoan ? 'أُرسل طلب الاستلاف للمُقرض' : counterUid ? 'أُرسل الدين للطرف الآخر ليقبله' : 'سُجّل الدين', 'info');
+    if (counterUid) sendNotifs([counterUid], isLoan ? 'طلب استلاف جديد' : 'طلب دين جديد',
+      isLoan ? `${data.creatorName} يطلب منك استلافاً ${fmtNum(amount)} ريال` : `${data.creatorName} سجّل دَيناً بينكما بمبلغ ${fmtNum(amount)} ريال`,
+      dbJid(nref.id), 'debt', 'dbinv_' + nref.id);
     state.view = 'home'; render();
   } catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
 }
@@ -220,7 +258,7 @@ async function dbCreate(f) {
 function dbView() {
   const d = DB.d; if (!d) return vLoading();
   const me = state.user.uid, lender = dbIsLender(d, me), st = dbStatus(d), left = dbLeft(d);
-  const isProposed = d.status === 'proposed';
+  const isProposed = d.status === 'proposed', isRequested = d.status === 'requested';
   const canPay = d.status === 'open' && left > 0;
   const pendingN = lender ? DB.pays.filter(p => p.status === 'pending').length : 0;
   const payBtn = canPay ? `<button type="button" class="btn b-white" data-act="db-pay-modal"><i class="fa-solid ${lender ? 'fa-hand-holding-dollar' : 'fa-money-bill-transfer'}"></i> ${lender ? 'تسجيل مبلغ مستلم' : 'سددت مبلغاً'}</button>` : '';
@@ -232,6 +270,7 @@ function dbView() {
       <div class="h-2.5 rounded-full bg-white/25 overflow-hidden mt-2"><div class="h-full rounded-full bg-white" style="width:${dbPct(d)}%"></div></div>
       <p class="text-[11px] text-amber-50 mt-1">سُدّد ${fmtNum(dbN(d.paid))} من ${fmtNum(d.amount)} ريال</p></div>
     ${isProposed ? `<div class="rounded-2xl bg-white/15 p-3 text-center text-xs font-bold">بانتظار قبول ${esc(d.counterName)} لهذا الدين</div>` : ''}
+    ${isRequested ? (lender ? `<div class="grid grid-cols-2 gap-2"><button type="button" class="btn b-white" data-act="db-loan-confirm" data-id="${esc(d.id)}"><i class="fa-solid fa-circle-check"></i> أكدت التحويل</button><button type="button" class="btn b-red" data-act="db-decline" data-id="${esc(d.id)}">رفض الطلب</button></div>` : `<div class="rounded-2xl bg-white/15 p-3 text-center text-xs font-bold">بانتظار أن يحوّل ${esc(d.counterName)} المبلغ ويؤكد التحويل هنا</div>${!d.counterUid && d.counterPhone ? `<a class="btn b-white w-full" target="_blank" rel="noopener" href="${waLink(d.counterPhone, loanReqText(d.counterName, d.amount, d.reason))}"><i class="fa-brands fa-whatsapp"></i> إعادة إرسال الطلب عبر واتساب</a>` : ''}`) : ''}
     ${payBtn}
   </div>`;
 
@@ -245,7 +284,7 @@ function dbView() {
   return `<div class="space-y-4 max-w-2xl mx-auto">
     <div class="flex items-center gap-3"><button type="button" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex-none" data-act="go-home" aria-label="رجوع"><i class="fa-solid fa-arrow-right"></i></button>
       <div class="jicon"><i class="fa-solid fa-scale-balanced"></i></div>
-      <div class="min-w-0"><h2 class="font-black text-lg truncate">${esc(d.counterName)}</h2><p class="text-[11px] text-slate-500 truncate"><span class="text-amber-700 font-bold">دين</span> • ${fmtNum(d.amount)} ريال</p></div></div>
+      <div class="min-w-0"><h2 class="font-black text-lg truncate">${esc(d.counterName)}</h2><p class="text-[11px] text-slate-500 truncate"><span class="text-amber-700 font-bold">${d.type === 'loan' ? 'استلاف' : 'دين'}</span> • ${fmtNum(d.amount)} ريال</p></div></div>
     ${bar}${hero}${body}</div>`;
 }
 function dbOverviewTab(d, lender, st, left) {
@@ -264,6 +303,7 @@ function dbOverviewTab(d, lender, st, left) {
 function dbAdvice(d, lender, st, left) {
   switch (st.k) {
     case 'proposed': return `بانتظار أن يقبل ${esc(d.counterName)} الدين. لن يُحتسب قبل القبول.`;
+    case 'requested': if (!d.counterUid && !lender) return `أرسلنا الطلب إلى ${esc(d.counterName)} عبر واتساب مع رابط التسجيل. سيظهر له الطلب بعد تسجيله بنفس الجوال، ثم يحوّل المبلغ ويؤكد التحويل.`; return lender ? `طلب ${esc(d.creatorName || '')} استلافاً ${fmtNum(d.amount)} ريال. حوّل المبلغ ثم أكّد التحويل، فيثبت القرض عليه وتتابعه هنا.` : `بانتظار أن يحوّل ${esc(d.counterName)} المبلغ ويؤكد التحويل. لن يُحتسب القرض قبل ذلك.`;
     case 'declined': return `رفض ${esc(d.counterName)} هذا الدين.`;
     case 'closed': return left > 0 ? 'أُغلق الدين وأُعفي من المتبقي.' : 'تم سداد الدين بالكامل.';
     case 'late': return lender ? `تجاوز موعد السداد. المتبقي ${fmtNum(left)} ريال، يمكنك التذكير به.` : `تجاوز موعد السداد. المتبقي عليك ${fmtNum(left)} ريال، سدّده في أقرب وقت.`;
@@ -369,6 +409,19 @@ async function dbCancelPay(pid) {
 }
 
 /* ---------- القبول والرفض والإدارة ---------- */
+const dbClaiming = new Set();
+async function dbClaimLoan(did, myPh) {
+  if (dbClaiming.has(did)) return; dbClaiming.add(did);
+  const b = db.batch();
+  b.update(dbRef(did), { counterUid: state.user.uid, updatedAt: FV.serverTimestamp() });
+  b.delete(loanReqRef(myPh, did));
+  try { await b.commit(); }
+  catch (e) {
+    // الطلب حُذف من المُستلف: نحذف الفهرس وحده
+    if (e && e.code === 'not-found') await loanReqRef(myPh, did).delete().catch(() => {});
+    else console.warn('الديون: تعذر ربط الاستلاف', e && e.code);
+  } finally { dbClaiming.delete(did); }
+}
 async function dbRespond(id, status) {
   try { await dbRef(id).update({ status, updatedAt: FV.serverTimestamp() }); toast(status === 'open' ? 'تم قبول الدين' : 'تم رفض الدين', 'info'); const dd = DB.list.find(x => x.id === id); if (dd) sendNotifs([dd.creatorUid], status === 'open' ? 'قُبل الدين ✓' : 'رُفض الدين', `${dispName(state.profile)} ${status === 'open' ? 'قبل' : 'رفض'} الدين المسجّل بمبلغ ${fmtNum(dbN(dd.amount))} ريال`, dbJid(id), 'debt'); }
   catch (e) { toast('تعذر التحديث: ' + e.message, 'error'); }
@@ -404,9 +457,38 @@ async function dbDelete() {
   try {
     const ref = dbRef(d.id), pays = await ref.collection('payments').get();
     const refs = [...pays.docs.map(x => x.ref), ref];
+    if (d.type === 'loan' && !d.counterUid && d.counterPhone) refs.push(loanReqRef(normPhone(d.counterPhone), d.id));
     for (let i = 0; i < refs.length; i += 400) { const b = db.batch(); refs.slice(i, i + 400).forEach(r => b.delete(r)); await b.commit(); }
     dbLeave(); state.view = 'home'; render(); toast('حُذف الدين', 'info');
   } catch (e) { toast('تعذر الحذف: ' + e.message, 'error'); }
+}
+
+/* ---------- استلاف: تأكيد التحويل ---------- */
+// المُقرض يؤكد أنه حوّل المبلغ، فيثبت القرض على المُستلف بالمبلغ والتاريخ الفعليين
+function dbLoanOf(id) {
+  const d = DB.list.find(x => x.id === id) || (DB.d && DB.d.id === id ? DB.d : null);
+  return d && d.status === 'requested' && d.counterUid === state.user.uid ? d : null;
+}
+function dbOpenLoanConfirm(id) {
+  const d = dbLoanOf(id); if (!d) return toast('هذا الطلب لم يعد متاحاً', 'error');
+  DB.confirmId = id;
+  const lb = 'text-xs font-semibold block mb-1';
+  showModal('تأكيد تحويل المبلغ', `<form id="f-db-loan" class="space-y-3">
+    <p class="text-xs text-slate-500">سيثبت القرض على ${esc(d.creatorName || '')} بهذا المبلغ، وتتابعان السداد من هنا.</p>
+    <div><label class="${lb}">المبلغ المحوَّل (ريال)</label><input name="lamount" type="number" min="0.01" max="100000000" step="any" class="inp" required value="${dbN(d.amount)}"></div>
+    <div><label class="${lb}">تاريخ التحويل</label><input name="ldate" type="date" class="inp" required value="${dbDay()}"></div>
+    <button class="btn b-pri w-full py-3" type="submit">تأكيد وإثبات القرض</button></form>`);
+}
+async function dbSaveLoanConfirm(f) {
+  const d = dbLoanOf(DB.confirmId); if (!d) return toast('هذا الطلب لم يعد متاحاً', 'error');
+  const amount = r2(parseFloat(f.lamount.value)), date = f.ldate.value;
+  if (!(amount > 0) || amount > 100000000) return toast('المبلغ غير صحيح', 'error');
+  if (!dbDateOk(date)) return toast('حدد تاريخ التحويل', 'error');
+  try {
+    await dbRef(d.id).update({ status: 'open', amount, startDate: date, paid: 0, updatedAt: FV.serverTimestamp() });
+    closeModal(); toast('تم إثبات القرض على المستلف');
+    sendNotifs([d.creatorUid], 'تم تحويل القرض ✓', `${dispName(state.profile)} حوّل ${fmtNum(amount)} ريال وأكّد القرض`, dbJid(d.id), 'debt');
+  } catch (e) { toast('تعذر التأكيد: ' + e.message, 'error'); }
 }
 
 /* ---------- الربط بالتطبيق الرئيسي ---------- */
@@ -424,10 +506,12 @@ const DB_ACTIONS = {
   'db-close': () => dbSetClosed(true),
   'db-reopen': () => dbSetClosed(false),
   'db-edit-modal': () => dbOpenEdit(),
-  'db-delete': () => dbDelete()
+  'db-delete': () => dbDelete(),
+  'db-loan-confirm': el => dbOpenLoanConfirm(el.dataset.id)
 };
 const DB_FORMS = {
   'f-db-new': f => needVerified(() => dbCreate(f)),
   'f-db-pay': dbSavePay,
-  'f-db-edit': dbEditSave
+  'f-db-edit': dbEditSave,
+  'f-db-loan': dbSaveLoanConfirm
 };
