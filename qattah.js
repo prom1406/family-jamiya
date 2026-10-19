@@ -179,9 +179,11 @@ function qtInvitesHtml() {
 // يُدرج في الصفحة الرئيسية قبل قائمة الجمعيات
 function qtHomeBlock() {
   const cards = QT.list.map(qtCard).join('');
+  const coll = QT.list.reduce((s, q) => s + qtNum(q.collected), 0), tg = QT.list.reduce((s, q) => s + qtNum(q.target), 0);
+  const sum = QT.list.length ? `<div class="card p-4 flex items-center justify-between gap-3 flex-wrap"><div class="min-w-0"><p class="text-[11px] text-slate-500 flex items-center gap-1.5"><i class="fa-solid fa-sack-dollar text-teal-600"></i>إجمالي المبلغ المجتمع</p><b class="text-xl font-black text-teal-700">${fmtNum(coll)} <span class="text-xs">ريال</span></b></div><div class="text-left"><p class="text-[11px] text-slate-500">من أصل الأهداف</p><b class="text-sm">${fmtNum(tg)} ريال</b></div></div>` : '';
   return `<div class="space-y-2.5"><div class="sw-sec"><h3>القطة</h3>
       <button type="button" class="sw-add" data-act="qt-new"><i class="fa-solid fa-plus"></i> قطة جديدة</button></div>
-    ${cards || '<div class="card p-6 text-center text-xs text-slate-500">لا توجد قطة بعد. أنشئ صندوقاً مشتركاً لفعالية أو رحلة.</div>'}</div>`;
+    ${sum}${cards || '<div class="card p-6 text-center text-xs text-slate-500">لا توجد قطة بعد. أنشئ صندوقاً مشتركاً لفعالية أو رحلة.</div>'}</div>`;
 }
 // حقول النموذج فقط (mode: create | edit | wizard). في المعالج تُحسب الحصة في «الملخص الفوري» فلا حاجة لبطاقة الحصة ولا لمعالجات oninput
 function qtFieldsHtml(q, mode) {
