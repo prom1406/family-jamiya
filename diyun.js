@@ -14,7 +14,7 @@
      amount, date, note, byUid, byName, status ('pending' | 'confirmed' | 'rejected')
 */
 
-const DB = { list: [], d: null, did: null, pays: [], tab: 'overview', unsubs: [], dUnsubs: [], seen: {}, pend: false };
+const DB = { list: [], d: null, did: null, pays: [], tab: 'overview', unsubs: [], dUnsubs: [], seen: {}, pend: false, pendP: {}, pendSubs: {} };
 const DB_COL = 'debts';
 
 /* ---------- أدوات ---------- */
@@ -47,15 +47,29 @@ function dbStatus(d) {
   return { k: 'open', l: 'مفتوح', c: 'bg-amber-100 text-amber-700' };
 }
 
+// الدين مؤكد من الطرف الآخر: لا يُحذف (يبقى سجلاً ملزماً للطرفين)
+const dbLocked = d => (d.status === 'open' || d.status === 'closed') && !!d.counterUid;
+
 function dbTotals() {
-  const me = state.user.uid; let owed = 0, owe = 0, late = 0;
+  const me = state.user.uid;
+  let owed = 0, owe = 0, late = 0, paidToMe = 0, paidByMe = 0, waitLoan = 0, waitPay = 0;
   DB.list.forEach(d => {
+    const lender = dbIsLender(d, me);
+    if (d.status === 'requested') waitLoan += dbN(d.amount);
+    (DB.pendP[d.id] || []).forEach(p => { waitPay += dbN(p.amount); });
+    if (d.status === 'open' || d.status === 'closed') {
+      if (lender) paidToMe += dbN(d.paid); else paidByMe += dbN(d.paid);
+    }
     if (d.status !== 'open') return;
     const left = dbLeft(d);
-    if (dbIsLender(d, me)) owed += left; else owe += left;
+    if (lender) owed += left; else owe += left;
     if (dbStatus(d).k === 'late') late++;
   });
-  return { owed: r2(owed), owe: r2(owe), late };
+  return {
+    owed: r2(owed), owe: r2(owe), late,
+    paidToMe: r2(paidToMe), paidByMe: r2(paidByMe),
+    waitLoan: r2(waitLoan), waitPay: r2(waitPay), waitTotal: r2(waitLoan + waitPay)
+  };
 }
 
 /* ---------- الاشتراك ---------- */
@@ -65,6 +79,7 @@ function dbLeave() {
 }
 function stopDebts() {
   DB.unsubs.forEach(u => u()); DB.unsubs = [];
+  Object.values(DB.pendSubs).forEach(u => u()); DB.pendSubs = {}; DB.pendP = {};
   dbLeave(); DB.list = []; DB.seen = {};
 }
 function dbRepaint() {
@@ -86,7 +101,7 @@ function startDebtListeners() {
   const merge = () => {
     const m = new Map(); [...asCreator, ...asCounter].forEach(x => m.set(x.id, x));
     DB.list = [...m.values()].sort((x, y) => dbTs(y.createdAt) - dbTs(x.createdAt));
-    dbNotify(); dbRepaint();
+    dbNotify(); dbSyncPending(); dbRepaint();
   };
   const warn = code => e => console.warn('الديون: تعذر التحميل', code, e && e.code);
   DB.unsubs.push(db.collection(DB_COL).where('creatorUid', '==', uid).onSnapshot(s => {
@@ -103,6 +118,30 @@ function startDebtListeners() {
     }, warn('claim')));
   }
 }
+// دفعات بانتظار التأكيد لكل دين مؤكد (لحساب «بانتظار موافقة الاستلاف أو التحويل»)
+function dbSyncPending() {
+  const want = new Set(DB.list.filter(d => d.status === 'open' || d.status === 'closed').map(d => d.id));
+  Object.keys(DB.pendSubs).forEach(id => {
+    if (want.has(id)) return;
+    DB.pendSubs[id](); delete DB.pendSubs[id]; delete DB.pendP[id];
+  });
+  want.forEach(id => {
+    if (DB.pendSubs[id]) return;
+    DB.pendSubs[id] = dbRef(id).collection('payments').where('status', '==', 'pending').onSnapshot(s => {
+      DB.pendP[id] = s.docs.map(x => ({ id: x.id, ...x.data() })); dbRepaint();
+    }, () => {});
+  });
+}
+// إجمالي مبالغ الديون المسجّلة في النظام: رقم واحد فقط بلا تفاصيل (للمالك/المشرف العام)
+async function dbAdminTotal() {
+  try {
+    const r = await db.collection(DB_COL)
+      .where('status', 'in', ['proposed', 'requested', 'open', 'closed'])
+      .aggregate({ total: firebase.firestore.AggregateField.sum('amount') }).get();
+    return dbN(r.data().total);
+  } catch (e) { console.warn('الديون: تعذر حساب الإجمالي', e && e.code); return null; }
+}
+
 // إشعار عند وصول طلب دين جديد لم يُر من قبل
 function dbNotify() {
   const me = state.user.uid;
@@ -165,10 +204,27 @@ function dbInvitesHtml() {
 }
 function dbSummaryHtml() {
   const t = dbTotals();
-  return `<div class="grid grid-cols-3 gap-2">
-    <div class="card p-3 text-center"><p class="text-[10px] text-slate-500">لك عند الآخرين</p><b class="text-sm text-emerald-700">${fmtNum(t.owed)}</b></div>
-    <div class="card p-3 text-center"><p class="text-[10px] text-slate-500">عليك للآخرين</p><b class="text-sm text-rose-600">${fmtNum(t.owe)}</b></div>
-    <div class="card p-3 text-center"><p class="text-[10px] text-slate-500">ديون متأخرة</p><b class="text-sm ${t.late ? 'text-rose-600' : 'text-slate-800'}">${nf(t.late)}</b></div></div>`;
+  const mny = v => `${fmtNum(v)} <span class="text-[10px] font-semibold opacity-80">ريال</span>`;
+  const hero = (bg, ic, lb, v) => `<div class="rounded-2xl p-4 text-white shadow-sm min-w-0" style="background:${bg}">
+      <p class="text-[11px] font-bold opacity-90 flex items-center gap-1.5"><i class="fa-solid ${ic}"></i>${lb}</p>
+      <b class="text-xl font-black block mt-1">${mny(v)}</b></div>`;
+  const tile = (lb, v, c) => `<div class="p-3 rounded-2xl bg-white border border-slate-100 min-w-0">
+      <p class="text-[10px] text-slate-500">${lb}</p><b class="text-sm block mt-0.5 truncate ${c}">${mny(v)}</b></div>`;
+  const split = t.waitTotal ? `<p class="text-[11px] text-slate-500 mt-1">استلاف ${fmtNum(t.waitLoan)} • تحويل ${fmtNum(t.waitPay)} ريال</p>` : '';
+  return `<div class="card p-4 space-y-3">
+    <div class="grid grid-cols-2 gap-2.5">
+      ${hero('linear-gradient(135deg,#047857,#10b981)', 'fa-hand-holding-dollar', 'لك عند الآخرين', t.owed)}
+      ${hero('linear-gradient(135deg,#be123c,#f43f5e)', 'fa-file-invoice-dollar', 'عليك للآخرين', t.owe)}
+    </div>
+    <div class="grid grid-cols-2 gap-2.5">
+      ${tile('إجمالي المسدَّد لي', t.paidToMe, 'text-emerald-700')}
+      ${tile('إجمالي المسدَّد عليّ', t.paidByMe, 'text-teal-700')}
+    </div>
+    <div class="flex items-center justify-between gap-3 p-3 rounded-2xl ${t.waitTotal ? 'bg-sky-50 border border-sky-100' : 'bg-slate-50'}">
+      <div class="min-w-0"><p class="text-xs font-bold text-slate-700 flex items-center gap-1.5"><i class="fa-solid fa-hourglass-half text-sky-600"></i>بانتظار موافقة الاستلاف أو التحويل</p>${split}</div>
+      <b class="text-sm text-sky-700 flex-none">${mny(t.waitTotal)}</b></div>
+    ${t.late ? `<p class="text-[11px] text-rose-600 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> ${nf(t.late)} دين متأخر</p>` : ''}
+  </div>`;
 }
 // قسم الديون في الصفحة الرئيسية: عنوان وزر بجواره، ثم الملخص والقائمة
 function dbHomeBlock() {
@@ -321,25 +377,25 @@ function dbPaymentsTab(d, lender) {
   }).join('');
   const all = DB.pays.map(p => {
     const [lb, cl] = p.status === 'confirmed' ? ['مؤكدة', 'bg-emerald-100 text-emerald-700'] : p.status === 'pending' ? ['بانتظار التأكيد', 'bg-sky-100 text-sky-700'] : ['مرفوضة', 'bg-rose-100 text-rose-700'];
-    const undo = lender && p.status === 'confirmed' && d.status !== 'proposed'
-      ? `<button type="button" class="px-2 py-1 bg-rose-50 text-rose-600 rounded-lg" data-act="db-pay-undo" data-id="${esc(p.id)}" aria-label="التراجع عن الدفعة"><i class="fa-solid fa-rotate-left"></i></button>` : '';
     return `<div class="p-3 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center gap-2 text-xs">
       <div class="min-w-0"><p class="font-bold">${fmtNum(p.amount)} ريال</p><p class="text-[10px] text-slate-500">${dbFmt(p.date)} • ${esc(p.byName || '')}${p.note ? ' • ' + esc(p.note) : ''}</p></div>
-      <div class="flex items-center gap-2"><span class="px-2 py-1 rounded-lg font-bold ${cl}">${lb}</span>${undo}</div></div>`;
+      <div class="flex items-center gap-2"><span class="px-2 py-1 rounded-lg font-bold ${cl}">${lb}</span></div></div>`;
   }).join('');
   return (pend.length ? dbBox('<i class="fa-solid fa-clock text-sky-600"></i> دفعات بانتظار التأكيد', `<div class="space-y-2">${pendHtml}</div>`) : '')
     + dbBox('<i class="fa-solid fa-list text-slate-500"></i> سجل الدفعات', `<div class="space-y-2">${all || dbEmpty('لا توجد دفعات مسجّلة بعد')}</div>`);
 }
 function dbMoreTab(d, lender) {
-  const canEdit = d.creatorUid === state.user.uid && dbN(d.paid) === 0;
+  const mine = d.creatorUid === state.user.uid, locked = dbLocked(d), noPay = dbN(d.paid) === 0;
   const parts = [];
-  if (canEdit) parts.push(`<button type="button" class="btn b-sec" data-act="db-edit-modal"><i class="fa-solid fa-pen"></i> تعديل الدين</button>`);
+  if (mine && noPay) parts.push(`<button type="button" class="btn b-sec" data-act="db-edit-modal"><i class="fa-solid fa-pen"></i> تعديل الدين</button>`);
   if (lender && d.status === 'open') parts.push(`<button type="button" class="btn b-sec" data-act="db-close"><i class="fa-solid fa-hand-holding-heart"></i> إعفاء المتبقي وإغلاق الدين</button>`);
   if (lender && d.status === 'closed') parts.push(`<button type="button" class="btn b-sec" data-act="db-reopen"><i class="fa-solid fa-lock-open"></i> إعادة فتح الدين</button>`);
-  if (d.creatorUid === state.user.uid && dbN(d.paid) === 0) parts.push(`<button type="button" class="btn b-red" data-act="db-delete"><i class="fa-solid fa-trash"></i> حذف الدين</button>`);
-  return dbBox('<i class="fa-solid fa-sliders text-indigo-600"></i> إجراءات', parts.length
+  if (mine && noPay && !locked) parts.push(`<button type="button" class="btn b-red" data-act="db-delete"><i class="fa-solid fa-trash"></i> حذف الدين</button>`);
+  const lockNote = mine && locked ? `<p class="text-[11px] text-amber-800 bg-amber-50 border border-amber-100 rounded-xl p-2.5 leading-relaxed"><i class="fa-solid fa-lock"></i> هذا الدين مؤكد من الطرف الآخر، لذلك لا يمكن حذفه.</p>` : '';
+  const body = parts.length
     ? `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${parts.join('')}</div>`
-    : '<p class="text-xs text-slate-500 leading-relaxed">لا توجد إجراءات متاحة الآن. يمكن تعديل الدين أو حذفه قبل تسجيل أي دفعة عليه.</p>');
+    : '<p class="text-xs text-slate-500 leading-relaxed">لا توجد إجراءات متاحة الآن. يمكن تعديل الدين أو حذفه قبل تسجيل أي دفعة عليه وقبل تأكيده.</p>';
+  return dbBox('<i class="fa-solid fa-sliders text-indigo-600"></i> إجراءات', body + lockNote);
 }
 
 /* ---------- الدفعات ---------- */
@@ -387,16 +443,6 @@ async function dbDecidePay(pid, ok) {
   if (ok) dbApplyPaid(b, ref, d, dbN(p.amount));
   try { await b.commit(); toast(ok ? 'تم تأكيد الدفعة' : 'رُفضت الدفعة', 'info'); if (p.byUid) sendNotifs([p.byUid], ok ? 'تم تأكيد دفعتك ✓' : 'لم تُقبل دفعتك', `${fmtNum(dbN(p.amount))} ريال — ${dispName(state.profile)}`, dbJid(d.id), 'debt'); }
   catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
-}
-async function dbUndoPay(pid) {
-  const d = DB.d, p = DB.pays.find(x => x.id === pid);
-  if (!d || !p || p.status !== 'confirmed' || !dbIsLender(d, state.user.uid)) return;
-  if (!confirm('التراجع عن هذه الدفعة؟ سينقص المبلغ من المسدّد.')) return;
-  const ref = dbRef(d.id), b = db.batch();
-  b.delete(ref.collection('payments').doc(pid));
-  dbApplyPaid(b, ref, d, -dbN(p.amount));
-  try { await b.commit(); toast('أُلغيت الدفعة', 'info'); }
-  catch (e) { toast('تعذر التراجع: ' + e.message, 'error'); }
 }
 async function dbCancelPay(pid) {
   const d = DB.d; if (!d) return;
@@ -450,6 +496,7 @@ async function dbEditSave(f) {
 }
 async function dbDelete() {
   const d = DB.d; if (!d || d.creatorUid !== state.user.uid || dbN(d.paid) > 0) return;
+  if (dbLocked(d)) return toast('الدين مؤكد من الطرف الآخر ولا يمكن حذفه', 'error');
   if (!confirm('حذف هذا الدين نهائياً؟')) return;
   try {
     const ref = dbRef(d.id), pays = await ref.collection('payments').get();
@@ -498,7 +545,6 @@ const DB_ACTIONS = {
   'db-pay-modal': () => dbOpenPay(),
   'db-pay-ok': el => dbDecidePay(el.dataset.id, true),
   'db-pay-no': el => dbDecidePay(el.dataset.id, false),
-  'db-pay-undo': el => dbUndoPay(el.dataset.id),
   'db-pay-cancel': el => dbCancelPay(el.dataset.id),
   'db-close': () => dbSetClosed(true),
   'db-reopen': () => dbSetClosed(false),
