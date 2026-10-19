@@ -280,7 +280,14 @@ function wzBarHtml(step) {
   if (step === 4) return `${sum}<div class="wz-btns"><button type="button" class="btn b-sec" data-act="wz-edit"><i class="fa-solid fa-pen"></i> تعديل البيانات</button><button type="submit" class="btn b-pri" data-wz-submit><i class="fa-solid fa-circle-check"></i> تأكيد الإنشاء</button></div>`;
   return `${sum}<div class="wz-btns"><button type="button" class="btn b-sec" data-act="wz-back">${back(r)} السابق</button><button type="button" class="btn b-pri" data-act="wz-next">${step === 2 ? 'التالي: المعاينة' : 'التالي: المراجعة'} ${next(r)}</button></div>`;
 }
-const WZ_FIELDS = { jamiya: () => jamiyaFieldsHtml(), family: () => familyFieldsHtml(), qattah: () => qtFieldsHtml(null, 'wizard'), debt: () => dbFieldsHtml() };
+// حماية من نسخ قديمة مخزنة مؤقتاً (ملف قديم لا يحوي الدالة): نمسح الذاكرة ونعيد التحميل مرة واحدة فقط
+function wzStale(fn) {
+  try { if (!sessionStorage.getItem('jm_wz_reload')) { sessionStorage.setItem('jm_wz_reload', '1');
+    (window.caches ? caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))) : Promise.resolve()).catch(() => {}).then(() => location.reload()); } } catch (e) {}
+  return `<div class="wz-note amber" role="alert">يلزم تحديث التطبيق لعرض هذا النموذج. جارٍ إعادة التحميل… إن لم يحدث ذلك فحدّث الصفحة يدوياً. (${fn})</div>`;
+}
+const wzFn = (name, call) => typeof window[name] === 'function' ? call() : wzStale(name);
+const WZ_FIELDS = { jamiya: () => wzFn('jamiyaFieldsHtml', () => jamiyaFieldsHtml()), family: () => wzFn('familyFieldsHtml', () => familyFieldsHtml()), qattah: () => wzFn('qtFieldsHtml', () => qtFieldsHtml(null, 'wizard')), debt: () => wzFn('dbFieldsHtml', () => dbFieldsHtml()) };
 const WZ_INTRO = {
   jamiya: '', qattah: '<div class="wz-note amber">القطة صندوق مشترك لفعالية أو رحلة: تحدد الهدف والمدتين، ثم يسجّل المشرف المدفوعات ويعيّن نائباً يسجّل المصروفات معه. من تضيفه مباشرة يراها في حسابه فور دخوله.</div>', family: '', debt: ''
 };
