@@ -292,6 +292,11 @@ h1,h2,h3,.font-display{color:var(--ink)}
 .inp:hover{border-color:#C3D2DD}
 .inp:focus{border-color:var(--brand);background:#fff;box-shadow:0 0 0 4px rgba(30,90,70,.14)}
 .inp:disabled,.inp[disabled],.inp[readonly]{background:#F1F5F9;color:var(--muted);cursor:not-allowed}
+/* حقول التاريخ/الوقت: Safari على iOS يرسمها بمظهرها الأصلي فتتجاوز عرض العمود وتتوسّط؛ نوحّد عرضها ومحاذاتها */
+input.inp[type=date],input.inp[type=month],input.inp[type=time],input.inp[type=datetime-local]{-webkit-appearance:none;appearance:none;display:block;box-sizing:border-box;width:100%;min-width:0;max-width:100%;min-height:48px;line-height:1.5;text-align:start;margin:0}
+input.inp[type=date]::-webkit-date-and-time-value,input.inp[type=month]::-webkit-date-and-time-value,input.inp[type=time]::-webkit-date-and-time-value,input.inp[type=datetime-local]::-webkit-date-and-time-value{text-align:start;margin:0;min-height:1.5em;display:block}
+input.inp[type=date]::-webkit-calendar-picker-indicator{margin:0}
+.wz .grid>*,.wz-fields>*{min-width:0}
 
 /* لوحة المعلومات: بطل صلب بلا تدرجات */
 .hero{background:var(--brand-dark);color:#fff;border-radius:22px;box-shadow:var(--shadow);padding:1.25rem}
@@ -572,9 +577,9 @@ button.wz-sb{cursor:pointer;min-height:48px}
 <div id="modal"></div>
 <div id="toasts" class="toasts" aria-live="polite"></div>
 
-<script src="qattah.js?v=32"></script>
-<script src="diyun.js?v=32"></script>
-<script src="wizard.js?v=32"></script>
+<script src="qattah.js?v=33"></script>
+<script src="diyun.js?v=33"></script>
+<script src="wizard.js?v=33"></script>
 <script>
 
 /* ============ اللغة: عربي / English ============ */
