@@ -571,7 +571,7 @@ button.wz-sb{cursor:pointer;min-height:48px}
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">سِواء • الإصدار 1.3.9<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">سِواء • الإصدار 1.3.0<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
@@ -807,14 +807,40 @@ function accountFor(j, turns, cur, started, payments, uid, amount = j.amount) {
   if (started) status = confirmed >= owed - eps ? 'confirmed' : paid >= owed - eps ? 'pending' : paid > 0 ? 'partial' : 'unpaid';
   return { n, owed, confirmed, pending, paid, remaining, credit, status, covers: amount > 0 ? r2(paid / amount) : 0, mine: payments.filter(p => p.uid === uid) };
 }
-// رقم الدورة الحالية في بطاقة الجمعية الرئيسية (المشرف يعدّله، والأعضاء يرونه)
-// تعديل الرقم يحرّك تاريخ البداية بعدد الدورات المطلوب، فتصبح الدورة المدخلة هي الحالية
+const REC_NAMES = {}; // أسماء أصحاب الأدوار المجلوبة للرئيسية (أعضاء الجمعية لا تُحمَّل قبل فتحها)
+// اسم صاحب الدور في الدورة الحالية: يُجلب مرة واحدة ثم يُخزَّن مؤقتاً
+function curRecName(j, cur) {
+  const uid = (j.turns || [])[cur]; if (!uid) return '';
+  const key = j.id + ':' + uid;
+  if (REC_NAMES[key] !== undefined) return REC_NAMES[key];
+  REC_NAMES[key] = '';
+  db.collection('jamiyat').doc(j.id).collection('members').doc(uid).get()
+    .then(sn => { REC_NAMES[key] = sn.exists ? dispName(sn.data()) : '—'; if (state.view === 'home') render(); })
+    .catch(() => { REC_NAMES[key] = '—'; });
+  return '';
+}
+// بطاقة الجمعية الرئيسية: «لم تبدأ بعد» أو الدورة الحالية والمستلم والأيام المتبقية
+// رقم الدورة يعدّله المشرف فقط (تعديله يحرّك تاريخ البداية بعدد الدورات المطلوب)
 function cycleRowHtml(j) {
-  const idx = monthIdx(j), mgr = j.creatorUid === state.user.uid, shown = idx < 0 ? 1 : Math.min(idx + 1, j.count);
-  const body = mgr
+  if (j.type === 'family') return '';
+  const idx = monthIdx(j);
+  if (idx < 0) return '<p class="text-[11px] font-bold text-amber-700 mt-1.5">لم تبدأ بعد</p>';
+  const mgr = j.creatorUid === state.user.uid, finished = idx >= j.count;
+  const cur = Math.min(idx, j.count - 1), shown = Math.min(idx + 1, j.count);
+  const rec = curRecName(j, cur);
+  let left;
+  if (finished) left = '<span class="text-slate-500">انتهت الجمعية</span>';
+  else {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const days = Math.max(0, Math.round((periodStart(j, cur + 1) - today) / 864e5));
+    left = days === 0 ? '<span class="text-rose-600 font-bold">تنتهي الدورة اليوم</span>' : `<span>متبقي <b class="text-teal-700">${nf(days)}</b> يوم</span>`;
+  }
+  const body = mgr && !finished
     ? `<input type="number" min="1" max="${j.count}" value="${shown}" dir="ltr" aria-label="رقم الدورة الحالية" class="inp !py-0.5 !px-1 w-14 text-center text-xs font-black"><button type="button" data-act="jam-cycle-save" data-id="${esc(j.id)}" class="px-2 py-0.5 rounded-lg bg-teal-600 text-white text-[11px] font-bold">حفظ</button>`
-    : `<b class="text-xs">${idx < 0 ? 'لم تبدأ' : shown}</b>`;
-  return `<div class="flex items-center gap-1.5 mt-1.5 flex-wrap" onclick="event.stopPropagation()"><span class="text-[11px] text-slate-500">الدورة الحالية</span>${body}<span class="text-[11px] text-slate-400">/ ${j.count}</span></div>`;
+    : `<b class="text-xs">${shown}</b>`;
+  return `<div class="mt-1.5 space-y-1 text-[11px]" onclick="event.stopPropagation()">
+    <div class="flex items-center gap-1.5 flex-wrap"><span class="text-slate-500">الدورة الحالية</span>${body}<span class="text-slate-400">/ ${j.count}</span></div>
+    <p class="text-slate-500">${rec ? `المستلم: <b class="text-slate-700">${esc(rec)}</b> • ` : ''}${left}</p></div>`;
 }
 async function jamCycleSave(el) {
   const j = state.jamiyat.find(x => x.id === el.dataset.id);
