@@ -633,3 +633,12 @@ function wzApplyReuse(form, id) {
   setTimeout(() => { if (f.lastDay) { f.lastDay.value = j.lastDay || ''; delete f.lastDay.dataset.auto; } if (f.payDay) { f.payDay.value = j.payDay || ''; delete f.payDay.dataset.auto; }
     if (f.icon) { f.icon.value = j.icon || ''; f.icon.dispatchEvent(new Event('input', { bubbles: true })); } wzRefreshLive(); }, 0);
 }
+
+/* ---- لوحة المفاتيح: نخفي الشريطين الثابتين أثناء الكتابة حتى لا يحجبا الحقول (iOS/Android) ---- */
+(function () {
+  if (typeof document === 'undefined' || window.__wzKb) return; window.__wzKb = true;
+  const isField = el => !!(el && el.matches && el.matches('input:not([type=radio]):not([type=checkbox]):not([type=button]):not([type=submit]),textarea,select'));
+  let t = null;
+  document.addEventListener('focusin', e => { if (isField(e.target) && e.target.closest && e.target.closest('[data-wz]')) { clearTimeout(t); document.documentElement.classList.add('wz-typing'); } });
+  document.addEventListener('focusout', () => { clearTimeout(t); t = setTimeout(() => { if (!isField(document.activeElement)) document.documentElement.classList.remove('wz-typing'); }, 200); });
+})();

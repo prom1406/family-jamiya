@@ -543,6 +543,9 @@ button.wz-sb{cursor:pointer;min-height:48px}
 .wz-kv dt{color:var(--wz-mut);flex:none}.wz-kv dd{margin:0;font-weight:800;color:var(--wz-ink);text-align:end;overflow-wrap:anywhere;min-width:0}
 .wz-bar{position:sticky;bottom:calc(var(--tab-h) + var(--sab) + 8px);z-index:30;margin:1.25rem -.25rem 0;padding:.7rem;border-radius:1.2rem;background:rgba(255,255,255,.96);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--wz-line);box-shadow:0 14px 30px -16px rgba(15,60,70,.45)}
 @media(min-width:768px){.wz-bar{bottom:12px}}
+/* أثناء الكتابة (لوحة المفاتيح مفتوحة): iOS يرفع العناصر الثابتة فوق الحقول، فنجعل شريط الخطوات عادياً ونخفي شريط التبويبات */
+.wz-typing .wz-bar{position:static;bottom:auto;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+.wz-typing #tabbar{display:none!important}
 .wz-sum{font-size:.75rem;font-weight:800;color:var(--wz-dk);margin:0 .2rem .5rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wz-btns{display:grid;grid-template-columns:1fr 1.5fr;gap:.5rem}.wz-btns .btn{min-height:50px;width:100%;font-size:.88rem}
 .wz-okc{width:72px;height:72px;border-radius:50%;margin:0 auto;display:grid;place-items:center;font-size:1.8rem;color:#fff;background:linear-gradient(135deg,#0fb16b,#0f4c3a);animation:wzPop .5s cubic-bezier(.2,1.4,.4,1)}
@@ -569,9 +572,9 @@ button.wz-sb{cursor:pointer;min-height:48px}
 <div id="modal"></div>
 <div id="toasts" class="toasts" aria-live="polite"></div>
 
-<script src="qattah.js?v=31"></script>
-<script src="diyun.js?v=31"></script>
-<script src="wizard.js?v=31"></script>
+<script src="qattah.js?v=32"></script>
+<script src="diyun.js?v=32"></script>
+<script src="wizard.js?v=32"></script>
 <script>
 
 /* ============ اللغة: عربي / English ============ */
