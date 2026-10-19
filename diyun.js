@@ -182,14 +182,11 @@ function dbHomeBlock() {
 }
 
 /* ---------- العرض: دين جديد ---------- */
-function dbNewView() {
+// حقول نموذج الدين (تُعرض داخل معالج الإنشاء وتُحفظ عبر dbCreate)
+function dbFieldsHtml() {
   const lb = 'text-xs font-semibold block mb-1';
-  const opt = (v, t, checked) => `<label class="p-3 rounded-xl border border-slate-200 cursor-pointer flex items-center gap-2 text-sm"><input type="radio" name="kind" value="${v}" ${checked ? 'checked' : ''}> ${t}</label>`;
-  return `<div class="max-w-xl mx-auto space-y-4">
-    <div class="flex items-center gap-3"><button type="button" class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex-none" data-act="go-home" aria-label="رجوع"><i class="fa-solid fa-arrow-right"></i></button>
-      <div class="jicon"><i class="fa-solid fa-scale-balanced"></i></div><h2 class="font-black text-lg">دين جديد</h2></div>
-    <form id="f-db-new" class="card p-5 space-y-4">
-      <div class="grid grid-cols-1 gap-2">${opt('lent', 'أنا أقرضت (لي عند الطرف الآخر)', true)}${opt('borrowed', 'أنا اقترضت (عليّ للطرف الآخر)', false)}${opt('loan', 'استلاف: أطلب من شخص مسجّل أن يقرضني (يثبت بعد تأكيده التحويل)', false)}</div>
+  const opt = (v, t, checked) => `<label class="wz-opt"><input type="radio" name="kind" value="${v}" ${checked ? 'checked' : ''}> <span>${t}</span></label>`;
+  return `<div><p class="${lb}" id="wz-kind-l">نوع الدين</p><div class="grid grid-cols-1 gap-2" role="radiogroup" aria-labelledby="wz-kind-l">${opt('lent', 'أنا أقرضت (لي عند الطرف الآخر)', true)}${opt('borrowed', 'أنا اقترضت (عليّ للطرف الآخر)', false)}${opt('loan', 'استلاف: أطلب من شخص مسجّل أن يقرضني (يثبت بعد تأكيده التحويل)', false)}</div></div>
       <div class="grid md:grid-cols-2 gap-3">
         <div><label class="${lb}">اسم الطرف الآخر</label><input name="cname" class="inp" required maxlength="40" placeholder="مثال: خالد"></div>
         <div><label class="${lb}">جواله (إن كان مسجلاً يرى الدين ويقبله، وإجباري في الاستلاف)</label><input name="cphone" class="inp" dir="ltr" placeholder="05xxxxxxxx"></div>
@@ -201,10 +198,10 @@ function dbNewView() {
       <div class="grid md:grid-cols-2 gap-3">
         <div><label class="${lb}">تاريخ الدين</label><input name="start" type="date" class="inp" required value="${dbDay()}"></div>
         <div><label class="${lb}">موعد السداد (اختياري)</label><input name="due" type="date" class="inp"></div>
-      </div>
-      <button class="btn b-pri w-full py-3" type="submit">حفظ الدين</button>
-    </form></div>`;
+      </div>`;
 }
+// الواجهة القديمة المستقلة (view=debtNew) صارت تفتح المعالج على نوع «دين»
+function dbNewView() { if (state.createType !== 'debt') { state.createType = 'debt'; wzS().step = 2; } return wzView(); }
 const loanReqRef = (phone, did) => db.collection('loanReqs').doc(phone).collection('items').doc(did);
 function loanReqText(name, amount, reason) {
   return `السلام عليكم ${name || ''}،\nأطلب منك استلاف ${fmtNum(amount)} ريال${reason ? ' — ' + reason : ''}.\nإن وافقت فحوّل المبلغ، ثم أكّد التحويل في التطبيق ليُسجَّل القرض بعد تأكيدك. شكراً لك.`;
@@ -240,7 +237,7 @@ async function dbCreate(f) {
     if (isLoan && !counterUid) b.set(loanReqRef(phone, nref.id), { debtId: nref.id, creatorUid: state.user.uid, creatorName: data.creatorName, amount, reason: data.reason, createdAt: FV.serverTimestamp() });
     await b.commit();
     if (isLoan && !counterUid) {
-      state.view = 'home'; render();
+      wzS().data.debt = {}; wzDraftClear(); state.view = 'home'; render();
       showModal('أُرسل طلب الاستلاف', `<div class="space-y-3 text-sm">
         <p class="text-xs text-slate-600 leading-relaxed">المُقرض غير مسجّل بعد. أرسل له الطلب عبر واتساب، وفيه رابط التسجيل. سيظهر الطلب له بعد تسجيله بنفس الجوال.</p>
         <a class="btn b-pri w-full" target="_blank" rel="noopener" href="${waLink(phone, loanReqText(data.counterName, amount, reason))}"><i class="fa-brands fa-whatsapp"></i> إرسال الطلب عبر واتساب</a></div>`);
@@ -250,7 +247,7 @@ async function dbCreate(f) {
     if (counterUid) sendNotifs([counterUid], isLoan ? 'طلب استلاف جديد' : 'طلب دين جديد',
       isLoan ? `${data.creatorName} يطلب منك استلافاً ${fmtNum(amount)} ريال` : `${data.creatorName} سجّل دَيناً بينكما بمبلغ ${fmtNum(amount)} ريال`,
       dbJid(nref.id), 'debt', 'dbinv_' + nref.id);
-    state.view = 'home'; render();
+    wzDone('debt', nref.id, name);
   } catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
 }
 
@@ -493,7 +490,7 @@ async function dbSaveLoanConfirm(f) {
 
 /* ---------- الربط بالتطبيق الرئيسي ---------- */
 const DB_ACTIONS = {
-  'go-create-debt': () => { dbLeave(); state.view = 'debtNew'; render(); },
+  'go-create-debt': () => { dbLeave(); wzStart('debt'); },
   'db-open': el => dbOpen(el.dataset.id),
   'db-tab': el => { DB.tab = el.dataset.v; render(); window.scrollTo({ top: 0 }); },
   'db-accept': el => dbRespond(el.dataset.id, 'open'),

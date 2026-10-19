@@ -183,29 +183,27 @@ function qtHomeBlock() {
       <button type="button" class="sw-add" data-act="qt-new"><i class="fa-solid fa-plus"></i> قطة جديدة</button></div>
     ${cards || '<div class="card p-6 text-center text-xs text-slate-500">لا توجد قطة بعد. أنشئ صندوقاً مشتركاً لفعالية أو رحلة.</div>'}</div>`;
 }
-function qtFormHtml(q, mode) {
+// حقول النموذج فقط (mode: create | edit | wizard). في المعالج تُحسب الحصة في «الملخص الفوري» فلا حاجة لبطاقة الحصة ولا لمعالجات oninput
+function qtFieldsHtml(q, mode) {
   const v = k => esc(q && q[k] != null ? q[k] : '');
-  const lbl = 'text-xs font-semibold block mb-1', today = qtDay(), minAttr = mode === 'create' ? `min="${today}"` : '';
+  const lbl = 'text-xs font-semibold block mb-1', today = qtDay(), minAttr = mode === 'edit' ? '' : `min="${today}"`, wiz = mode === 'wizard';
   const dateF = (name, l, val) => `<div><label class="${lbl}">${l}</label><input name="${name}" type="date" class="inp" required ${minAttr} value="${esc(val || '')}"></div>`;
-  return `<form id="${mode === 'edit' ? 'f-qat-edit' : 'f-qat-create'}" class="space-y-4">
-    ${mode === 'edit' ? `<input type="hidden" name="qid" value="${esc(q.id)}">` : ''}
+  const live = wiz ? '' : ' oninput="qtPreview(this.form)"';
+  return `${mode === 'edit' ? `<input type="hidden" name="qid" value="${esc(q.id)}">` : ''}
     <div><label class="${lbl}">اسم القطة</label><input name="qname" class="inp" required maxlength="60" value="${v('name')}" placeholder="مثال: رحلة الطائف للعائلة"></div>
     <div><label class="${lbl}">سبب القطة</label><textarea name="qreason" rows="3" class="inp" required maxlength="400" placeholder="اشرح الغرض من الجمع">${v('reason')}</textarea></div>
     <div class="grid md:grid-cols-2 gap-4">
-      <div><label class="${lbl}">القيمة المطلوبة (ريال)</label><input name="qtarget" type="number" min="1" step="any" class="inp" required value="${v('target')}" oninput="qtPreview(this.form)"></div>
-      <div><label class="${lbl}">عدد الأفراد المشاركين (يشمل المشرف)</label><input name="qpart" type="number" min="2" max="100" class="inp" required value="${v('participants')}" oninput="qtPreview(this.form)"></div>
+      <div><label class="${lbl}">القيمة المطلوبة (ريال)</label><input name="qtarget" type="number" min="1" step="any" class="inp" required value="${v('target')}"${live}></div>
+      <div><label class="${lbl}">عدد الأفراد المشاركين (يشمل المشرف)</label><input name="qpart" type="number" min="2" max="100" class="inp" required value="${v('participants')}"${live}></div>
     </div>
-    <div class="p-3 rounded-xl bg-amber-50 border border-amber-100 text-xs flex justify-between items-center"><span>حصة كل فرد</span><b data-qt-share>${q ? fmtNum(qtShare(q)) + ' ريال' : '—'}</b></div>
+    ${wiz ? '' : `<div class="p-3 rounded-xl bg-amber-50 border border-amber-100 text-xs flex justify-between items-center"><span>حصة كل فرد</span><b data-qt-share>${q ? fmtNum(qtShare(q)) + ' ريال' : '—'}</b></div>`}
     <div class="grid md:grid-cols-2 gap-4">${dateF('qcs', 'بداية الجمع', q && q.collectStart)}${dateF('qce', 'نهاية الجمع (الموعد النهائي)', q && q.collectEnd)}</div>
-    <div class="grid md:grid-cols-2 gap-4">${dateF('qes', 'بداية الفعالية / الرحلة', q && q.eventStart)}${dateF('qee', 'نهاية الفعالية / الرحلة', q && q.eventEnd)}</div>
+    <div class="grid md:grid-cols-2 gap-4">${dateF('qes', 'بداية الفعالية / الرحلة', q && q.eventStart)}${dateF('qee', 'نهاية الفعالية / الرحلة', q && q.eventEnd)}</div>`;
+}
+function qtFormHtml(q, mode) {
+  return `<form id="${mode === 'edit' ? 'f-qat-edit' : 'f-qat-create'}" class="space-y-4">${qtFieldsHtml(q, mode)}
     <button class="btn b-pri w-full py-3" type="submit">${mode === 'edit' ? 'حفظ التعديلات' : 'إنشاء القطة'}</button>
   </form>`;
-}
-function qtCreateView() {
-  return `<div class="max-w-xl mx-auto card p-8"><div class="flex justify-between items-center mb-5"><h3 class="text-xl font-bold">إنشاء جديد</h3><button data-act="go-home" class="text-slate-400" aria-label="إغلاق"><i class="fa-solid fa-xmark text-lg"></i></button></div>
-    ${createTabs()}
-    <div class="p-3 bg-amber-50 border border-amber-100 rounded-2xl text-xs text-amber-900 leading-relaxed mb-4">القطة صندوق مشترك لفعالية أو رحلة: تحدد الهدف والمدتين، ثم يسجّل المشرف المدفوعات ويعيّن نائباً يسجّل المصروفات معه. من تضيفه مباشرة يراها في حسابه فور دخوله.</div>
-    ${qtFormHtml(null, 'create')}</div>`;
 }
 function qtPreview(f) {
   const el = f && f.querySelector('[data-qt-share]'); if (!el) return;
@@ -372,7 +370,7 @@ async function qtCreateCore(f) {
   const uid = state.user.uid, p = state.profile || {}, ref = db.collection(QT_COL).doc(), b = db.batch();
   b.set(ref, { ...v, ...qtAcctOf(p), adminUid: uid, adminName: dispName(p), deputyUid: '', deputyName: '', memberUids: [uid], collected: 0, expOpen: false, createdAt: FV.serverTimestamp() });
   b.set(ref.collection('members').doc(uid), qtMemberDoc(uid, dispName(p), p.phone, true));
-  try { await b.commit(); toast('تم إنشاء القطة'); qtOpen(ref.id); }
+  try { await b.commit(); toast('تم إنشاء القطة'); wzDone('qattah', ref.id, v.name); }
   catch (e) { toast('تعذر الإنشاء: ' + e.message, 'error'); }
 }
 function qtOpenEdit() { const q = QT.q; if (!q || !qtAdminOf(q)) return; showModal('تعديل القطة', qtFormHtml(q, 'edit')); }
@@ -662,8 +660,8 @@ async function qtCancelItem(k, id) {
 
 /* ---------- ربط الأحداث بالتطبيق الرئيسي ---------- */
 const QT_ACTIONS = {
-  'go-create-family': () => { state.createType = 'family'; state.view = 'create'; render(); },
-  'qt-new': () => { qtLeave(); state.createType = 'qattah'; state.view = 'create'; render(); },
+  'go-create-family': () => wzStart('family'),
+  'qt-new': () => { qtLeave(); wzStart('qattah'); },
   'qt-open': el => qtOpen(el.dataset.id),
   'qt-tab': el => { QT.tab = el.dataset.v; render(); window.scrollTo({ top: 0 }); },
   'qt-accept': el => qtAccept(el.dataset.id),

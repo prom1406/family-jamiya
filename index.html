@@ -472,6 +472,82 @@ body .tab.on i{transform:none}
   body.sw-home main{padding-top:0}
   body.sw-home .sw-hero{margin:calc(-56px - var(--sat)) -1rem 0;border-radius:0 0 32px 32px;padding:calc(56px + var(--sat) + 14px) 1.5rem 4.6rem}
 }
+
+/* ===== معالج الإنشاء (wizard.js): جوال أولاً، RTL، تباين مناسب ===== */
+.wz{--wz-main:#0d7a68;--wz-dk:#0f4c3a;--wz-soft:#e8f5f1;--wz-line:#dbe6e2;--wz-ink:#0f172a;--wz-mut:#475569;--wz-bad:#e11d48;--wz-warn:#b45309}
+.wz :focus-visible{outline:3px solid rgba(13,122,104,.5);outline-offset:2px;border-radius:.6rem}
+.wz-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.wz-head h3{font-weight:900;font-size:1.3rem;color:var(--wz-ink)}
+.wz-x{width:44px;height:44px;border-radius:14px;color:#64748b;display:grid;place-items:center;font-size:1.1rem}.wz-x:hover{background:#f1f5f9}
+.wz-steps{display:flex;gap:.25rem;margin:0 0 1.4rem;padding:0;list-style:none}
+.wz-st{flex:1;position:relative;text-align:center}
+.wz-st::before{content:"";position:absolute;top:15px;inset-inline-start:50%;width:100%;height:2px;background:var(--wz-line)}
+.wz-st:last-child::before{display:none}.wz-st.done::before{background:var(--wz-main)}
+.wz-sb{display:flex;flex-direction:column;align-items:center;gap:.3rem;width:100%;position:relative;z-index:1;background:none;border:0;padding:0;font-family:inherit;cursor:default}
+button.wz-sb{cursor:pointer;min-height:48px}
+.wz-dot{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:.8rem;background:#fff;border:2px solid var(--wz-line);color:#64748b;transition:.2s}
+.wz-st.on .wz-dot{background:var(--wz-main);border-color:var(--wz-main);color:#fff;box-shadow:0 0 0 4px rgba(13,122,104,.16)}
+.wz-st.done .wz-dot{background:var(--wz-soft);border-color:var(--wz-main);color:var(--wz-dk)}
+.wz-sl{font-size:.7rem;font-weight:700;color:#64748b}.wz-st.on .wz-sl{color:var(--wz-ink)}.wz-st.done .wz-sl{color:var(--wz-dk)}
+.wz-h{font-weight:900;font-size:1.05rem;margin:0 0 .9rem;color:var(--wz-ink);outline:none;display:flex;align-items:center;gap:.5rem}
+.wz-h i{color:var(--wz-main)}
+[data-wz-panel]{animation:wzIn .25s ease}
+@keyframes wzIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.wz-cards{display:grid;gap:.6rem}
+.wz-card{display:flex;align-items:center;gap:.8rem;width:100%;text-align:start;padding:.9rem 1rem;min-height:76px;border:2px solid var(--wz-line);border-radius:1.15rem;background:#fff;transition:transform .15s,border-color .15s,background .15s,box-shadow .15s;font-family:inherit;cursor:pointer}
+.wz-card:hover{border-color:#9cc9bf}.wz-card:active{transform:scale(.985)}
+.wz-card.on{border-color:var(--wz-main);background:var(--wz-soft);box-shadow:0 10px 22px -16px rgba(13,122,104,.8);transform:scale(1.012)}
+.wz-ci{flex:none;width:48px;height:48px;border-radius:15px;display:grid;place-items:center;font-size:1.2rem;background:var(--wz-soft);color:var(--wz-dk);transition:.15s}
+.wz-card.on .wz-ci{background:var(--wz-main);color:#fff}
+.wz-ct{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem}
+.wz-ct b{font-size:.95rem;font-weight:900;color:var(--wz-ink)}.wz-ct small{font-size:.75rem;color:var(--wz-mut);line-height:1.55}
+.wz-ck{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:.7rem;color:#fff;background:var(--wz-main);opacity:0;transform:scale(.4);transition:.18s}
+.wz-card.on .wz-ck{opacity:1;transform:scale(1)}
+.wz-debt{border-style:dashed}
+.wz-or{display:flex;align-items:center;gap:.6rem;margin:1.1rem 0 .7rem;color:#64748b;font-size:.75rem;font-weight:700}
+.wz-or::before,.wz-or::after{content:"";flex:1;height:1px;background:var(--wz-line)}
+.wz-note{padding:.75rem .9rem;border-radius:1rem;font-size:.75rem;line-height:1.75;margin-bottom:1rem}
+.wz-note.amber{background:#fffbeb;border:1px solid #fde68a;color:#78350f}.wz-note.slate{background:#f1f5f9;border:1px solid #e2e8f0;color:#334155}
+.wz-alert{padding:.7rem .9rem;border-radius:1rem;background:#fff1f2;border:1px solid #fecdd3;color:#9f1239;font-size:.78rem;font-weight:700;margin-bottom:1rem}
+.wz-link{color:var(--wz-dk);font-weight:800;text-decoration:underline;min-height:32px;display:inline}
+.wz-lb{font-size:.75rem;font-weight:700;color:var(--wz-ink)}
+.wz-hint{font-size:.72rem;color:var(--wz-mut);line-height:1.75;margin-top:.4rem}
+.wz-reuse{margin-bottom:1rem}.wz-reuse .wz-lb{display:block;margin-bottom:.3rem}
+.wz-fields label{color:#1e293b}.wz-fields .inp{scroll-margin-bottom:200px}
+.wz-fields [aria-invalid=true]{border-color:#fb7185;background:#fff}
+.wz-err{margin-top:.35rem;font-size:.75rem;font-weight:700;color:var(--wz-bad)}
+.wz-icon{border:1.5px solid #e3ebee;border-radius:1.1rem;background:rgba(248,251,251,.9)}
+.wz-icon>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:.6rem;min-height:48px;padding:.4rem 1rem;cursor:pointer}
+.wz-icon>summary::-webkit-details-marker{display:none}
+.wz-ic-sum{display:flex;align-items:center;gap:.6rem;color:#64748b;font-size:.8rem}.wz-ic-cur{font-size:1.3rem;line-height:1;color:var(--wz-dk)}
+.wz-icon[open]>summary .fa-chevron-down{transform:rotate(180deg)}.wz-icon>div{padding:0 1rem 1rem}
+.wz-chip{margin-top:.45rem;display:inline-flex;align-items:center;min-height:38px;padding:.25rem .85rem;border-radius:99px;background:var(--wz-soft);color:var(--wz-dk);font-size:.75rem;font-weight:800;border:1px dashed #86c5b6;font-family:inherit;cursor:pointer}
+.wz-opt{display:flex;align-items:center;gap:.6rem;min-height:52px;padding:.7rem .9rem;border:1.5px solid var(--wz-line);border-radius:1rem;background:#fff;cursor:pointer;font-size:.85rem;font-weight:700;line-height:1.55}
+.wz-opt input{width:20px;height:20px;accent-color:var(--wz-main);flex:none}.wz-opt:has(input:checked){border-color:var(--wz-main);background:var(--wz-soft)}
+.wz-live{margin-top:1.1rem;padding:.9rem;border-radius:1.1rem;background:linear-gradient(180deg,#f3faf7,#fff);border:1px solid #cfe7df}
+.wz-lt{font-size:.78rem;font-weight:900;color:var(--wz-dk);margin-bottom:.6rem;display:flex;gap:.4rem;align-items:center}
+.wz-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}
+.wz-tile{padding:.65rem .75rem;border-radius:.9rem;background:#fff;border:1px solid #e4ece9;min-width:0}
+.wz-tile span{display:block;font-size:.68rem;color:var(--wz-mut);margin-bottom:.15rem}.wz-tile b{display:block;font-size:.88rem;font-weight:900;color:var(--wz-ink);overflow-wrap:anywhere}
+.wz-tile.main{grid-column:1/-1;background:var(--wz-dk);border-color:var(--wz-dk)}.wz-tile.main span{color:#c6ecde}.wz-tile.main b{color:#fff;font-size:1.2rem}
+.wz-tile.wide{grid-column:1/-1}.wz-tile.bad b{color:var(--wz-bad)}.wz-tile.warn b{color:var(--wz-warn)}
+.wz-sch{margin-top:1rem}.wz-rows{list-style:none;margin:0;padding:0;display:grid;gap:.4rem}
+.wz-row{display:flex;align-items:center;gap:.6rem;padding:.55rem .7rem;border-radius:.9rem;background:#f8fafc;border:1px solid #e8edf2}
+.wz-n{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--wz-soft);color:var(--wz-dk);font-size:.72rem;font-weight:900}
+.wz-rm{flex:1;min-width:0;display:flex;flex-direction:column}.wz-rm b{font-size:.8rem}.wz-rm small{font-size:.68rem;color:var(--wz-mut)}.wz-rr{flex:none;font-size:.68rem;color:#64748b}
+.wz-more{margin-top:.5rem}.wz-more>summary{cursor:pointer;font-size:.78rem;font-weight:800;color:var(--wz-dk);min-height:44px;display:flex;align-items:center}
+.wz-notes{margin-top:.9rem;display:grid;gap:.4rem}
+.wz-notes p{display:flex;gap:.5rem;font-size:.75rem;line-height:1.75;color:#334155;background:#f8fafc;border:1px solid #e8edf2;border-radius:.9rem;padding:.6rem .75rem}.wz-notes i{color:var(--wz-main);margin-top:.4rem}
+.wz-kvs{margin:0;border:1px solid #e4ece9;border-radius:1.1rem;overflow:hidden}
+.wz-kv{display:flex;justify-content:space-between;gap:1rem;padding:.7rem .9rem;border-bottom:1px solid #eef2f1;font-size:.8rem}.wz-kv:last-child{border-bottom:0}
+.wz-kv dt{color:var(--wz-mut);flex:none}.wz-kv dd{margin:0;font-weight:800;color:var(--wz-ink);text-align:end;overflow-wrap:anywhere;min-width:0}
+.wz-bar{position:sticky;bottom:calc(var(--tab-h) + var(--sab) + 8px);z-index:30;margin:1.25rem -.25rem 0;padding:.7rem;border-radius:1.2rem;background:rgba(255,255,255,.96);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--wz-line);box-shadow:0 14px 30px -16px rgba(15,60,70,.45)}
+@media(min-width:768px){.wz-bar{bottom:12px}}
+.wz-sum{font-size:.75rem;font-weight:800;color:var(--wz-dk);margin:0 .2rem .5rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wz-btns{display:grid;grid-template-columns:1fr 1.5fr;gap:.5rem}.wz-btns .btn{min-height:50px;width:100%;font-size:.88rem}
+.wz-okc{width:72px;height:72px;border-radius:50%;margin:0 auto;display:grid;place-items:center;font-size:1.8rem;color:#fff;background:linear-gradient(135deg,#0fb16b,#0f4c3a);animation:wzPop .5s cubic-bezier(.2,1.4,.4,1)}
+@keyframes wzPop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+@media(prefers-reduced-motion:reduce){.wz *,[data-wz-panel]{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body class="text-slate-800 antialiased">
@@ -495,6 +571,7 @@ body .tab.on i{transform:none}
 
 <script src="qattah.js"></script>
 <script src="diyun.js"></script>
+<script src="wizard.js"></script>
 <script>
 
 /* ============ اللغة: عربي / English ============ */
@@ -1108,7 +1185,7 @@ async function handleCreateCore(f) {
   const batch = db.batch();
   batch.set(ref, { name, icon: cleanIcon(f.icon.value), count, amount, frequency, startDate, lastDay, payDay, creatorUid: uid, creatorName: dispName(p), memberUids: joinSelf ? [uid] : [], turns: joinSelf ? [uid] : [], modRequest: null, createdAt: FV.serverTimestamp() });
   if (joinSelf) batch.set(ref.collection('members').doc(uid), memberDoc(uid, p));
-  try { await batch.commit(); toast(joinSelf ? 'تم إنشاء الجمعية' : 'تم إنشاء الجمعية وأنت مشرف فقط'); schedStats(true); openJamiya(ref.id); }
+  try { await batch.commit(); toast(joinSelf ? 'تم إنشاء الجمعية' : 'تم إنشاء الجمعية وأنت مشرف فقط'); schedStats(true); wzDone('jamiya', ref.id, name); }
   catch (e) { toast('تعذر الإنشاء: ' + e.message, 'error'); }
 }
 /* ============ تنبيهات الصفحة الرئيسية + التقويم ============ */
@@ -1142,6 +1219,7 @@ function runAfterOpen() {
   if (!a || a.id !== state.activeId || !state.j || !state.gotM || !state.gotP) return;
   state.afterOpen = null;
   if (a.act === 'wa-remind') openWaReminders();
+  if (a.act === 'invite-modal') openModal('invite');
 }
 function homeAlerts() {
   const uid = state.user.uid, out = [], today = new Date(); today.setHours(0, 0, 0, 0);
@@ -2483,6 +2561,7 @@ function render() {
   trackView(v);
   app.querySelectorAll('form').forEach(fm => { if (fm.querySelector('[data-identity]')) updPreview(fm); });
   if (state._lv !== v) { state._lv = v; window.scrollTo(0, 0); }
+  wzAfterRender();
 }
 function renderNav() {
   const nav = $('nav'), sub = $('hdrSub'), tb = $('tabbar');
@@ -2686,7 +2765,7 @@ function vHome() {
     <p class="sw-big">${nf(nActive)}<span>التزام</span></p>
     <div class="sw-chips"><span class="sw-chip up">${nf(jamList.length)} الجمعيات</span><span class="sw-chip">${nf(QT.list.length)} القطات</span><button type="button" class="sw-chip" data-act="alerts-open">${nf(nAl)} التنبيهات</button></div>
   </div>
-  <div class="sw-quick">${swAct('i1', 'fa-people-roof', 'جمعية', 'go-create')}${swAct('i2', 'fa-hand-holding-dollar', 'قطّة', 'qt-new')}${swAct('i3', 'fa-scale-balanced', 'ديون', 'go-create-debt')}${swAct('i4', 'fa-handshake', 'تعاونية', 'go-create-family')}</div>`;
+  <div class="sw-quick">${swAct('i1', 'fa-people-roof', 'جمعية', 'go-create-jamiya')}${swAct('i2', 'fa-hand-holding-dollar', 'قطّة', 'qt-new')}${swAct('i3', 'fa-scale-balanced', 'ديون', 'go-create-debt')}${swAct('i4', 'fa-handshake', 'تعاونية', 'go-create-family')}</div>`;
   return `<div class="space-y-5">
     ${hero}
     ${verifyBanner()}${detailsNudge()}${growthCards()}
@@ -2694,7 +2773,7 @@ function vHome() {
     ${inv ? `<div class="space-y-2"><h3 class="font-black text-sm"><i class="fa-solid fa-envelope-open-text text-amber-500"></i> دعوات بانتظارك</h3>${inv}</div>` : ''}
     ${qtInvitesHtml()}
     ${dbInvitesHtml()}
-    <div class="space-y-2.5">${secHead('fa-people-roof', 'الجمعيات', 'go-create', 'جمعية جديدة')}${jamList.map(jamCard).join('') || empty('لا توجد جمعيات بعد. أنشئ جمعيتك الأولى أو انتظر دعوة.', '<button type="button" class="btn b-pri mt-4" data-act="go-create">ابدأ مجاناً الآن</button>')}</div>
+    <div class="space-y-2.5">${secHead('fa-people-roof', 'الجمعيات', 'go-create-jamiya', 'جمعية جديدة')}${jamList.map(jamCard).join('') || empty('لا توجد جمعيات بعد. أنشئ جمعيتك الأولى أو انتظر دعوة.', '<button type="button" class="btn b-pri mt-4" data-act="go-create-jamiya">ابدأ مجاناً الآن</button>')}</div>
     <div class="space-y-2.5">${secHead('fa-handshake', 'التعاون', 'go-create-family', 'تعاون جديد')}${famList.map(famCard).join('') || empty('لا توجد تعاونات عائلية بعد.')}</div>
     ${qtHomeBlock()}
     ${dbHomeBlock()}
@@ -2706,14 +2785,9 @@ function dayLabels(freq) {
                 : { last: 'آخر يوم للسداد كل شهر (1–31)', pay: 'يوم الاستلام من الشهر (1–31)', max: 31 };
 }
 function freqOpts(sel) { return Object.entries(FREQS).map(([k, v]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${v.label}</option>`).join(''); }
-function vCreate() {
-  if (state.createType === 'family') return vCreateFamily();
-  if (state.createType === 'qattah') return qtCreateView();
+function jamiyaFieldsHtml() {
   const dl = dayLabels('monthly');
-  return `<div class="max-w-xl mx-auto card p-8"><div class="flex justify-between items-center mb-5"><h3 class="text-xl font-bold">إنشاء جديد</h3><button data-act="go-home" class="text-slate-400"><i class="fa-solid fa-xmark text-lg"></i></button></div>
-  ${createTabs()}
-  <form id="f-create" class="space-y-4">
-    <div><label class="text-xs font-semibold block mb-1">اسم الجمعية</label><input name="jname" class="inp" required placeholder="جمعية عائلة ... 2026"></div>
+  return `<div><label class="text-xs font-semibold block mb-1">اسم الجمعية</label><input name="jname" class="inp" required placeholder="جمعية عائلة ... 2026"></div>
     ${iconPicker('')}
     <div><label class="text-xs font-semibold block mb-1">نوع الجمعية (مدة الدورة)</label><select name="frequency" class="inp" data-freq>${freqOpts('monthly')}</select></div>
     <div class="grid md:grid-cols-2 gap-4"><div><label class="text-xs font-semibold block mb-1">عدد الأعضاء (يساوي عدد الدورات)</label><input name="count" type="number" min="2" max="30" class="inp" required></div>
@@ -2721,9 +2795,10 @@ function vCreate() {
     <div class="grid md:grid-cols-3 gap-4"><div><label class="text-xs font-semibold block mb-1">تاريخ البداية</label><input name="start" type="date" class="inp" required></div>
     <div><label class="text-xs font-semibold block mb-1" data-lbl-last>${dl.last}</label><input name="lastDay" type="number" min="1" max="${dl.max}" class="inp" required></div>
     <div><label class="text-xs font-semibold block mb-1" data-lbl-pay>${dl.pay}</label><input name="payDay" type="number" min="1" max="${dl.max}" class="inp" required></div></div>
-    <label class="flex items-start gap-2.5 p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs leading-relaxed"><input type="checkbox" name="joinSelf" checked class="mt-0.5 w-4 h-4 accent-teal-600"><span><b>أشارك كعضو في هذه الجمعية</b><br><span class="text-slate-500">ألغِ الاختيار إن كنت ستشرف فقط دون دور استلام أو أقساط. يمكنك الانضمام لاحقاً من صفحة الجمعية إن توفر مكان شاغر.</span></span></label>
-    <button class="btn b-pri w-full py-3" type="submit">إنشاء الجمعية</button></form></div>`;
+    <label class="flex items-start gap-2.5 p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs leading-relaxed"><input type="checkbox" name="joinSelf" checked class="mt-0.5 w-4 h-4 accent-teal-600"><span><b>أشارك كعضو في هذه الجمعية</b><br><span class="text-slate-500">ألغِ الاختيار إن كنت ستشرف فقط دون دور استلام أو أقساط. يمكنك الانضمام لاحقاً من صفحة الجمعية إن توفر مكان شاغر.</span></span></label>`;
 }
+// نافذة «إنشاء جديد»: معالج من أربع خطوات (wizard.js) يغلّف نماذج الجمعية والتعاون والقطة والدين
+function vCreate() { return wzView(); }
 
 function vJamiya() {
   const c = ctx(); if (!c) return vLoading();
@@ -3494,17 +3569,9 @@ async function submitLockOff(f) {
 }
 
 /* ============ التعاون العائلي: فترة واحدة، المشرف هو المستفيد، ومساهمات بمبالغ حرة ============ */
-const createTabs = () => {
-  const t = ['family', 'qattah'].includes(state.createType) ? state.createType : 'jamiya';
-  const b = (k, ico, ttl, sub) => `<button type="button" data-act="ctype" data-v="${k}" class="p-3 rounded-2xl border-2 text-right ${t === k ? 'border-teal-600 bg-teal-50' : 'border-slate-200 bg-white'}"><p class="font-black text-sm">${ico} ${ttl}</p><p class="text-[11px] text-slate-500 mt-0.5 leading-snug">${sub}</p></button>`;
-  return `<div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-5">${b('jamiya', '🔄', 'جمعية', 'أقساط دورية بالتناوب بين الأعضاء')}${b('family', '🤝', 'تعاون عائلي', 'مساهمات لمرة واحدة لدعم هدف')}${b('qattah', '💰', 'قطة', 'صندوق مشترك لفعالية أو رحلة')}</div>`;
-};
-function vCreateFamily() {
+function familyFieldsHtml() {
   const p = state.profile || {}, known = BANKS.includes(p.bank), sel = known ? p.bank : (p.bank ? OTHER_BANK : undefined), lbl = 'text-xs font-semibold block mb-1';
-  return `<div class="max-w-xl mx-auto card p-8"><div class="flex justify-between items-center mb-5"><h3 class="text-xl font-bold">إنشاء جديد</h3><button data-act="go-home" class="text-slate-400"><i class="fa-solid fa-xmark text-lg"></i></button></div>
-  ${createTabs()}
-  <form id="f-create-family" class="space-y-4">
-    <div class="p-3 bg-violet-50 border border-violet-100 rounded-2xl text-xs text-violet-900 leading-relaxed">أنت <b>المستفيد</b> من هذا التعاون: يحوّل الأعضاء مساهماتهم مباشرة إلى حسابك وتراجع أنت الإيصالات وتؤكدها. اختر نوع التعاون أدناه: فترة واحدة تنتهي في تاريخ تحدده، أو مستمر شهرياً باشتراك ثابت لكل عضو وينتهي عند بلوغ المبلغ المستهدف.</div>
+  return `<div class="p-3 bg-violet-50 border border-violet-100 rounded-2xl text-xs text-violet-900 leading-relaxed">أنت <b>المستفيد</b> من هذا التعاون: يحوّل الأعضاء مساهماتهم مباشرة إلى حسابك وتراجع أنت الإيصالات وتؤكدها. اختر نوع التعاون أدناه: فترة واحدة تنتهي في تاريخ تحدده، أو مستمر شهرياً باشتراك ثابت لكل عضو وينتهي عند بلوغ المبلغ المستهدف.</div>
     <div><label class="${lbl}">اسم التعاون</label><input name="jname" class="inp" required maxlength="60" placeholder="تعاون عائلي لـ ..."></div>
     ${iconPicker('')}
     <div><label class="${lbl}">الهدف</label><input name="goal" class="inp" required maxlength="120" placeholder="مثال: رسوم مرافقين، عملية جراحية، دعم طارئ"></div>
@@ -3516,11 +3583,11 @@ function vCreateFamily() {
       <div><label class="${lbl}">يوم السداد والتذكير من كل شهر (1 إلى 28)</label><input name="monthlyDay" type="number" min="1" max="28" value="1" class="inp"></div></div>
       <div><label class="${lbl}">الاشتراك الشهري الثابت لكل عضو (اختياري)</label><input name="monthlyAmount" type="number" min="1" class="inp" placeholder="اتركه فارغاً ليحدد كل عضو قيمته الثابتة بنفسه"></div>
       <p class="text-[11px] text-slate-500 leading-relaxed">يصل كل عضو تذكير تلقائي في يوم السداد من كل شهر إن لم يسدد، ويُغلق التعاون تلقائياً عند بلوغ المبلغ المستهدف.</p></div>
+    <div><label class="${lbl}">عدد المشاركين المتوقع (اختياري — لحساب التقدير فقط ولا يُحفظ)</label><input name="fpart" type="number" min="2" max="1000" class="inp" placeholder="مثال: 10"></div>
     <div class="p-3 bg-slate-50 border border-slate-100 rounded-2xl space-y-3"><p class="text-xs font-black"><i class="fa-solid fa-building-columns text-violet-600"></i> حساب المستفيد لاستلام التحويلات</p>
       <div><label class="${lbl}">البنك</label><select name="bank" class="inp">${bankOpts(sel)}</select><div data-other class="${sel === OTHER_BANK ? '' : 'hide'} mt-2"><input name="bankOther" class="inp" placeholder="اكتب اسم البنك أو المحفظة" value="${esc(known ? '' : p.bank)}"></div></div>
       <div><label class="${lbl}">الآيبان (SA + 22 رقماً)</label><input name="iban" class="inp" dir="ltr" required value="${esc(p.iban)}" placeholder="SA0000000000000000000000"></div>
-      <p class="text-[11px] text-slate-500">عُبّئ من ملفك الشخصي، عدّله إن كان الحساب مختلفاً. يظهر لأعضاء هذا التعاون فقط.</p></div>
-    <button class="btn b-pri w-full py-3" type="submit">إنشاء التعاون</button></form></div>`;
+      <p class="text-[11px] text-slate-500">عُبّئ من ملفك الشخصي، عدّله إن كان الحساب مختلفاً. يظهر لأعضاء هذا التعاون فقط.</p></div>`;
 }
 function handleCreateFamily(f) { needVerified(() => handleCreateFamilyCore(f)); }
 async function handleCreateFamilyCore(f) {
@@ -3546,7 +3613,7 @@ async function handleCreateFamilyCore(f) {
     doc.endDate = endDate; doc.endAt = firebase.firestore.Timestamp.fromDate(new Date(endDate + 'T23:59:59')); if (target) doc.targetAmount = target;
   }
   batch.set(ref, doc); batch.set(ref.collection('members').doc(uid), memberDoc(uid, p));
-  try { await batch.commit(); toast('تم إنشاء التعاون'); jlog(ref.id, 'family', `${dispName(p)} أنشأ التعاون «${name}»`); openJamiya(ref.id); }
+  try { await batch.commit(); toast('تم إنشاء التعاون'); jlog(ref.id, 'family', `${dispName(p)} أنشأ التعاون «${name}»`); wzDone('family', ref.id, name); }
   catch (e) { toast('تعذر الإنشاء: ' + e.message, 'error'); }
 }
 const famEnd = j => j.endAt && j.endAt.toDate ? j.endAt.toDate() : new Date((j.endDate || '') + 'T23:59:59');
@@ -4010,11 +4077,11 @@ renderBanner();
 const actions = {
   'go-follow': () => { state.fMem = {}; state.view = 'follow'; render(); loadFollowMembers(); }, 'follow-open': el => openJamiya(el.dataset.id), 'follow-wa': el => followWa(el.dataset.uid),
   'go-home': () => { cleanup(state.jUnsubs); qtLeave(); dbLeave(); state.view = state.user && state.profile ? 'home' : state.view; render(); },
-  'go-create': () => { state.createType = 'jamiya'; state.view = 'create'; render(); },
-  'growth-create': () => { logEvent('growth_create_click'); lsSet(GK.create, String(Date.now())); state.createType = 'jamiya'; state.view = 'create'; render(); },
+  'go-create': () => wzStart(null), 'go-create-jamiya': () => wzStart('jamiya'),
+  'growth-create': () => { logEvent('growth_create_click'); lsSet(GK.create, String(Date.now())); wzStart('jamiya'); },
   'growth-dismiss': el => { const k = el && el.dataset && el.dataset.k; if (GK[k]) { lsSet(GK[k], String(Date.now())); logEvent('growth_dismiss_' + k); } render(); },
   'growth-review': () => { lsSet(GK.review, String(Date.now())); logEvent('growth_review_click'); },
-  'ctype': el => { state.createType = el.dataset.v; render(); },
+  'ctype': el => wzStart(el.dataset.v),
   'fam-pay': openFamilyPay, 'fam-self': openSelfContrib, 'fam-remind': famRemind, 'jam-tab': el => { state.jamTab = el.dataset.v; render(); window.scrollTo({ top: 0 }); },
   'fam-tab': el => { state.famTab = el.dataset.v; render(); window.scrollTo({ top: 0 }); }, 'pledge-modal': el => openPledgeModal(el && el.dataset && el.dataset.gid), 'pledge-del': deletePledge, 'guest-add': openAddGuest, 'guest-pay': el => openGuestPay(el.dataset.gid), 'guest-del': el => deleteGuest(el.dataset.gid), 'guest-wa': el => guestWa(el.dataset.gid), 'fam-del-pay': el => deleteFamPay(el.dataset.id), 'pledge-keep': keepPledge, 'pledge-fill': el => { const i = document.querySelector('#f-pledge [name=amount]'); if (i) i.value = el.dataset.v; }, 'fam-reject': el => rejectFamilyPay(el.dataset.id), 'fam-edit': openFamilyEdit, 'fam-toggle': toggleFamClosed,
   'go-profile': () => { state.view = 'profile'; render(); },
@@ -4077,6 +4144,7 @@ const actions = {
 };
 Object.assign(actions, QT_ACTIONS);
 Object.assign(actions, DB_ACTIONS);
+Object.assign(actions, WZ_ACTIONS);
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
   const fn = actions[el.dataset.act]; if (fn) fn(el);
