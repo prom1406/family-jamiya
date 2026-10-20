@@ -32,6 +32,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-check-compat.js"></script>
 <style>
 :root{--brand:#1e5a46;--brand-2:#1e5a46;--ink:#0f172a;--bg:#f5f7f5;--tab-h:64px;--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px)}
 *{-webkit-tap-highlight-color:transparent}
@@ -634,6 +635,10 @@ const EMAILJS_SERVICE_ID = "service_5dxkih9";
 const EMAILJS_TEMPLATE_ID = "template_mr4lkca";
 
 firebase.initializeApp(firebaseConfig);
+// App Check: يثبت أن الطلبات من تطبيقنا (reCAPTCHA Enterprise). الإجبار (Enforcement) يُفعَّل لاحقاً بعد مراقبة الطلبات
+const APPCHECK_SITE_KEY = '6Lem2_ctAAAAAFliRUsxWe8I99mXkUD7PIWzfT1E';
+try { firebase.appCheck().activate(new firebase.appCheck.ReCaptchaEnterpriseProvider(APPCHECK_SITE_KEY), true); }
+catch (e) { console.warn('App Check غير مفعّل:', e && e.message); }
 const auth = firebase.auth(), db = firebase.firestore();
 // ذاكرة محلية: عند إعادة فتح التطبيق تُحتسب التغييرات فقط بدل إعادة قراءة كل المستندات.
 // ضعها false إن كان الجهاز مشتركاً بين عدة أشخاص.
