@@ -1126,8 +1126,7 @@ async function sendPhoneCode(f) {
   if (!validPhone(p)) return toast('رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
   btn.disabled = true;
   try {
-    if (phoneVerifier) { try { phoneVerifier.clear(); } catch (e) {} }
-    phoneVerifier = new firebase.auth.RecaptchaVerifier('pv-recaptcha', { size: 'invisible' });
+    phoneVerifier = freshRecaptcha(phoneVerifier, 'pv-recaptcha');
     state._phoneConf = await auth.currentUser.linkWithPhoneNumber('+966' + p.slice(1), phoneVerifier);
     state._phoneP = p;
     f.classList.add('hide'); $('f-phone-code').classList.remove('hide');
@@ -1160,13 +1159,20 @@ async function confirmPhoneCode(f) {
 
 /* ---- الدخول/التسجيل برقم الجوال من شاشة الدخول: رمز SMS يكفي، والبريد اختياري ---- */
 let authVerifier = null;
+// reCAPTCHA لا يُرسم مرتين في العنصر نفسه: نُزيل القديم ونستبدله بعنصر جديد لكل محاولة
+function freshRecaptcha(oldVerifier, containerId) {
+  if (oldVerifier) { try { oldVerifier.clear(); } catch (e) {} }
+  const old = $(containerId); if (!old) throw new Error('recaptcha container missing');
+  const box = document.createElement('div'); box.id = containerId + '-' + Date.now();
+  old.replaceWith(box);
+  return new firebase.auth.RecaptchaVerifier(box.id, { size: 'invisible' });
+}
 async function sendAuthCode(f) {
   const p = normPhone(f.phone.value), btn = f.querySelector('button[type=submit]');
   if (!validPhone(p)) return toast('رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
   btn.disabled = true;
   try {
-    if (authVerifier) { try { authVerifier.clear(); } catch (e) {} }
-    authVerifier = new firebase.auth.RecaptchaVerifier('auth-recaptcha', { size: 'invisible' });
+    authVerifier = freshRecaptcha(authVerifier, 'auth-recaptcha');
     state._phoneConf = await auth.signInWithPhoneNumber('+966' + p.slice(1), authVerifier);
     state._phoneP = p; state._phoneLabel = p; state._phoneName = (f.name.value || '').trim();
     state.phoneStep = 'code'; render();
