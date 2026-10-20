@@ -83,7 +83,7 @@ function qtRepaint() {
 function startQattahListeners() {
   stopQattah();
   const u = state.user; if (!u || !state.profile) return;
-  const uid = u.uid, email = lc(u.email), phone = normPhone(state.profile.phone);
+  const uid = u.uid, email = realEmail(u), phone = phone05FromUser(u);
   let byPhone = [], byMail = [];
   const mergeInv = () => {
     const m = new Map(); [...byPhone, ...byMail].forEach(i => m.set(i.id, i));
@@ -96,11 +96,11 @@ function startQattahListeners() {
     qtSyncCard();
     qtRepaint();
   }, e => console.warn('القطة: تعذر تحميل القائمة', e.code)));
-  if (u.emailVerified) {
+  if (isVerified(u)) {
     if (validPhone(phone)) QT.unsubs.push(db.collection(QT_INV).where('phone', '==', phone).where('status', '==', 'pending').onSnapshot(s => {
       byPhone = s.docs.map(d => ({ id: d.id, ...d.data() })); mergeInv();
     }, e => console.warn('القطة: تعذر تحميل دعوات الجوال', e.code)));
-    QT.unsubs.push(db.collection(QT_INV).where('email', '==', email).where('status', '==', 'pending').onSnapshot(s => {
+    if (u.emailVerified && email) QT.unsubs.push(db.collection(QT_INV).where('email', '==', email).where('status', '==', 'pending').onSnapshot(s => {
       byMail = s.docs.map(d => ({ id: d.id, ...d.data() })); mergeInv();
     }, e => console.warn('القطة: تعذر تحميل دعوات البريد', e.code)));
   }

@@ -571,15 +571,15 @@ button.wz-sb{cursor:pointer;min-height:48px}
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-5" id="app"></main>
-<footer class="text-center text-[11px] text-slate-400 pb-4">سِواء • الإصدار 1.3.1<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
+<footer class="text-center text-[11px] text-slate-400 pb-4">سِواء • الإصدار 1.0.1<br><a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline">سياسة الخصوصية</a> • <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline">شروط الخدمة</a> • <a href="privacy.html#data-deletion" target="_blank" rel="noopener" class="underline">حذف البيانات</a></footer>
 <nav class="tabbar hide" id="tabbar" aria-label="التنقل"></nav>
 <div id="banner"></div>
 <div id="modal"></div>
 <div id="toasts" class="toasts" aria-live="polite"></div>
 
-<script src="qattah.js?v=34"></script>
-<script src="diyun.js?v=34"></script>
-<script src="wizard.js?v=34"></script>
+<script src="qattah.js?v=35"></script>
+<script src="diyun.js?v=35"></script>
+<script src="wizard.js?v=35"></script>
 <script>
 
 /* ============ اللغة: عربي / English ============ */
@@ -647,7 +647,7 @@ const BANKS = ["مصرف الراجحي","البنك الأهلي السعودي
 
 /* ============ الحالة ============ */
 const state = {
-  user: null, profile: null, isAdmin: false, view: 'loading', authMode: (function () { try { return localStorage.getItem('jm_email') ? 'login' : 'register'; } catch (e) { return 'login'; } })(),
+  user: null, profile: null, isAdmin: false, view: 'loading', authMode: (function () { try { return localStorage.getItem('jm_email') ? 'login' : 'phone'; } catch (e) { return 'login'; } })(), phoneStep: 'pw', _phoneName: '', _phoneLabel: '',
   jamiyat: [], invites: [], activeId: null, j: null, members: {}, payments: [], jInvites: [],
   admin: { jamiyat: [], users: [], qattahs: [] }, unsubs: [], jUnsubs: [], pays: {}, payLs: {}, afterOpen: null
 };
@@ -669,7 +669,7 @@ const canSeeField = (m, key) => {
   if (state.j && (state.j.creatorUid === me || (state.j.deputyUid && state.j.deputyUid === me))) return true; // المشرف يرى كل البيانات
   return key === 'phone' ? !!m.showPhone : !!m.showEmail;
 };
-const memberDoc = (uid, p) => ({ uid, name: p.name, email: lc(p.email || state.user.email), phone: p.phone, bank: p.bank, iban: p.iban, waOptIn: p.waOptIn !== false,
+const memberDoc = (uid, p) => ({ uid, name: p.name, email: lc(p.email || realEmail(state.user)), phone: p.phone, bank: p.bank, iban: p.iban, waOptIn: p.waOptIn !== false,
   nick: p.nick || '', showAs: (p.showAs === 'nick' && p.nick) ? 'nick' : 'name', showPhone: !!p.showPhone, showEmail: !!p.showEmail, ...(state.statsPub ? { st: state.statsPub } : {}) });
 const readIdentity = f => ({ nick: f.nick.value.trim(), showAs: f.showAs.value === 'nick' ? 'nick' : 'name', showPhone: f.showPhone.checked, showEmail: f.showEmail.checked });
 const identityErr = i => i.nick.length > 30 ? 'الكنية طويلة (30 حرفاً كحد أقصى)' : (i.showAs === 'nick' && !i.nick) ? 'اكتب الكنية أو اختر إظهار الاسم' : '';
@@ -692,6 +692,15 @@ const normPhone = s => {
   return d;
 };
 const validPhone = s => /^05\d{8}$/.test(String(s || '').trim());
+// الجوال «المُتحقَّق منه» هو رقم حساب Firebase نفسه (رمز SMS)، لا الرقم المكتوب في الملف الشخصي
+const phone05FromUser = u => { const d = String((u && u.phoneNumber) || '').replace(/\D/g, ''); return /^9665\d{8}$/.test(d) ? '0' + d.slice(3) : ''; };
+// الحساب موثَّق إن فعّل بريده، أو وثّق جواله السعودي بالرمز
+const isVerified = u => !!u && (!!u.emailVerified || !!phone05FromUser(u));
+// Firebase يسجّل الدخول بكلمة المرور عبر البريد فقط: لحساب الجوال بريد داخلي ثابت لا يظهر ولا يُرسل إليه شيء
+const PHONE_MAIL = '@phone.siwaa.app';
+const realEmail = u => { const e = lc(u && u.email); return e && !e.endsWith(PHONE_MAIL) ? e : ''; };
+const phoneLoginEmail = p => p + PHONE_MAIL;
+const hasPassword = u => !!u && (u.providerData || []).some(pd => pd && pd.providerId === 'password');
 const fmtDate = d => d.toLocaleDateString(LOCD(), { year: 'numeric', month: 'long', day: 'numeric' });
 const fmtMonth = d => d.toLocaleDateString(LOCD(), { year: 'numeric', month: 'long' });
 
@@ -875,7 +884,7 @@ async function bootUser(user) {
   let loadErr = null;
   try {
     // تحديث الرمز ليحمل حالة تفعيل البريد الحالية، وإلا ترفض القواعد القراءة حتى ساعة بعد التفعيل
-    if (user.emailVerified) await user.getIdToken(true).catch(() => {});
+    if (isVerified(user)) await user.getIdToken(true).catch(() => {});
     let snap = await db.collection('users').doc(user.uid).get();
     if (!snap.exists && snap.metadata && snap.metadata.fromCache) snap = await db.collection('users').doc(user.uid).get({ source: 'server' }); // لا نصدّق «غير موجود» القادم من الذاكرة المؤقتة
     state.profile = snap.exists ? snap.data() : null;
@@ -933,7 +942,7 @@ async function maybeRestoreProfile() {
   }
 }
 function startListeners() {
-  const uid = state.user.uid, email = lc(state.user.email), phone = normPhone(state.profile && state.profile.phone), ver = !!state.user.emailVerified;
+  const uid = state.user.uid, email = realEmail(state.user), phone = phone05FromUser(state.user), ver = isVerified(state.user);
   let invA = [], invB = [], jA = [], jB = [];
   const mergeJ = () => { const m = new Map(); [...jA, ...jB].forEach(x => m.set(x.id, x)); state.jamiyat = [...m.values()]; maybeRestoreProfile(); syncPayListeners(); schedStats(); if (state.view === 'home') render(); else renderNav(); };
   const merge = () => { const m = new Map(); [...invA, ...invB].forEach(i => m.set(i.id, i)); state.invites = [...m.values()];
@@ -945,7 +954,7 @@ function startListeners() {
     db.collection('jamiyat').where('creatorUid', '==', uid).onSnapshot(s => {
       jB = s.docs.map(d => ({ id: d.id, ...d.data() })); mergeJ();
     }, e => console.warn('تعذر تحميل الجمعيات التي أشرف عليها (تحقق من قواعد Firestore):', e.code)),
-    ...(ver ? [db.collection('invites').where('email', '==', email).where('status', '==', 'pending').onSnapshot(s => {
+    ...(state.user.emailVerified && email ? [db.collection('invites').where('email', '==', email).where('status', '==', 'pending').onSnapshot(s => {
       invA = s.docs.map(d => ({ id: d.id, ...d.data() })); merge();
     }, e => toast('خطأ في تحميل الدعوات: ' + e.message, 'error'))] : [])
   );
@@ -958,14 +967,27 @@ function startListeners() {
 }
 
 // إنشاء الملف الشخصي تلقائياً بالحد الأدنى (الاسم والبريد)، وباقي البيانات تُطلب عند الحاجة فقط
+// حساب جوال لا يحق له الدخول (رقم محجوز لحساب آخر): نحذفه حتى لا يبقى يتيماً
+async function discardPhoneAccount() {
+  try { if (auth.currentUser && !auth.currentUser.email) await auth.currentUser.delete(); } catch (e) {}
+  await auth.signOut().catch(() => {});
+}
 async function autoProfile(u, name) {
   if (state.settings.regClosed && !state.isAdmin) { toast(state.settings.regMsg || 'التسجيل الجديد متوقف مؤقتاً', 'error'); await auth.signOut().catch(() => {}); return false; }
-  const profile = { name, email: lc(u.email), phone: '', bank: '', iban: '', waOptIn: false, nick: '', showAs: 'name', showPhone: false, showEmail: false, avatar: u.photoURL || '', ownerNotified: false, createdAt: FV.serverTimestamp() };
+  const ph = phone05FromUser(u);
+  const profile = { name, email: realEmail(u), phone: ph, bank: '', iban: '', waOptIn: false, nick: '', showAs: 'name', showPhone: false, showEmail: false, avatar: u.photoURL || '', ownerNotified: false, createdAt: FV.serverTimestamp() };
   let existing = null;
   try {
-    const ref = db.collection('users').doc(u.uid);
-    await db.runTransaction(async t => { const sn = await t.get(ref); if (sn.exists) { existing = sn.data(); return; } t.set(ref, profile); }); // إنشاء فقط إن لم يكن الملف موجوداً
-  } catch (e) { toast('تعذر إنشاء الحساب: ' + e.message, 'error'); return false; }
+    const ref = db.collection('users').doc(u.uid), pref = ph ? db.collection('phones').doc(ph) : null;
+    await db.runTransaction(async t => {
+      const sn = await t.get(ref); if (sn.exists) { existing = sn.data(); return; } // إنشاء فقط إن لم يكن الملف موجوداً
+      if (pref) { const ps = await t.get(pref); if (ps.exists && ps.data().uid !== u.uid) throw new Error('PHONE_TAKEN'); t.set(pref, { uid: u.uid }); }
+      t.set(ref, profile);
+    });
+  } catch (e) {
+    if (e.message === 'PHONE_TAKEN') { toast(PHONE_TAKEN_MSG + '. ادخل بحسابك بالبريد وأضف جوالك من الملف الشخصي', 'error'); await discardPhoneAccount(); return false; }
+    toast('تعذر إنشاء الحساب: ' + e.message, 'error'); return false;
+  }
   if (existing) { state.profile = existing; return true; }
   state.profile = profile; if (!state.isAdmin) incStat({ regs: 1 }); logEvent('register', { name });
   return true;
@@ -1038,7 +1060,7 @@ async function doCompleteProfile(f) {
 /* ---- تفعيل البريد بدون تعطيل: تنبيه خفيف، ويُطلب عند الحاجة فقط ---- */
 let verChecking = false;
 async function softVerifyCheck(manual) {
-  const u = auth.currentUser; if (!u || verChecking) return;
+  const u = auth.currentUser; if (!u || !realEmail(u) || verChecking) return;
   if (u.emailVerified) { if (manual) toast('بريدك مفعّل ✓'); return; }
   verChecking = true;
   try {
@@ -1049,21 +1071,148 @@ async function softVerifyCheck(manual) {
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') softVerifyCheck(false); });
 function needVerified(next) {
-  if (!state.user || state.user.emailVerified) return next();
+  if (!state.user || isVerified(state.user)) return next();
   state._afterVerify = next;
   showModal('فعّل بريدك أولاً', `<div class="space-y-3 text-center"><div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl"><i class="fa-solid fa-envelope-circle-check"></i></div>
     <p class="text-xs text-slate-600 leading-relaxed">لحماية حسابك وأموال الأعضاء نفعّل بريدك مرة واحدة فقط. أرسلنا الرابط إلى <b dir="ltr">${esc(state.user.email)}</b>، افتحه ثم عد واضغط «تم التفعيل».</p>
-    <button class="btn b-pri w-full py-3" data-act="verify-check">تم التفعيل، تابع</button><button class="btn b-sec w-full" data-act="verify-resend">إعادة إرسال الرابط</button></div>`);
+    <button class="btn b-pri w-full py-3" data-act="verify-check">تم التفعيل، تابع</button><button class="btn b-sec w-full" data-act="verify-resend">إعادة إرسال الرابط</button><button class="btn b-sec w-full" data-act="phone-verify"><i class="fa-solid fa-mobile-screen"></i> أو وثّق جوالك بدلاً من البريد</button></div>`);
 }
 async function verifyCheckAction() {
   await softVerifyCheck(true);
-  if (state.user && state.user.emailVerified && state._afterVerify) { const n = state._afterVerify; state._afterVerify = null; n(); }
+  if (isVerified(state.user) && state._afterVerify) { const n = state._afterVerify; state._afterVerify = null; n(); }
 }
 function verifyBanner() {
-  if (!state.user || state.user.emailVerified) return '';
+  if (!state.user || isVerified(state.user)) return '';
   return `<div class="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs space-y-2"><p class="font-black text-amber-900"><i class="fa-solid fa-envelope-circle-check"></i> فعّل بريدك لتنضم أو تنشئ جمعية</p>
     <p class="text-amber-800 leading-relaxed">أرسلنا رابط التفعيل إلى <b dir="ltr">${esc(state.user.email)}</b>. افتحه ثم ارجع هنا وسيُحدَّث تلقائياً.</p>
-    <div class="flex gap-2"><button class="btn b-pri flex-1" data-act="verify-check">تم التفعيل</button><button class="btn b-sec flex-1" data-act="verify-resend">إعادة الإرسال</button></div></div>`;
+    <div class="flex gap-2"><button class="btn b-pri flex-1" data-act="verify-check">تم التفعيل</button><button class="btn b-sec flex-1" data-act="verify-resend">إعادة الإرسال</button></div><button class="btn b-sec w-full" data-act="phone-verify"><i class="fa-solid fa-mobile-screen"></i> وثّق جوالك بدلاً من البريد</button></div>`;
+}
+
+/* ---- توثيق الجوال بديلاً عن البريد: رمز SMS يُربط بحساب الدخول الحالي فيُعدّ الحساب موثّقاً ---- */
+let phoneVerifier = null;
+const phoneAuthErr = e => ({
+  'auth/invalid-phone-number': 'رقم الجوال غير صحيح',
+  'auth/missing-phone-number': 'اكتب رقم الجوال',
+  'auth/too-many-requests': 'محاولات كثيرة، انتظر قليلاً ثم أعد المحاولة',
+  'auth/invalid-verification-code': 'الرمز غير صحيح',
+  'auth/code-expired': 'انتهت صلاحية الرمز، اطلب رمزاً جديداً',
+  'auth/credential-already-in-use': 'هذا الجوال مرتبط بحساب آخر',
+  'auth/provider-already-linked': 'حسابك موثّق بجوال بالفعل',
+  'auth/captcha-check-failed': 'تعذر التحقق من الأمان، أعد المحاولة',
+  'auth/quota-exceeded': 'تجاوزت حد الرسائل المسموح، حاول لاحقاً',
+  'auth/operation-not-allowed': 'توثيق الجوال غير مفعّل في إعدادات المشروع بعد'
+}[e && e.code]) || (e && e.message === 'PHONE_TAKEN' ? PHONE_TAKEN_MSG : authErr(e));
+function openPhoneVerify() {
+  if (!state.user) return;
+  showModal('وثّق جوالك', `<div class="space-y-3">
+    <p class="text-xs text-slate-600 leading-relaxed">أرسل رمز تحقق إلى جوالك. بعد التوثيق لا تحتاج تفعيل البريد.</p>
+    <form id="f-phone-send" class="space-y-3">
+      <input name="phone" class="inp" dir="ltr" type="tel" inputmode="numeric" autocomplete="tel" placeholder="05xxxxxxxx" required>
+      <div id="pv-recaptcha"></div>
+      <button class="btn b-pri w-full py-3" type="submit">أرسل الرمز</button>
+    </form>
+    <form id="f-phone-code" class="space-y-3 hide">
+      <input name="code" class="inp" dir="ltr" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="رمز التحقق" required>
+      <button class="btn b-pri w-full py-3" type="submit">تأكيد</button>
+    </form></div>`);
+}
+async function sendPhoneCode(f) {
+  const p = normPhone(f.phone.value), btn = f.querySelector('button[type=submit]');
+  if (!validPhone(p)) return toast('رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
+  btn.disabled = true;
+  try {
+    if (phoneVerifier) { try { phoneVerifier.clear(); } catch (e) {} }
+    phoneVerifier = new firebase.auth.RecaptchaVerifier('pv-recaptcha', { size: 'invisible' });
+    state._phoneConf = await auth.currentUser.linkWithPhoneNumber('+966' + p.slice(1), phoneVerifier);
+    state._phoneP = p;
+    f.classList.add('hide'); $('f-phone-code').classList.remove('hide');
+    toast('أرسلنا رمز التحقق إلى جوالك', 'success');
+  } catch (e) {
+    toast(phoneAuthErr(e), 'error');
+    if (phoneVerifier) { try { phoneVerifier.clear(); } catch (_) {} phoneVerifier = null; }
+  } finally { btn.disabled = false; }
+}
+async function confirmPhoneCode(f) {
+  const btn = f.querySelector('button[type=submit]');
+  if (!state._phoneConf) return toast('أرسل الرمز أولاً', 'error');
+  btn.disabled = true;
+  try {
+    await state._phoneConf.confirm(f.code.value.trim());
+    await auth.currentUser.getIdToken(true); // ليحمل الرمز مطالبة رقم الجوال قبل كتابة الملف الشخصي
+    state.user = auth.currentUser; state._phoneConf = null;
+    const p = state._phoneP, old = state.profile && state.profile.phone;
+    if (state.profile && normPhone(old) !== p) {
+      await saveProfileWithPhone(state.user.uid, { phone: p }, 'update', validPhone(old) ? old : null);
+      state.profile = { ...state.profile, phone: p };
+    }
+    cleanup(state.unsubs); if (state.profile) startListeners();
+    closeModal(); toast('تم توثيق جوالك ✓', 'success');
+    const n = state._afterVerify; state._afterVerify = null;
+    if (n) n(); else render();
+  } catch (e) { toast(phoneAuthErr(e), 'error'); }
+  finally { btn.disabled = false; }
+}
+
+/* ---- الدخول/التسجيل برقم الجوال من شاشة الدخول: رمز SMS يكفي، والبريد اختياري ---- */
+let authVerifier = null;
+async function sendAuthCode(f) {
+  const p = normPhone(f.phone.value), btn = f.querySelector('button[type=submit]');
+  if (!validPhone(p)) return toast('رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
+  btn.disabled = true;
+  try {
+    if (authVerifier) { try { authVerifier.clear(); } catch (e) {} }
+    authVerifier = new firebase.auth.RecaptchaVerifier('auth-recaptcha', { size: 'invisible' });
+    state._phoneConf = await auth.signInWithPhoneNumber('+966' + p.slice(1), authVerifier);
+    state._phoneP = p; state._phoneLabel = p; state._phoneName = (f.name.value || '').trim();
+    state.phoneStep = 'code'; render();
+    toast('أرسلنا رمز التحقق إلى جوالك', 'success');
+  } catch (e) {
+    toast(phoneAuthErr(e), 'error');
+    if (authVerifier) { try { authVerifier.clear(); } catch (_) {} authVerifier = null; }
+  } finally { btn.disabled = false; }
+}
+async function confirmAuthCode(f) {
+  const btn = f.querySelector('button[type=submit]');
+  if (!state._phoneConf) { state.phoneStep = 'phone'; render(); return toast('أعد إرسال الرمز', 'error'); }
+  btn.disabled = true; state._registering = true; // نمنع bootUser حتى يُضبط الاسم
+  try {
+    const cred = await state._phoneConf.confirm(f.code.value.trim());
+    state._phoneConf = null; state.phoneStep = 'pw';
+    if (state._phoneName.length >= 3) await cred.user.updateProfile({ displayName: state._phoneName }).catch(() => {});
+    state._registering = false;
+    await bootUser(auth.currentUser);
+    if (auth.currentUser && phone05FromUser(auth.currentUser) && !hasPassword(auth.currentUser)) openSetPassword();
+  } catch (e) { state._registering = false; toast(phoneAuthErr(e), 'error'); }
+  finally { btn.disabled = false; }
+}
+// دخول بالجوال وكلمة المرور: لا رسائل نصية بعد إنشاء كلمة المرور
+async function submitPwLogin(f) {
+  const p = normPhone(f.phone.value), btn = f.querySelector('button[type=submit]');
+  if (!validPhone(p)) return toast('رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
+  btn.disabled = true;
+  try { await auth.signInWithEmailAndPassword(phoneLoginEmail(p), f.password.value); }
+  catch (e) {
+    const wrong = ['auth/invalid-credential', 'auth/invalid-login-credentials', 'auth/wrong-password', 'auth/user-not-found'].includes(e.code);
+    toast(wrong ? 'الجوال أو كلمة المرور غير صحيحة. إن لم تنشئ كلمة مرور بعد فادخل برمز SMS' : authErr(e), 'error');
+  } finally { btn.disabled = false; }
+}
+// إنشاء كلمة المرور بعد أول دخول برمز SMS (يُربط بالحساب نفسه دون حساب جديد)
+async function submitSetPassword(f) {
+  const u = auth.currentUser, pass = f.password.value;
+  if (!u || hasPassword(u)) return closeModal();
+  if (pass.length < 6) return toast('كلمة المرور 6 أحرف على الأقل', 'error');
+  const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+  try {
+    const em = realEmail(u) || phoneLoginEmail(phone05FromUser(u));
+    await u.linkWithCredential(firebase.auth.EmailAuthProvider.credential(em, pass));
+    closeModal(); toast('تم حفظ كلمة المرور ✓ ادخل بها لاحقاً برقم جوالك', 'success'); render();
+  } catch (e) { toast(authErr(e), 'error'); }
+  finally { btn.disabled = false; }
+}
+function openSetPassword() {
+  showModal('أنشئ كلمة مرور', `<form id="f-setpw" class="space-y-3"><p class="text-xs text-slate-600 leading-relaxed">ادخل بها لاحقاً برقم جوالك دون انتظار رسالة نصية. يمكنك تغييرها من الملف الشخصي.</p>
+    <div><label class="text-xs font-semibold block mb-1">كلمة المرور</label><input name="password" type="password" minlength="6" class="inp" required autocomplete="new-password" placeholder="6 أحرف على الأقل"></div>
+    <button class="btn b-pri w-full py-3" type="submit">حفظ</button><button type="button" class="w-full text-xs text-slate-500" data-act="close">لاحقاً</button></form>`);
 }
 
 /* ---- البيانات تُطلب عند الحاجة: الجوال والحساب البنكي قبل الانضمام لجمعية فقط ---- */
@@ -1090,6 +1239,13 @@ async function doNeedDetails(f) {
     closeModal(); toast('تم حفظ بياناتك');
     const n = state._afterDetails; state._afterDetails = null; if (n) n(); else render();
   } catch (e) { toast(phoneSaveErr(e), 'error'); }
+}
+// تحذير خفيف لمن لا كلمة مرور له: يدخل برمز SMS في كل مرة حتى ينشئ كلمة مرور
+function recoveryNudge() {
+  const u = state.user;
+  if (!u || hasPassword(u) || !phone05FromUser(u)) return '';
+  if (Date.now() - Number(lsGet('jm_rec_x') || 0) < 7 * 864e5) return ''; // مُخفى لسبعة أيام
+  return `<div class="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs flex items-start gap-3"><div class="flex-1 space-y-1"><p class="font-black text-amber-900"><i class="fa-solid fa-key"></i> ادخل بدون رسائل نصية</p><p class="text-amber-800 leading-relaxed">أنشئ كلمة مرور لتدخل برقم جوالك مباشرة، وتوفّر رسائل التحقق.</p><button class="btn b-pri mt-1" data-act="set-pass">أنشئ كلمة المرور</button></div><button class="text-amber-500" data-act="rec-dismiss" aria-label="إخفاء"><i class="fa-solid fa-xmark"></i></button></div>`;
 }
 function detailsNudge() {
   if (profileComplete(state.profile) || lsGet('jm_nudge_x')) return '';
@@ -2663,28 +2819,49 @@ function trustStrip() {
     ${row('fa-ban', 'لا نستلم أموالاً', 'كل التحويلات بين الأعضاء تتم خارج التطبيق، وهو للإدارة والمتابعة فقط.')}
     ${row('fa-shield-halved', 'بياناتك محدودة', 'لا نطلب هوية وطنية ولا بيانات بطاقات بنكية.')}</div>`;
 }
+function vPhoneForm() {
+  const lb = 'text-xs font-semibold block mb-1';
+  if (state.phoneStep === 'code') return `<form id="f-auth-code" class="space-y-3">
+    <p class="text-xs text-slate-600 leading-relaxed">أرسلنا رمزاً من 6 أرقام إلى <b dir="ltr">${esc(state._phoneLabel)}</b></p>
+    <div><label class="${lb}">رمز التحقق</label><input name="code" class="inp" dir="ltr" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required></div>
+    <button class="btn b-pri w-full py-3 text-sm" type="submit">تأكيد ودخول</button>
+    <button type="button" class="w-full text-xs text-slate-500" data-act="auth-phone-back">تغيير الرقم</button></form>`;
+  if (state.phoneStep === 'phone') return `<form id="f-auth-phone" class="space-y-3">
+    <div><label class="${lb}">اسمك <span class="text-slate-400 font-normal">(للحساب الجديد)</span></label><input name="name" class="inp" autocomplete="name" placeholder="الاسم الأول والأخير" value="${esc(state._phoneName)}"></div>
+    <div><label class="${lb}">رقم الجوال</label><input name="phone" class="inp" dir="ltr" type="tel" inputmode="numeric" autocomplete="tel" placeholder="05xxxxxxxx" required></div>
+    <div id="auth-recaptcha"></div>
+    <button class="btn b-pri w-full py-3 text-sm" type="submit">أرسل رمز التحقق</button>
+    <button type="button" class="w-full text-xs text-slate-500" data-act="auth-pw">عندي كلمة مرور، ادخل بها</button></form>`;
+  return `<form id="f-auth-pw" class="space-y-3">
+    <div><label class="${lb}">رقم الجوال</label><input name="phone" class="inp" dir="ltr" type="tel" inputmode="numeric" autocomplete="tel username" placeholder="05xxxxxxxx" required></div>
+    <div><label class="${lb}">كلمة المرور</label><input name="password" type="password" class="inp" required autocomplete="current-password"></div>
+    <button class="btn b-pri w-full py-3 text-sm" type="submit">دخول</button>
+    <div class="flex justify-between gap-2 text-xs"><button type="button" class="text-emerald-700 font-semibold" data-act="auth-sms">دخول برمز SMS</button><button type="button" class="text-slate-500" data-act="auth-sms">نسيت كلمة المرور؟</button></div>
+    <p class="text-[11px] text-slate-500 leading-relaxed text-center">حساب جديد؟ اختر «دخول برمز SMS» وأكمل التسجيل بالرمز.</p></form>`;
+}
 function vAuth() {
-  const m = state.authMode, jp = state.joinPreview, reg = m === 'register', lb = 'text-xs font-semibold block mb-1';
+  const m = state.authMode, jp = state.joinPreview, reg = m === 'register', ph = m === 'phone', lb = 'text-xs font-semibold block mb-1';
   let last = ''; try { last = localStorage.getItem('jm_email') || ''; } catch (e) {}
-  const title = { login: 'أهلاً بعودتك', register: 'ابدأ في أقل من دقيقة', reset: 'استعادة كلمة المرور' }[m];
+  const title = { login: 'أهلاً بعودتك', register: 'ابدأ في أقل من دقيقة', reset: 'استعادة كلمة المرور', phone: 'ابدأ برقم جوالك' }[m];
   const invite = jp ? `<div class="mb-4 p-3 rounded-2xl bg-emerald-50 border border-emerald-100 text-center space-y-0.5"><p class="text-[11px] text-emerald-700 font-bold">${esc(jp.creatorName || 'المشرف')} يدعوك للانضمام إلى</p><p class="font-black text-emerald-900">${esc(jp.name)}</p>
     <p class="text-[11px] text-slate-500">${jp.type === 'family' ? 'تعاون عائلي' : 'القسط ' + money(jp.amount) + ' ' + (FREQS[jp.frequency] || FREQS.monthly).every}</p>
     <p class="text-[11px] text-emerald-800 pt-1.5 leading-relaxed">✓ تعرف دورك ومتى تقبض ومتى تسدد &nbsp;✓ تذكيرات تلقائية &nbsp;✓ مجاني وبدون تنزيل</p></div>` : '';
-  const seg = m === 'reset' ? '' : `<div class="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-2xl mb-4">${[['register', 'حساب جديد'], ['login', 'دخول']].map(([k, l]) => `<button type="button" data-act="auth-${k}" class="py-2 rounded-xl text-sm font-bold ${m === k ? 'bg-white shadow text-emerald-700' : 'text-slate-500'}">${l}</button>`).join('')}</div>`;
+  const seg = m === 'reset' ? '' : `<div class="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-2xl mb-4">${[['phone', 'الجوال'], ['register', 'بريد جديد'], ['login', 'دخول بالبريد']].map(([k, l]) => `<button type="button" data-act="auth-${k}" class="py-2 rounded-xl text-xs font-bold ${m === k ? 'bg-white shadow text-emerald-700' : 'text-slate-500'}">${l}</button>`).join('')}</div>`;
   const pass = `<div><label class="${lb}">كلمة المرور</label><div class="relative"><input name="password" type="password" autocomplete="${reg ? 'new-password' : 'current-password'}" class="inp pl-12" required minlength="6" placeholder="${reg ? '6 أحرف على الأقل' : ''}"><button type="button" data-act="toggle-pass" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" aria-label="إظهار كلمة المرور"><i class="fa-regular fa-eye"></i></button></div></div>`;
-  return `<div class="max-w-md mx-auto card p-6 sm:p-8">
-    <div class="text-center mb-4"><img src="logo-full.jpg" alt="سِواء - منصة التكافل والحلول المالية التشاركية" width="112" height="112" class="w-24 h-24 mx-auto mb-1 object-contain"><h2 class="text-xl font-black">${title}</h2></div>
-    ${invite}${trustStrip()}${seg}
-    ${m !== 'reset' ? `<button data-act="google" class="w-full mb-4 py-3.5 border-2 border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center justify-center gap-3"><img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="">${reg ? 'التسجيل بحساب جوجل (بضغطة واحدة)' : 'الدخول بحساب جوجل'}</button>
-    <div class="flex items-center my-4"><div class="flex-grow border-t"></div><span class="px-3 text-xs text-slate-400">أو بالبريد</span><div class="flex-grow border-t"></div></div>` : ''}
-    <form id="${reg ? 'f-register' : m === 'reset' ? 'f-reset' : 'f-login'}" class="space-y-3">
+  const emailForm = `<form id="${reg ? 'f-register' : m === 'reset' ? 'f-reset' : 'f-login'}" class="space-y-3">
       ${reg ? `<div><label class="${lb}">اسمك</label><input name="name" class="inp" autocomplete="name" required placeholder="الاسم الأول والأخير"></div>` : ''}
       <div><label class="${lb}">البريد الإلكتروني</label><input name="email" type="email" dir="ltr" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" class="inp" required value="${m === 'login' ? esc(last) : ''}"></div>
       ${m !== 'reset' ? pass : ''}
       <button class="btn b-pri w-full py-3 text-sm" type="submit">${m === 'login' ? 'دخول' : reg ? 'ابدأ مجاناً الآن' : 'إرسال رابط الاستعادة'}</button>
-    </form>
+    </form>`;
+  return `<div class="max-w-md mx-auto card p-6 sm:p-8">
+    <div class="text-center mb-4"><img src="logo-full.jpg" alt="سِواء - منصة التكافل والحلول المالية التشاركية" width="112" height="112" class="w-24 h-24 mx-auto mb-1 object-contain"><h2 class="text-xl font-black">${title}</h2></div>
+    ${invite}${trustStrip()}${seg}
+    ${ph ? vPhoneForm() : `${m !== 'reset' ? `<button data-act="google" class="w-full mb-4 py-3.5 border-2 border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center justify-center gap-3"><img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="">${reg ? 'التسجيل بحساب جوجل (بضغطة واحدة)' : 'الدخول بحساب جوجل'}</button>
+    <div class="flex items-center my-4"><div class="flex-grow border-t"></div><span class="px-3 text-xs text-slate-400">أو بالبريد</span><div class="flex-grow border-t"></div></div>` : ''}
+    ${emailForm}
     ${m !== 'reset' ? `<button type="button" data-act="email-link" class="w-full mt-3 py-2.5 rounded-xl border border-dashed border-slate-300 text-xs font-semibold text-slate-600"><i class="fa-solid fa-wand-magic-sparkles"></i> أرسل لي رابط دخول بدون كلمة مرور</button>` : ''}
-    <div class="text-center mt-4 space-y-1">${m === 'login' ? '<button class="text-xs text-slate-500" data-act="auth-reset">نسيت كلمة المرور؟</button>' : m === 'reset' ? '<button class="text-xs text-emerald-600 font-semibold" data-act="auth-login">العودة لتسجيل الدخول</button>' : ''}</div>
+    <div class="text-center mt-4 space-y-1">${m === 'login' ? '<button class="text-xs text-slate-500" data-act="auth-reset">نسيت كلمة المرور؟</button>' : m === 'reset' ? '<button class="text-xs text-emerald-600 font-semibold" data-act="auth-login">العودة لتسجيل الدخول</button>' : ''}</div>`}
     ${m === 'login' ? `<button type="button" data-act="auth-register" class="btn b-sec w-full py-3 text-sm mt-3">جديد هنا؟ <b>ابدأ مجاناً الآن</b></button>` : ''}
     <p class="text-[11px] text-slate-400 text-center leading-relaxed mt-4">بالمتابعة أنت توافق على <a href="privacy.html#terms" target="_blank" rel="noopener" class="underline text-emerald-700">الشروط والأحكام</a> و<a href="privacy.html#privacy" target="_blank" rel="noopener" class="underline text-emerald-700">سياسة الخصوصية</a></p></div>`;
 }
@@ -2808,7 +2985,7 @@ function vHome() {
   <div class="sw-quick">${swAct('i1', 'fa-people-roof', 'جمعية', 'go-create-jamiya')}${swAct('i2', 'fa-hand-holding-dollar', 'قطّة', 'qt-new')}${swAct('i3', 'fa-scale-balanced', 'ديون', 'go-create-debt')}${swAct('i4', 'fa-handshake', 'تعاونية', 'go-create-family')}</div>`;
   return `<div class="space-y-5">
     ${hero}
-    ${verifyBanner()}${detailsNudge()}${growthCards()}
+    ${verifyBanner()}${recoveryNudge()}${detailsNudge()}${growthCards()}
     ${staffJams().length ? (() => { const D = followData(); return `<button class="w-full text-right card p-4 flex items-center justify-between gap-3" data-act="go-follow"><span class="flex items-center gap-3 min-w-0"><span class="jicon"><i class="fa-solid fa-list-check"></i></span><span class="min-w-0"><b class="text-sm block">متابعة الأعضاء</b><span class="text-[11px] ${D.nLate ? 'text-rose-600' : 'text-slate-500'}">${D.list.length ? nf(D.list.length) + ' عضو عليهم مبالغ' + (D.nLate ? ' • ' + nf(D.nLate) + ' متأخر' : '') : 'كل شيء مسدد حالياً ✓'}</span></span></span><i class="fa-solid fa-chevron-left text-slate-300"></i></button>`; })() : ''}
     ${inv ? `<div class="space-y-2"><h3 class="font-black text-sm"><i class="fa-solid fa-envelope-open-text text-amber-500"></i> دعوات بانتظارك</h3>${inv}</div>` : ''}
     ${qtInvitesHtml()}
@@ -2944,10 +3121,63 @@ function vJamiya() {
     ${bar}${body}</div>`;
 }
 
+/* ---- البريد وكلمة المرور في الملف الشخصي ---- */
+function emailCardHtml() {
+  const u = state.user; if (!u) return '';
+  const em = realEmail(u);
+  if (em) {
+    if (u.emailVerified) return '';
+    return `<div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-envelope-circle-check text-amber-500"></i> بريدك بانتظار التفعيل</h4>
+      <p class="text-xs text-slate-500 leading-relaxed">أرسلنا رابط التفعيل إلى <b dir="ltr">${esc(em)}</b>. بعد تفعيله تعمل الدعوات بالبريد واستعادة كلمة المرور.</p>
+      <div class="flex gap-2"><button class="btn b-pri flex-1" data-act="verify-check">تم التفعيل</button><button class="btn b-sec flex-1" data-act="resend-verify">إعادة الإرسال</button></div></div>`;
+  }
+  const lb = 'text-xs font-semibold block mb-1', pw = hasPassword(u);
+  return `<div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-envelope text-emerald-600"></i> أضف بريدك الإلكتروني</h4>
+    <p class="text-xs text-slate-500 leading-relaxed">يتيح لك استعادة كلمة المرور، واستلام الدعوات المرسلة إلى بريدك.</p>
+    ${pw ? '<p class="text-xs text-amber-800 leading-relaxed bg-amber-50 border border-amber-200 rounded-xl p-2.5">تنبيه: بعد إضافة البريد يصبح هو وسيلة الدخول بكلمة المرور، ولن يعمل الدخول برقم الجوال وكلمة المرور.</p>' : ''}
+    <form id="f-addemail" class="space-y-3">
+      <div><label class="${lb}">البريد الإلكتروني</label><input name="email" type="email" dir="ltr" inputmode="email" autocomplete="email" class="inp" required></div>
+      ${pw ? '' : `<div><label class="${lb}">كلمة مرور للدخول بالبريد</label><input name="password" type="password" minlength="6" class="inp" required autocomplete="new-password" placeholder="6 أحرف على الأقل"></div>`}
+      <button class="btn b-pri w-full py-3" type="submit">أضف البريد وأرسل رابط التفعيل</button></form></div>`;
+}
+function passCardHtml() {
+  const u = state.user; if (!u || !hasPassword(u)) return '';
+  return `<div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-key text-slate-700"></i> كلمة المرور</h4>
+    <form id="f-changepass" class="space-y-3"><div><label class="text-xs font-semibold block mb-1">كلمة مرور جديدة</label><input name="password" type="password" minlength="6" class="inp" required autocomplete="new-password" placeholder="6 أحرف على الأقل"></div>
+    <button class="btn b-sec w-full" type="submit">تغيير كلمة المرور</button></form></div>`;
+}
+async function submitChangePass(f) {
+  const u = auth.currentUser, pass = f.password.value;
+  if (!u || !hasPassword(u)) return;
+  if (pass.length < 6) return toast('كلمة المرور 6 أحرف على الأقل', 'error');
+  const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+  try { await u.updatePassword(pass); f.reset(); toast('تم تغيير كلمة المرور ✓', 'success'); }
+  catch (e) { toast(e.code === 'auth/requires-recent-login' ? 'سجّل الخروج وادخل من جديد، ثم أعد تغيير كلمة المرور' : authErr(e), 'error'); }
+  finally { btn.disabled = false; }
+}
+async function submitAddEmail(f) {
+  const u = auth.currentUser, email = lc(f.email.value);
+  if (!u || realEmail(u)) return;
+  const pw = hasPassword(u);
+  if (!validEmail(email)) return toast('البريد غير صحيح', 'error');
+  if (!pw && f.password.value.length < 6) return toast('كلمة المرور 6 أحرف على الأقل', 'error');
+  const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+  try {
+    if (pw) await u.updateEmail(email); // يحتفظ بكلمة المرور الحالية
+    else await u.linkWithCredential(firebase.auth.EmailAuthProvider.credential(email, f.password.value)); // نفس الحساب
+    await u.sendEmailVerification({ url: appUrl() }).catch(() => {});
+    await db.collection('users').doc(u.uid).update({ email });
+    state.user = auth.currentUser; state.profile = { ...state.profile, email };
+    try { localStorage.setItem('jm_email', email); } catch (e) {}
+    toast('أضفنا بريدك. افتح رابط التفعيل لتعمل الدعوات بالبريد', 'success');
+    render();
+  } catch (e) { toast(e.code === 'auth/requires-recent-login' ? 'سجّل الخروج وادخل من جديد ثم أعد إضافة البريد' : authErr(e), 'error'); }
+  finally { btn.disabled = false; }
+}
 function vProfile() {
   const p = state.profile, inst = isStandalone();
   if (!statsFresh()) setTimeout(() => loadMyStats(), 0);
-  return `<div class="max-w-xl mx-auto space-y-4"><div class="card p-6 space-y-5"><div class="flex justify-between items-center gap-3"><div class="flex items-center gap-3 min-w-0"><div class="jicon !rounded-full"><i class="fa-solid fa-user"></i></div><div class="min-w-0"><h3 class="font-black text-lg truncate">${esc(p.name)}</h3><p class="text-xs text-slate-500 truncate" dir="ltr">${esc(p.email)}</p></div></div><button class="btn b-sec hidden md:inline-flex" data-act="go-home">الرئيسية</button></div>
+  return `<div class="max-w-xl mx-auto space-y-4">${emailCardHtml()}${passCardHtml()}<div class="card p-6 space-y-5"><div class="flex justify-between items-center gap-3"><div class="flex items-center gap-3 min-w-0"><div class="jicon !rounded-full"><i class="fa-solid fa-user"></i></div><div class="min-w-0"><h3 class="font-black text-lg truncate">${esc(p.name)}</h3><p class="text-xs text-slate-500 truncate" dir="ltr">${esc(p.email)}</p></div></div><button class="btn b-sec hidden md:inline-flex" data-act="go-home">الرئيسية</button></div>
     <form id="f-profile" class="space-y-3"><div><label class="text-xs font-semibold block mb-1">الاسم</label><input name="name" class="inp" value="${esc(p.name)}" required></div>${bankFields(p)}
     <button class="btn b-pri w-full py-3" type="submit">حفظ التعديلات</button></form></div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-chart-simple text-teal-600"></i> نشاطي في الجمعيات</h4>${state.stats ? statsTiles(state.stats) : '<p class="text-xs text-slate-400">جارٍ حساب إحصاءاتك…</p>'}</div>
@@ -4124,13 +4354,13 @@ const actions = {
   'ctype': el => wzStart(el.dataset.v),
   'fam-pay': openFamilyPay, 'fam-self': openSelfContrib, 'fam-remind': famRemind, 'jam-tab': el => { state.jamTab = el.dataset.v; render(); window.scrollTo({ top: 0 }); },
   'fam-tab': el => { state.famTab = el.dataset.v; render(); window.scrollTo({ top: 0 }); }, 'pledge-modal': el => openPledgeModal(el && el.dataset && el.dataset.gid), 'pledge-del': deletePledge, 'guest-add': openAddGuest, 'guest-pay': el => openGuestPay(el.dataset.gid), 'guest-del': el => deleteGuest(el.dataset.gid), 'guest-wa': el => guestWa(el.dataset.gid), 'fam-del-pay': el => deleteFamPay(el.dataset.id), 'pledge-keep': keepPledge, 'pledge-fill': el => { const i = document.querySelector('#f-pledge [name=amount]'); if (i) i.value = el.dataset.v; }, 'fam-reject': el => rejectFamilyPay(el.dataset.id), 'fam-edit': openFamilyEdit, 'fam-toggle': toggleFamClosed,
-  'go-profile': () => { state.view = 'profile'; render(); },
+  'go-profile': () => { state.view = 'profile'; render(); }, 'rec-dismiss': () => { lsSet('jm_rec_x', String(Date.now())); render(); },
   'go-admin': () => { state.view = 'admin'; render(); loadAdmin(); },
   'logout': async () => { if (state.user) ssDel('jm_sess_' + state.user.uid); stopHeartbeat(); await Promise.race([unregisterPush(), new Promise(r => setTimeout(r, 3000))]); auth.signOut(); },
   'reg-push': async () => { const r = await registerPush(true); toast(r.ok ? 'سُجّل هذا الجهاز لإشعارات حسابك ✓' : 'تعذر تسجيل الجهاز: ' + r.err, r.ok ? 'success' : 'error'); },
   'google': doGoogle,
   'toggle-pass': el => { const i = el.parentElement.querySelector('input'); if (i) { const show = i.type === 'password'; i.type = show ? 'text' : 'password'; el.innerHTML = show ? '<i class="fa-regular fa-eye-slash"></i>' : '<i class="fa-regular fa-eye"></i>'; } },
-  'email-link': doEmailLink, 'verify-check': verifyCheckAction, 'verify-resend': () => auth.currentUser.sendEmailVerification({ url: appUrl() }).then(() => toast('أُعيد إرسال رابط التفعيل')).catch(e => toast(authErr(e), 'error')),
+  'email-link': doEmailLink, 'verify-check': verifyCheckAction, 'auth-phone': () => { state.authMode = 'phone'; state.phoneStep = 'pw'; state._phoneConf = null; render(); }, 'auth-sms': () => { state.phoneStep = 'phone'; state._phoneConf = null; render(); }, 'auth-pw': () => { state.phoneStep = 'pw'; state._phoneConf = null; render(); }, 'set-pass': () => openSetPassword(), 'auth-phone-back': () => { state.phoneStep = 'phone'; state._phoneConf = null; render(); }, 'phone-verify': () => openPhoneVerify(), 'verify-resend': () => auth.currentUser.sendEmailVerification({ url: appUrl() }).then(() => toast('أُعيد إرسال رابط التفعيل')).catch(e => toast(authErr(e), 'error')),
   'open-details': () => needDetails(() => render()), 'dismiss-nudge': () => { lsSet('jm_nudge_x', '1'); render(); },
   'auth-register': () => { state.authMode = 'register'; render(); },
   'auth-login': () => { state.authMode = 'login'; render(); },
@@ -4207,7 +4437,7 @@ document.addEventListener('input', e => {
   if (fm.querySelector('[data-identity]')) updPreview(fm);
   if (e.target.name === 'icon') fm.querySelectorAll('.emo').forEach(b => b.classList.toggle('on', b.dataset.v === e.target.value.trim()));
 });
-const forms = { 'f-register': doRegister, 'f-login': doLogin, 'f-reset': doReset, 'f-complete': doCompleteProfile, 'f-need': doNeedDetails, 'f-create': handleCreate,
+const forms = { 'f-auth-pw': submitPwLogin, 'f-setpw': submitSetPassword, 'f-changepass': submitChangePass, 'f-addemail': submitAddEmail, 'f-auth-phone': sendAuthCode, 'f-auth-code': confirmAuthCode, 'f-phone-send': sendPhoneCode, 'f-phone-code': confirmPhoneCode, 'f-register': doRegister, 'f-login': doLogin, 'f-reset': doReset, 'f-complete': doCompleteProfile, 'f-need': doNeedDetails, 'f-create': handleCreate,
   'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-notif': submitNotif, 'f-deputy': f => setDeputy(f.uid.value), 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete, 'f-wish': submitWish, 'f-chat': sendChat, 'f-create-family': handleCreateFamily, 'f-fampay': submitFamilyPay, 'f-famself': submitSelfContrib, 'f-addguest': submitAddGuest, 'f-famguest': submitGuestPay, 'f-pledge': submitPledge, 'f-famedit': submitFamilyEdit, 'f-share': submitShare, 'f-swap': submitSwap, 'f-lock': submitLock, 'f-lockoff': submitLockOff };
 Object.assign(forms, ADMIN_FORMS);
 Object.assign(forms, QT_FORMS);
