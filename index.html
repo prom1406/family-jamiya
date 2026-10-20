@@ -1160,11 +1160,11 @@ async function confirmPhoneCode(f) {
 /* ---- الدخول/التسجيل برقم الجوال من شاشة الدخول: رمز SMS يكفي، والبريد اختياري ---- */
 let authVerifier = null;
 // reCAPTCHA لا يُرسم مرتين في العنصر نفسه: نُزيل القديم ونستبدله بعنصر جديد لكل محاولة
-function freshRecaptcha(oldVerifier, containerId) {
+function freshRecaptcha(oldVerifier, wrapperId) {
   if (oldVerifier) { try { oldVerifier.clear(); } catch (e) {} }
-  const old = $(containerId); if (!old) throw new Error('recaptcha container missing');
-  const box = document.createElement('div'); box.id = containerId + '-' + Date.now();
-  old.replaceWith(box);
+  const wrap = $(wrapperId); if (!wrap) throw new Error('recaptcha container missing');
+  wrap.innerHTML = ''; // الحاوية الخارجية ثابتة، ونضع داخلها عنصراً جديداً لكل محاولة
+  const box = document.createElement('div'); box.id = wrapperId + '-' + Date.now(); wrap.appendChild(box);
   return new firebase.auth.RecaptchaVerifier(box.id, { size: 'invisible' });
 }
 async function sendAuthCode(f) {
