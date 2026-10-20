@@ -577,9 +577,9 @@ button.wz-sb{cursor:pointer;min-height:48px}
 <div id="modal"></div>
 <div id="toasts" class="toasts" aria-live="polite"></div>
 
-<script src="qattah.js?v=35"></script>
-<script src="diyun.js?v=35"></script>
-<script src="wizard.js?v=35"></script>
+<script src="qattah.js?v=34"></script>
+<script src="diyun.js?v=34"></script>
+<script src="wizard.js?v=34"></script>
 <script>
 
 /* ============ اللغة: عربي / English ============ */
@@ -647,7 +647,7 @@ const BANKS = ["مصرف الراجحي","البنك الأهلي السعودي
 
 /* ============ الحالة ============ */
 const state = {
-  user: null, profile: null, isAdmin: false, view: 'loading', authMode: (function () { try { return localStorage.getItem('jm_email') ? 'login' : 'phone'; } catch (e) { return 'login'; } })(), phoneStep: 'pw', _phoneName: '', _phoneLabel: '',
+  user: null, profile: null, isAdmin: false, view: 'loading', authMode: (function () { try { return localStorage.getItem('jm_email') ? 'login' : 'phone'; } catch (e) { return 'login'; } })(), phoneStep: (function () { try { return localStorage.getItem('jm_phone_pw') ? 'pw' : 'phone'; } catch (e) { return 'phone'; } })(), _phoneName: '', _phoneLabel: '',
   jamiyat: [], invites: [], activeId: null, j: null, members: {}, payments: [], jInvites: [],
   admin: { jamiyat: [], users: [], qattahs: [] }, unsubs: [], jUnsubs: [], pays: {}, payLs: {}, afterOpen: null
 };
@@ -1190,7 +1190,7 @@ async function submitPwLogin(f) {
   const p = normPhone(f.phone.value), btn = f.querySelector('button[type=submit]');
   if (!validPhone(p)) return toast('رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
   btn.disabled = true;
-  try { await auth.signInWithEmailAndPassword(phoneLoginEmail(p), f.password.value); }
+  try { await auth.signInWithEmailAndPassword(phoneLoginEmail(p), f.password.value); lsSet('jm_phone_pw', '1'); }
   catch (e) {
     const wrong = ['auth/invalid-credential', 'auth/invalid-login-credentials', 'auth/wrong-password', 'auth/user-not-found'].includes(e.code);
     toast(wrong ? 'الجوال أو كلمة المرور غير صحيحة. إن لم تنشئ كلمة مرور بعد فادخل برمز SMS' : authErr(e), 'error');
@@ -1205,7 +1205,7 @@ async function submitSetPassword(f) {
   try {
     const em = realEmail(u) || phoneLoginEmail(phone05FromUser(u));
     await u.linkWithCredential(firebase.auth.EmailAuthProvider.credential(em, pass));
-    closeModal(); toast('تم حفظ كلمة المرور ✓ ادخل بها لاحقاً برقم جوالك', 'success'); render();
+    lsSet('jm_phone_pw', '1'); closeModal(); toast('تم حفظ كلمة المرور ✓ ادخل بها لاحقاً برقم جوالك', 'success'); render();
   } catch (e) { toast(authErr(e), 'error'); }
   finally { btn.disabled = false; }
 }
@@ -2855,7 +2855,13 @@ function vAuth() {
       <button class="btn b-pri w-full py-3 text-sm" type="submit">${m === 'login' ? 'دخول' : reg ? 'ابدأ مجاناً الآن' : 'إرسال رابط الاستعادة'}</button>
     </form>`;
   return `<div class="max-w-md mx-auto card p-6 sm:p-8">
-    <div class="text-center mb-4"><img src="logo-full.jpg" alt="سِواء - منصة التكافل والحلول المالية التشاركية" width="112" height="112" class="w-24 h-24 mx-auto mb-1 object-contain"><h2 class="text-xl font-black">${title}</h2></div>
+    <div class="text-center mb-4"><div class="w-40 h-40 mx-auto mb-1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%" role="img" aria-label="سِواء Siwaa">
+  <text x="250" y="160" font-family="sans-serif" font-size="110" font-weight="900" fill="#0F4C3A" text-anchor="middle">سِواء</text>
+  <text x="330" y="190" font-family="sans-serif" font-size="110" font-weight="900" fill="#E65A2C" text-anchor="middle">ِ</text>
+  <text x="250" y="240" font-family="sans-serif" font-size="65" font-weight="bold" fill="#0F4C3A" text-anchor="middle" letter-spacing="2">Siwaa</text>
+  <path d="M 150 320 C 50 320, 50 420, 150 420 C 220 420, 280 320, 350 320 C 450 320, 450 420, 350 420 C 280 420, 220 320, 150 320 Z" fill="none" stroke="#0FB16B" stroke-width="35" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 350 320 C 450 320, 450 420, 350 420 C 300 420, 250 370, 250 370" fill="none" stroke="#E65A2C" stroke-width="35" stroke-linecap="round"/>
+</svg></div><h2 class="text-xl font-black">${title}</h2></div>
     ${invite}${trustStrip()}${seg}
     ${ph ? vPhoneForm() : `${m !== 'reset' ? `<button data-act="google" class="w-full mb-4 py-3.5 border-2 border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center justify-center gap-3"><img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="">${reg ? 'التسجيل بحساب جوجل (بضغطة واحدة)' : 'الدخول بحساب جوجل'}</button>
     <div class="flex items-center my-4"><div class="flex-grow border-t"></div><span class="px-3 text-xs text-slate-400">أو بالبريد</span><div class="flex-grow border-t"></div></div>` : ''}
@@ -4360,7 +4366,7 @@ const actions = {
   'reg-push': async () => { const r = await registerPush(true); toast(r.ok ? 'سُجّل هذا الجهاز لإشعارات حسابك ✓' : 'تعذر تسجيل الجهاز: ' + r.err, r.ok ? 'success' : 'error'); },
   'google': doGoogle,
   'toggle-pass': el => { const i = el.parentElement.querySelector('input'); if (i) { const show = i.type === 'password'; i.type = show ? 'text' : 'password'; el.innerHTML = show ? '<i class="fa-regular fa-eye-slash"></i>' : '<i class="fa-regular fa-eye"></i>'; } },
-  'email-link': doEmailLink, 'verify-check': verifyCheckAction, 'auth-phone': () => { state.authMode = 'phone'; state.phoneStep = 'pw'; state._phoneConf = null; render(); }, 'auth-sms': () => { state.phoneStep = 'phone'; state._phoneConf = null; render(); }, 'auth-pw': () => { state.phoneStep = 'pw'; state._phoneConf = null; render(); }, 'set-pass': () => openSetPassword(), 'auth-phone-back': () => { state.phoneStep = 'phone'; state._phoneConf = null; render(); }, 'phone-verify': () => openPhoneVerify(), 'verify-resend': () => auth.currentUser.sendEmailVerification({ url: appUrl() }).then(() => toast('أُعيد إرسال رابط التفعيل')).catch(e => toast(authErr(e), 'error')),
+  'email-link': doEmailLink, 'verify-check': verifyCheckAction, 'auth-phone': () => { state.authMode = 'phone'; state.phoneStep = lsGet('jm_phone_pw') ? 'pw' : 'phone'; state._phoneConf = null; render(); }, 'auth-sms': () => { state.phoneStep = 'phone'; state._phoneConf = null; render(); }, 'auth-pw': () => { state.phoneStep = 'pw'; state._phoneConf = null; render(); }, 'set-pass': () => openSetPassword(), 'auth-phone-back': () => { state.phoneStep = 'phone'; state._phoneConf = null; render(); }, 'phone-verify': () => openPhoneVerify(), 'verify-resend': () => auth.currentUser.sendEmailVerification({ url: appUrl() }).then(() => toast('أُعيد إرسال رابط التفعيل')).catch(e => toast(authErr(e), 'error')),
   'open-details': () => needDetails(() => render()), 'dismiss-nudge': () => { lsSet('jm_nudge_x', '1'); render(); },
   'auth-register': () => { state.authMode = 'register'; render(); },
   'auth-login': () => { state.authMode = 'login'; render(); },
