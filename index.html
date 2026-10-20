@@ -1105,7 +1105,7 @@ const phoneAuthErr = e => ({
   'auth/provider-already-linked': 'حسابك موثّق بجوال بالفعل',
   'auth/captcha-check-failed': 'تعذر التحقق من الأمان، أعد المحاولة',
   'auth/quota-exceeded': 'تجاوزت حد الرسائل المسموح، حاول لاحقاً',
-  'auth/operation-not-allowed': 'توثيق الجوال غير مفعّل في إعدادات المشروع بعد'
+  'auth/operation-not-allowed': 'أرسلنا الطلب لكن Firebase يمنع الرسائل إلى هذه الدولة. فعّل السعودية (+966) في Authentication ← Settings ← SMS region policy'
 }[e && e.code]) || (e && e.message === 'PHONE_TAKEN' ? PHONE_TAKEN_MSG : authErr(e));
 function openPhoneVerify() {
   if (!state.user) return;
