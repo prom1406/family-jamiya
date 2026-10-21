@@ -558,6 +558,36 @@ button.wz-sb{cursor:pointer;min-height:48px}
 @keyframes wzPop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
 @media(prefers-reduced-motion:reduce){.wz *,[data-wz-panel]{animation:none!important;transition:none!important}}
 </style>
+<style id="pf-style">
+.pf{max-width:36rem;margin:0 auto;display:flex;flex-direction:column;gap:1.05rem;padding-bottom:1.5rem}
+.pf-hero{position:relative;overflow:hidden;border-radius:1.6rem;padding:1.25rem;color:#fff;background:linear-gradient(135deg,#0f4c3a 0%,#1e5a46 55%,#0fb16b 140%);box-shadow:0 18px 40px -18px rgba(15,76,58,.6)}
+.pf-hero::after{content:"";position:absolute;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.08);top:-100px;left:-80px;pointer-events:none}
+.pf-top{display:flex;align-items:center;gap:.9rem;position:relative;z-index:1;min-width:0}
+.pf-av{width:58px;height:58px;border-radius:50%;flex:none;background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.1rem}
+.pf-name{font-weight:900;font-size:1.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-sub{font-size:.75rem;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.pf-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:1.1rem;position:relative;z-index:1}
+.pf-stat{background:rgba(255,255,255,.12);border-radius:1rem;padding:.6rem .3rem;text-align:center}
+.pf-stat b{display:block;font-size:1rem;font-weight:900}
+.pf-stat span{display:block;font-size:.64rem;opacity:.85;margin-top:2px}
+.pf-prog{margin-top:1rem;position:relative;z-index:1}
+.pf-prog-h{display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:.35rem;opacity:.92}
+.pf-bar{height:6px;border-radius:99px;background:rgba(255,255,255,.22);overflow:hidden}
+.pf-bar i{display:block;height:100%;border-radius:99px;background:#fff}
+.pf-group{background:var(--surface,#fff);border:1px solid rgba(226,232,240,.9);border-radius:1.4rem;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.pf-title{font-size:.72rem;font-weight:800;color:#64748b;padding:1rem 1.1rem .45rem;letter-spacing:.2px}
+.pf-body{padding:.25rem 1.1rem 1.1rem}
+.pf-row{display:flex;align-items:center;gap:.8rem;width:100%;padding:.85rem 1.1rem;background:none;border:0;text-align:start;font-family:inherit;cursor:pointer;color:inherit;transition:background .15s}
+.pf-row:active{background:#f8fafc}
+.pf-row+.pf-row{border-top:1px solid #f1f5f4}
+.pf-ic{width:36px;height:36px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;background:#e8f3ef;color:#1e5a46;font-size:.9rem}
+.pf-ic.warn{background:#fff4e5;color:#b45309}
+.pf-ic.red{background:#fdecec;color:#b91c1c}
+.pf-tx{flex:1;min-width:0}
+.pf-tx b{display:block;font-size:.88rem;font-weight:800}
+.pf-tx small{display:block;font-size:.72rem;color:#64748b;margin-top:2px;line-height:1.5}
+.pf-chev{color:#cbd5e1;font-size:.8rem}
+</style>
 </head>
 <body class="text-slate-800 antialiased">
 
@@ -3321,27 +3351,68 @@ async function submitAddEmail(f) {
   finally { btn.disabled = false; }
 }
 function vProfile() {
-  const p = state.profile, inst = isStandalone();
+  const p = state.profile || {}, u = state.user, st = state.stats;
   if (!statsFresh()) setTimeout(() => loadMyStats(), 0);
-  return `<div class="max-w-xl mx-auto space-y-4">${emailCardHtml()}${passCardHtml()}<div class="card p-6 space-y-5"><div class="flex justify-between items-center gap-3"><div class="flex items-center gap-3 min-w-0"><div class="jicon !rounded-full"><i class="fa-solid fa-user"></i></div><div class="min-w-0"><h3 class="font-black text-lg truncate">${esc(p.name)}</h3><p class="text-xs text-slate-500 truncate" dir="ltr">${esc(p.email)}</p></div></div><button class="btn b-sec hidden md:inline-flex" data-act="go-home">الرئيسية</button></div>
-    <form id="f-profile" class="space-y-3"><div><label class="text-xs font-semibold block mb-1">الاسم</label><input name="name" class="inp" value="${esc(p.name)}" required></div>${bankFields(p)}
-    <button class="btn b-pri w-full py-3" type="submit">حفظ التعديلات</button></form></div>
-    <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-chart-simple text-teal-600"></i> نشاطي في الجمعيات</h4>${state.stats ? statsTiles(state.stats) : '<p class="text-xs text-slate-400">جارٍ حساب إحصاءاتك…</p>'}</div>
-    <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-bell text-amber-500"></i> إشعارات الجوال</h4>
-      <p class="text-xs text-slate-500 leading-relaxed">${!notifSupported() ? 'هذا المتصفح لا يدعم الإشعارات.' : notifDenied() ? (IS_NATIVE_IOS ? 'الإشعارات مغلقة لسِواء، فعّلها من الإعدادات ← الإشعارات ← سِواء.' : 'الإشعارات محظورة لهذا الموقع، فعّلها من إعدادات المتصفح.') : notifOn() ? 'الإشعارات مفعّلة ✓ ستصلك تنبيهات الدعوات والإيصالات والأعضاء الجدد وطلبات التعديل ورسائل الإدارة ومواعيد السداد.' : 'فعّلها لتصلك تنبيهات الدعوات والإيصالات ومواعيد السداد خارج التطبيق.'}${isIOS() && !isStandalone() ? ' على الآيفون يلزم تثبيت التطبيق أولاً.' : ''}</p>
-      <div class="flex flex-wrap gap-2">${notifOn() ? '<button class="btn b-sec" data-act="test-notif"><i class="fa-solid fa-paper-plane"></i> إشعار تجريبي</button><button class="btn b-sec" data-act="reg-push"><i class="fa-solid fa-rotate"></i> إعادة تسجيل الجهاز</button>' : '<button class="btn b-pri" data-act="enable-notif"><i class="fa-solid fa-bell"></i> تفعيل الإشعارات</button>'}<button class="btn b-sec" data-act="notif-help"><i class="fa-solid fa-circle-question"></i> الإشعارات لا تعمل؟</button></div></div>
-    <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-brands fa-whatsapp text-emerald-600"></i> تنبيهات واتساب</h4>
-      <label class="flex items-start gap-2 text-xs leading-relaxed"><input type="checkbox" data-wa-optin class="mt-0.5 w-4 h-4 accent-teal-600" ${p.waOptIn !== false ? 'checked' : ''}> <span>أوافق على استلام تذكيرات السداد والاستلام عبر واتساب على رقم جوالي المسجّل. يمكنك إيقافها في أي وقت.</span></label></div>
-    <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-lock text-slate-700"></i> قفل التطبيق</h4>
-      <p class="text-xs text-slate-500 leading-relaxed">${lockCfg() ? 'القفل مفعّل على هذا الجهاز ✓ يُطلب الرمز عند فتح التطبيق أو العودة إليه بعد دقيقة.' : 'احمِ بياناتك المالية برمز من 4 إلى 6 أرقام يُطلب عند فتح التطبيق على هذا الجهاز.'}</p>
-      <div class="flex flex-wrap gap-2">${lockCfg() ? '<button class="btn b-sec" data-act="lock-change">تغيير الرمز</button><button class="btn b-red" data-act="lock-off">إيقاف القفل</button>' : '<button class="btn b-pri" data-act="lock-on"><i class="fa-solid fa-lock"></i> تفعيل القفل</button>'}</div></div>
-    <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-mobile-screen-button text-emerald-600"></i> التطبيق</h4>
-      <p class="text-xs text-slate-500 leading-relaxed">${inst ? 'أنت تستخدم التطبيق المثبّت على جهازك ✓' : 'ثبّت سِواء على شاشتك الرئيسية لتعمل كتطبيق كامل وبسرعة أكبر.'}</p>
-      <div class="flex flex-wrap gap-2">${inst ? '' : '<button class="btn b-pri" data-act="install-app"><i class="fa-solid fa-download"></i> تثبيت التطبيق</button>'}<button class="btn b-sec" data-act="share-app"><i class="fa-solid fa-share-nodes"></i> مشاركة التطبيق</button></div></div>
-    <button class="btn b-red w-full py-3 md:hidden" data-act="logout"><i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج</button>
-    <div class="card p-5 space-y-3"><h4 class="font-black text-sm text-red-700"><i class="fa-solid fa-user-slash"></i> حذف الحساب</h4>
-      <p class="text-xs text-slate-500 leading-relaxed">يحذف حسابك وبياناتك الشخصية نهائياً من سِواء، ولا يمكن التراجع عن ذلك.</p>
-      <button class="btn b-red" data-act="del-account"><i class="fa-solid fa-trash"></i> حذف حسابي نهائياً</button></div></div>`;
+  const name = String(p.name || '').trim() || 'عضو سِواء';
+  const ini = name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('') || '؟';
+  const on = notifOn(), lockOn = !!lockCfg();
+  const checks = [name.length >= 3, validPhone(p.phone), !!p.bank, String(p.bank || '').startsWith('كاش') || validIban(p.iban), !!realEmail(u), on];
+  const pct = Math.round(checks.filter(Boolean).length / checks.length * 100);
+  const sv = (x, f = v => nf(v)) => x == null ? '—' : f(x);
+  const nSub = !notifSupported() ? 'غير مدعومة في هذا المتصفح' : notifDenied() ? (IS_NATIVE_IOS ? 'مغلقة من إعدادات الجهاز' : 'محظورة من إعدادات المتصفح') : on ? 'مفعّلة ✓ تصلك التنبيهات خارج التطبيق' : 'فعّلها لتصلك التنبيهات خارج التطبيق';
+  const row = (ic, tone, title, sub, act) => `<button type="button" class="pf-row" data-act="${act}"><span class="pf-ic ${tone}"><i class="fa-solid ${ic}"></i></span><span class="pf-tx"><b>${title}</b>${sub ? `<small>${sub}</small>` : ''}</span><i class="fa-solid fa-chevron-left pf-chev"></i></button>`;
+  return `<div class="pf fade">
+    <section class="pf-hero">
+      <div class="pf-top"><div class="pf-av">${esc(ini)}</div>
+        <div class="min-w-0 flex-1"><div class="pf-name">${esc(name)}</div><div class="pf-sub" dir="ltr">${esc(p.email || (u && u.email) || '')}</div></div></div>
+      <div class="pf-stats">
+        <div class="pf-stat"><b>${sv(st && st.n)}</b><span>جمعياتي</span></div>
+        <div class="pf-stat"><b>${sv(st && st.pct, v => v + '%')}</b><span>الالتزام</span></div>
+        <div class="pf-stat"><b>${sv(st && st.sup)}</b><span>أشرفت عليها</span></div>
+      </div>
+      <div class="pf-prog"><div class="pf-prog-h"><span>اكتمال ملفك</span><b>${pct}%</b></div><div class="pf-bar"><i style="width:${pct}%"></i></div></div>
+    </section>
+
+    ${emailCardHtml()}
+
+    <section class="pf-group">
+      <div class="pf-title">بياناتي الشخصية والبنكية</div>
+      <div class="pf-body">
+        <form id="f-profile" class="space-y-3">
+          <div><label class="text-xs font-semibold block mb-1">الاسم</label><input name="name" class="inp" value="${esc(p.name)}" required></div>
+          ${bankFields(p)}
+          <button class="btn b-pri w-full py-3" type="submit">حفظ التعديلات</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="pf-group">
+      <div class="pf-title">الإشعارات</div>
+      ${on ? row('fa-bell', '', 'إشعار تجريبي', nSub, 'test-notif') : row('fa-bell', 'warn', 'تفعيل الإشعارات', nSub, 'enable-notif')}
+      ${on ? row('fa-rotate', '', 'إعادة تسجيل الجهاز', 'استخدمه إذا توقفت الإشعارات', 'reg-push') : ''}
+      ${row('fa-circle-question', '', 'الإشعارات لا تعمل؟', 'خطوات الإصلاح خطوة بخطوة', 'notif-help')}
+    </section>
+
+    <section class="pf-group">
+      <div class="pf-title">الأمان</div>
+      ${lockOn
+        ? row('fa-lock', '', 'قفل التطبيق', 'مفعّل على هذا الجهاز ✓ · تغيير الرمز', 'lock-change')
+          + row('fa-lock-open', 'red', 'إيقاف القفل', 'سيُفتح التطبيق بدون رمز', 'lock-off')
+        : row('fa-lock', 'warn', 'قفل التطبيق', 'رمز من 4 إلى 6 أرقام عند فتح التطبيق', 'lock-on')}
+    </section>
+
+    ${passCardHtml()}
+
+    <section class="pf-group">
+      <div class="pf-title">المزيد</div>
+      ${row('fa-share-nodes', '', 'مشاركة سِواء', 'أرسل التطبيق لأصدقائك', 'share-app')}
+    </section>
+
+    <section class="pf-group">
+      ${row('fa-right-from-bracket', '', 'تسجيل الخروج', '', 'logout')}
+      ${row('fa-user-slash', 'red', 'حذف الحساب نهائياً', 'يحذف بياناتك الشخصية ولا يمكن التراجع', 'del-account')}
+    </section>
+  </div>`;
 }
 
 /* ============ النوافذ المنبثقة ============ */
