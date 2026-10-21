@@ -608,9 +608,9 @@ button.wz-sb{cursor:pointer;min-height:48px}
 <div id="modal"></div>
 <div id="toasts" class="toasts" aria-live="polite"></div>
 
-<script src="qattah.js?v=37"></script>
-<script src="diyun.js?v=37"></script>
-<script src="wizard.js?v=37"></script>
+<script src="qattah.js?v=38"></script>
+<script src="diyun.js?v=38"></script>
+<script src="wizard.js?v=38"></script>
 <script>
 
 /* ============ اللغة: عربي / English ============ */
@@ -670,7 +670,7 @@ const APPCHECK_SITE_KEY = '6Lem2_ctAAAAAFliRUsxWe8I99mXkUD7PIWzfT1E';
 try { firebase.appCheck().activate(new firebase.appCheck.ReCaptchaEnterpriseProvider(APPCHECK_SITE_KEY), true); }
 catch (e) { console.warn('App Check غير مفعّل:', e && e.message); }
 const auth = firebase.auth(), db = firebase.firestore();
-db.enablePersistence({ synchronizeTabs: true }).catch(() => {}); // تخزين الوثائق محلياً (IndexedDB) للعرض الفوري
+
 // ذاكرة محلية: عند إعادة فتح التطبيق تُحتسب التغييرات فقط بدل إعادة قراءة كل المستندات.
 // ضعها false إن كان الجهاز مشتركاً بين عدة أشخاص.
 const OFFLINE_CACHE = true;
