@@ -14,7 +14,7 @@
      amount, date, note, byUid, byName, status ('pending' | 'confirmed' | 'rejected')
 */
 
-const DB = { list: [], d: null, did: null, pays: [], tab: 'overview', unsubs: [], dUnsubs: [], seen: {}, pend: false, pendP: {}, pendSubs: {} };
+const DB = { list: [], arch: [], d: null, did: null, pays: [], tab: 'overview', unsubs: [], dUnsubs: [], seen: {}, pend: false, pendP: {}, pendSubs: {} };
 const DB_COL = 'debts';
 
 /* ---------- أدوات ---------- */
@@ -80,7 +80,7 @@ function dbLeave() {
 function stopDebts() {
   DB.unsubs.forEach(u => u()); DB.unsubs = [];
   Object.values(DB.pendSubs).forEach(u => u()); DB.pendSubs = {}; DB.pendP = {};
-  dbLeave(); DB.list = []; DB.seen = {};
+  dbLeave(); DB.list = []; DB.arch = []; DB.seen = {};
 }
 function dbRepaint() {
   if (!['home', 'debt'].includes(state.view)) return;
@@ -100,7 +100,8 @@ function startDebtListeners() {
   let asCreator = [], asCounter = [];
   const merge = () => {
     const m = new Map(); [...asCreator, ...asCounter].forEach(x => m.set(x.id, x));
-    DB.list = [...m.values()].sort((x, y) => dbTs(y.createdAt) - dbTs(x.createdAt));
+    const _da = [...m.values()].sort((x, y) => dbTs(y.createdAt) - dbTs(x.createdAt));
+    DB.list = _da.filter(d => !d.archivedAt); DB.arch = _da.filter(d => !!d.archivedAt);
     dbNotify(); dbSyncPending(); dbRepaint();
   };
   const warn = code => e => console.warn('الديون: تعذر التحميل', code, e && e.code);

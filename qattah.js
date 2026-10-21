@@ -10,7 +10,7 @@
      qattahInvites/{qid}__p{جوال}   دعوات بانتظار القبول (أو {qid}__{بريد})
 */
 
-const QT = { list: [], invites: [], q: null, qid: null, members: [], expenses: [], invAdmin: [], invFor: null, subFor: null, claims: [], reqs: [], spent: {}, expUnsubs: {}, tab: 'overview', unsubs: [], dUnsubs: [], seen: {}, pend: false, shareText: '' };
+const QT = { list: [], arch: [], invites: [], q: null, qid: null, members: [], expenses: [], invAdmin: [], invFor: null, subFor: null, claims: [], reqs: [], spent: {}, expUnsubs: {}, tab: 'overview', unsubs: [], dUnsubs: [], seen: {}, pend: false, shareText: '' };
 const QT_COL = 'qattahs', QT_INV = 'qattahInvites';
 
 /* ---------- أدوات مساعدة ---------- */
@@ -66,7 +66,7 @@ function qtLeave() {
 function stopQattah() {
   QT.unsubs.forEach(u => u()); QT.unsubs = [];
   Object.values(QT.expUnsubs).forEach(u => u()); QT.expUnsubs = {}; QT.spent = {};
-  qtLeave(); QT.list = []; QT.invites = []; QT.seen = {};
+  qtLeave(); QT.list = []; QT.arch = []; QT.invites = []; QT.seen = {};
 }
 
 function qtRepaint() {
@@ -92,7 +92,8 @@ function startQattahListeners() {
     qtRepaint();
   };
   QT.unsubs.push(db.collection(QT_COL).where('memberUids', 'array-contains', uid).onSnapshot(s => {
-    QT.list = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => qtTs(b.createdAt) - qtTs(a.createdAt));
+    const _qa = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => qtTs(b.createdAt) - qtTs(a.createdAt));
+    QT.list = _qa.filter(q => !q.archivedAt); QT.arch = _qa.filter(q => !!q.archivedAt);
     qtSyncCard();
     qtRepaint();
   }, e => console.warn('القطة: تعذر تحميل القائمة', e.code)));

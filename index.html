@@ -608,9 +608,9 @@ button.wz-sb{cursor:pointer;min-height:48px}
 <div id="modal"></div>
 <div id="toasts" class="toasts" aria-live="polite"></div>
 
-<script src="qattah.js?v=34"></script>
-<script src="diyun.js?v=34"></script>
-<script src="wizard.js?v=34"></script>
+<script src="qattah.js?v=37"></script>
+<script src="diyun.js?v=37"></script>
+<script src="wizard.js?v=37"></script>
 <script>
 
 /* ============ اللغة: عربي / English ============ */
@@ -670,6 +670,7 @@ const APPCHECK_SITE_KEY = '6Lem2_ctAAAAAFliRUsxWe8I99mXkUD7PIWzfT1E';
 try { firebase.appCheck().activate(new firebase.appCheck.ReCaptchaEnterpriseProvider(APPCHECK_SITE_KEY), true); }
 catch (e) { console.warn('App Check غير مفعّل:', e && e.message); }
 const auth = firebase.auth(), db = firebase.firestore();
+db.enablePersistence({ synchronizeTabs: true }).catch(() => {}); // تخزين الوثائق محلياً (IndexedDB) للعرض الفوري
 // ذاكرة محلية: عند إعادة فتح التطبيق تُحتسب التغييرات فقط بدل إعادة قراءة كل المستندات.
 // ضعها false إن كان الجهاز مشتركاً بين عدة أشخاص.
 const OFFLINE_CACHE = true;
@@ -917,10 +918,10 @@ const needsPay = (c, u) => (u !== c.recUid || sharesOf(c.turns, u) > 1) && c.acc
 
 /* ============ المصادقة ============ */
 auth.onAuthStateChanged(async user => { if (state._registering) return; await bootUser(user); });
-async function bootUser(user) {
+async function bootUserFull(user) {
   cleanup(state.unsubs); cleanup(state.jUnsubs); stopPayListeners(); state.pays = {}; stopBlockWatch(); stopHeartbeat(); state._tv = null; stopQattah(); stopDebts();
   state.user = user; state.profile = null; state.isAdmin = false; state._restoreTried = false;
-  state.jamiyat = []; state.invites = [];
+  state.jamiyat = []; state.jamiyatArch = []; state.invites = [];
   if (!user) { unlock(); state.view = 'auth'; return render(); }
 
   let loadErr = null;
@@ -986,7 +987,7 @@ async function maybeRestoreProfile() {
 function startListeners() {
   const uid = state.user.uid, email = realEmail(state.user), phone = phone05FromUser(state.user), ver = isVerified(state.user);
   let invA = [], invB = [], jA = [], jB = [];
-  const mergeJ = () => { const m = new Map(); [...jA, ...jB].forEach(x => m.set(x.id, x)); state.jamiyat = [...m.values()]; maybeRestoreProfile(); syncPayListeners(); schedStats(); if (state.view === 'home') render(); else renderNav(); };
+  const mergeJ = () => { const m = new Map(); [...jA, ...jB].forEach(x => m.set(x.id, x)); setJamiyat([...m.values()]); maybeRestoreProfile(); syncPayListeners(); schedStats(); if (state.view === 'home') render(); else renderNav(); };
   const merge = () => { const m = new Map(); [...invA, ...invB].forEach(i => m.set(i.id, i)); state.invites = [...m.values()];
     state.invites.forEach(i => pushLocal('دعوة جديدة للانضمام', `دعاك ${i.inviterName || ''} إلى جمعية «${i.jamiyaName || ''}»`, 'inv_' + i.id)); if (state.view === 'home') render(); };
   state.unsubs.push(
@@ -2040,7 +2041,7 @@ function ago(d) {
 }
 const bdg = (t, c) => `<span class="bdg ${c}">${t}</span>`;
 const DEV_L = { mobile: 'جوال', tablet: 'لوحي', desktop: 'حاسوب' };
-const VIEW_L = { auth: 'تسجيل الدخول', verify: 'تفعيل البريد', complete: 'إكمال الملف', home: 'جمعياتي', create: 'إنشاء جمعية', jamiya: 'صفحة الجمعية', profile: 'حسابي' };
+const VIEW_L = { auth: 'تسجيل الدخول', verify: 'تفعيل البريد', complete: 'إكمال الملف', home: 'جمعياتي', create: 'إنشاء جمعية', jamiya: 'صفحة الجمعية', profile: 'حسابي', archive: 'الأرشيف' };
 const FLAGS = { '': ['بدون تصنيف', ''], vip: ['⭐ مميز', 'bg-amber-100 text-amber-800'], watch: ['👁 تحت المراقبة', 'bg-sky-100 text-sky-700'], problem: ['⚠️ مشكلة / متأخر', 'bg-rose-100 text-rose-700'], follow: ['📌 يحتاج متابعة', 'bg-violet-100 text-violet-700'] };
 const EV_L = { login: ['دخول', 'fa-right-to-bracket', 'text-emerald-600'], register: ['تسجيل جديد', 'fa-user-plus', 'text-sky-600'], blocked_try: ['محاولة دخول (حساب محظور)', 'fa-ban', 'text-rose-600'],
   adm_block: ['حظر مستخدم', 'fa-user-slash', 'text-rose-600'], adm_unblock: ['رفع حظر', 'fa-user-check', 'text-emerald-600'], adm_note: ['ملاحظة إدارية', 'fa-note-sticky', 'text-amber-600'],
@@ -2927,7 +2928,7 @@ function render() {
   syncPayListeners();
   renderNav();
   const v = state.view, app = $('app');
-  const views = { loading: vLoading, auth: vAuth, verify: vVerify, complete: vComplete, loaderr: vLoadErr, home: vHome, follow: vFollow, create: vCreate, jamiya: vJamiya, profile: vProfile, admin: vAdmin, qattah: qtView, debt: dbView, debtNew: dbNewView };
+  const views = { loading: vLoading, auth: vAuth, verify: vVerify, complete: vComplete, loaderr: vLoadErr, home: vHome, follow: vFollow, create: vCreate, jamiya: vJamiya, profile: vProfile, archive: vArchive, admin: vAdmin, qattah: qtView, debt: dbView, debtNew: dbNewView };
   if (maintOn()) { $('tabbar').classList.add('hide'); app.innerHTML = vMaint(); return; }
   app.innerHTML = `<div class="fade">${annHtml()}${(views[v] || vLoading)()}</div>`;
   trackView(v);
@@ -2936,6 +2937,7 @@ function render() {
   wzAfterRender();
 }
 function renderNav() {
+  scheduleCache(); scheduleArchive();
   const nav = $('nav'), sub = $('hdrSub'), tb = $('tabbar');
   const canInst = !isStandalone() && !instFlag() && (deferredPrompt || isIOS());
   const instBtn = canInst ? '<button class="btn b-pri" data-act="install-app" aria-label="تثبيت التطبيق"><i class="fa-solid fa-download"></i><span class="hidden sm:inline"> تثبيت</span></button>' : '';
@@ -3350,12 +3352,121 @@ async function submitAddEmail(f) {
   } catch (e) { toast(e.code === 'auth/requires-recent-login' ? 'سجّل الخروج وادخل من جديد ثم أعد إضافة البريد' : authErr(e), 'error'); }
   finally { btn.disabled = false; }
 }
+/* ============ التخزين المحلي للحساب: عرض فوري ثم تحديث من السيرفر ============ */
+const CACHE_KEY = 'siwaa_cache_v1';
+const readCache = () => { try { return JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch (e) { return null; } };
+const clearCache = () => { try { localStorage.removeItem(CACHE_KEY); } catch (e) {} };
+let _cacheT = null;
+function scheduleCache() { clearTimeout(_cacheT); _cacheT = setTimeout(saveCache, 500); }
+function saveCache() {
+  if (!state.user || !state.profile) return;
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      uid: state.user.uid, profile: state.profile, isAdmin: !!state.isAdmin,
+      jamiyat: state.jamiyat || [], jamiyatArch: state.jamiyatArch || [],
+      qattahs: QT.list || [], qattahsArch: QT.arch || [],
+      debts: DB.list || [], debtsArch: DB.arch || []
+    }));
+  } catch (e) {}
+}
+function setJamiyat(all) {
+  const act = [], arch = [];
+  all.forEach(j => (j.archivedAt ? arch : act).push(j));
+  state.jamiyat = act; state.jamiyatArch = arch;
+}
+// تسجيل الدخول: إن وُجدت نسخة محلية لنفس الحساب تُعرض فوراً، ثم يُتحقق من السيرفر في الخلفية
+async function bootUser(user) {
+  const c = readCache();
+  if (!user) clearCache();
+  if (user && c && c.uid === user.uid && c.profile) {
+    cleanup(state.unsubs); cleanup(state.jUnsubs); stopPayListeners(); state.pays = {}; stopBlockWatch(); stopHeartbeat(); state._tv = null; stopQattah(); stopDebts();
+    state.user = user; state.profile = c.profile; state.isAdmin = !!c.isAdmin; state._restoreTried = false;
+    state.jamiyat = c.jamiyat || []; state.jamiyatArch = c.jamiyatArch || []; state.invites = [];
+    QT.list = c.qattahs || []; QT.arch = c.qattahsArch || []; DB.list = c.debts || []; DB.arch = c.debtsArch || [];
+    maybeLock(true); watchBlocked(); trackSession(); renderBanner();
+    startListeners(); startQattahListeners(); startDebtListeners();
+    state.view = state.isAdmin ? 'admin' : (launchAction() || 'home');
+    render(); if (state.isAdmin) loadAdmin();
+    checkPendingJoin();
+    refreshAccount(user);
+    return;
+  }
+  return bootUserFull(user);
+}
+async function refreshAccount(user) {
+  try {
+    if (isVerified(user)) await user.getIdToken(true).catch(() => {});
+    const snap = await db.collection('users').doc(user.uid).get({ source: 'server' }).catch(() => null);
+    if (!snap) return; // لا اتصال: نبقى على البيانات المحفوظة
+    if (!snap.exists) { clearCache(); return bootUserFull(user); }
+    state.profile = snap.data();
+    const adm = await db.collection('admins').doc(user.uid).get({ source: 'server' }).catch(() => ({ exists: false }));
+    state.isAdmin = adm.exists || (lc(user.email) === OWNER_EMAIL && user.emailVerified);
+    if (!state.isAdmin && await isBlockedNow()) return;
+    renderNav(); if (state.view === 'home') render();
+  } catch (e) {}
+}
+
+/* ============ الأرشيف: المنتهي ينتقل تلقائياً، ويعيده المشرف متى شاء ============ */
+const archToday = () => isoDay(new Date());
+const archFin = {
+  jam: j => j.type === 'family'
+    ? (j.closed === true || (j.mode !== 'monthly' && !!j.endDate && famState(j).ended))
+    : (!!j.startDate && monthIdx(j) >= j.count),
+  qt: q => !!q.eventEnd && q.eventEnd < archToday(),
+  db: d => d.status === 'closed' || d.status === 'declined'
+};
+let _archT = null;
+function scheduleArchive() { clearTimeout(_archT); _archT = setTimeout(archiveSync, 1500); }
+async function archiveSync() {
+  if (!state.user || !state.profile) return;
+  const me = state.user.uid, b = db.batch(); let n = 0;
+  const plan = (col, items, mine, fin) => items.forEach(it => {
+    if (!mine(it)) return;
+    const want = fin(it), archived = !!it.archivedAt, ref = db.collection(col).doc(it.id);
+    if (want && !archived && !it.archiveSkip) { b.update(ref, { archivedAt: new Date().toISOString(), archivedBy: me, archiveAuto: true }); n++; }
+    else if (!want && archived && it.archiveAuto) { b.update(ref, { archivedAt: FV.delete(), archivedBy: FV.delete(), archiveAuto: FV.delete() }); n++; }
+    else if (!want && it.archiveSkip) { b.update(ref, { archiveSkip: FV.delete() }); n++; }
+  });
+  plan('jamiyat', [...state.jamiyat, ...(state.jamiyatArch || [])], j => j.creatorUid === me, archFin.jam);
+  plan(QT_COL, [...QT.list, ...(QT.arch || [])], q => q.adminUid === me, archFin.qt);
+  plan(DB_COL, [...DB.list, ...(DB.arch || [])], d => d.creatorUid === me, archFin.db);
+  if (n) b.commit().catch(e => console.warn('الأرشفة: تعذر الحفظ', e && e.code));
+}
+async function archRestore(el) {
+  const kind = el.dataset.kind, id = el.dataset.id;
+  const col = kind === 'jam' ? 'jamiyat' : kind === 'qt' ? QT_COL : DB_COL;
+  try {
+    await db.collection(col).doc(id).update({ archivedAt: FV.delete(), archivedBy: FV.delete(), archiveAuto: FV.delete(), archiveSkip: true });
+    toast('أُعيد إلى القائمة الرئيسية', 'success');
+  } catch (e) { toast('تعذرت الإعادة: ' + (e.code === 'permission-denied' ? 'صلاحية غير كافية' : e.message), 'error'); }
+}
+const ARCH_ACTIONS = { 'go-archive': () => { state.view = 'archive'; render(); }, 'arch-restore': archRestore };
+function vArchive() {
+  const me = state.user.uid;
+  const row = (kind, title, sub, id, mine, openAct) => `<div class="pf-row" style="cursor:default">
+    <span class="pf-ic ${kind === 'jam' ? '' : 'warn'}"><i class="fa-solid ${kind === 'jam' ? 'fa-people-roof' : kind === 'qt' ? 'fa-hand-holding-dollar' : 'fa-scale-balanced'}"></i></span>
+    <span class="pf-tx"><b>${esc(title)}</b><small>${sub}</small></span>
+    <span class="flex gap-1.5 flex-none"><button type="button" class="btn b-sec" data-act="${openAct}" data-id="${esc(id)}">عرض</button>${mine ? `<button type="button" class="btn b-pri" data-act="arch-restore" data-kind="${kind}" data-id="${esc(id)}">إعادة</button>` : ''}</span></div>`;
+  const jam = (state.jamiyatArch || []).map(j => row('jam', j.name, `${j.type === 'family' ? 'تعاون عائلي' : 'جمعية'} • ${j.type === 'family' ? (j.reached ? 'اكتمل الهدف' : 'أُغلق') : 'انتهت جميع الدورات'}`, j.id, j.creatorUid === me, 'open'));
+  const qt = (QT.arch || []).map(q => row('qt', q.name, `قطة • انتهت الفعالية في ${esc(q.eventEnd)}`, q.id, q.adminUid === me, 'qt-open'));
+  const dbs = (DB.arch || []).map(d => row('db', d.counterName || d.creatorName || 'دين', `${d.status === 'declined' ? 'مرفوض' : 'مسدّد أو مُعفى'} • ${fmtNum(d.amount)} ريال`, d.id, d.creatorUid === me, 'db-open'));
+  const sec = (title, items) => items.length ? `<section class="pf-group"><div class="pf-title">${title} (${nf(items.length)})</div>${items.join('')}</section>` : '';
+  const none = jam.length + qt.length + dbs.length === 0;
+  return `<div class="pf fade">
+    <p class="text-xs text-slate-500 leading-relaxed px-1">العناصر المنتهية تُنقل هنا تلقائياً: الجمعيات بعد اكتمال دوراتها، والتعاون بعد بلوغ هدفه أو إغلاقه أو انتهاء مدته، والقطة بعد انتهاء فعاليتها، والديون بعد سدادها أو إعفائها أو رفضها. يمكن للمشرف إعادة أي عنصر متى شاء.</p>
+    ${none ? '<div class="card p-8 text-center text-xs text-slate-500"><i class="fa-solid fa-box-archive text-2xl mb-2 block text-slate-300"></i>لا توجد عناصر في الأرشيف</div>' : ''}
+    ${sec('الجمعيات والتعاون', jam)}${sec('القطات', qt)}${sec('الديون', dbs)}
+  </div>`;
+}
+
 function vProfile() {
   const p = state.profile || {}, u = state.user, st = state.stats;
   if (!statsFresh()) setTimeout(() => loadMyStats(), 0);
   const name = String(p.name || '').trim() || 'عضو سِواء';
   const ini = name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('') || '؟';
   const on = notifOn(), lockOn = !!lockCfg();
+  const archN = (state.jamiyatArch || []).length + (QT.arch || []).length + (DB.arch || []).length;
   const checks = [name.length >= 3, validPhone(p.phone), !!p.bank, String(p.bank || '').startsWith('كاش') || validIban(p.iban), !!realEmail(u), on];
   const pct = Math.round(checks.filter(Boolean).length / checks.length * 100);
   const sv = (x, f = v => nf(v)) => x == null ? '—' : f(x);
@@ -3405,6 +3516,7 @@ function vProfile() {
 
     <section class="pf-group">
       <div class="pf-title">المزيد</div>
+      ${row('fa-box-archive', '', 'الأرشيف', archN ? nf(archN) + ' عنصر منتهٍ' : 'لا توجد عناصر منتهية', 'go-archive')}
       ${row('fa-share-nodes', '', 'مشاركة سِواء', 'أرسل التطبيق لأصدقائك', 'share-app')}
     </section>
 
@@ -4634,6 +4746,7 @@ const actions = {
 };
 Object.assign(actions, QT_ACTIONS);
 Object.assign(actions, DB_ACTIONS);
+Object.assign(actions, ARCH_ACTIONS);
 Object.assign(actions, { 'jam-cycle-save': jamCycleSave });
 Object.assign(actions, WZ_ACTIONS);
 document.addEventListener('click', e => {
