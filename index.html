@@ -471,7 +471,7 @@ body .tab.on i{transform:none}
 @media(max-width:767px){
   body.sw-home .app-header{position:relative;background:transparent;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;z-index:41}
   body.sw-home .app-header h1{color:#fff;font-size:12px;font-weight:500;opacity:.85}
-  body.sw-home #hdrSub{color:#fff;font-size:16px;font-weight:700;max-width:14rem}
+  body.sw-home #hdrSub{color:#fff;font-size:16px;font-weight:700;max-width:14rem;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25;overflow-wrap:anywhere}
   body.sw-home .app-header .logo{background:#fff;padding:3px;object-fit:contain;width:42px;height:42px;border-radius:14px;box-shadow:none}
   body.sw-home .app-header .btn{background:rgba(255,255,255,.14);color:#fff;border:0;box-shadow:none;min-height:42px;min-width:42px;padding:0 .7rem;border-radius:14px}
   body.sw-home .app-header .btn .text-rose-500{color:#ff9b7a}
@@ -757,6 +757,8 @@ function mailErrHint(e) {
    APP_SHORT_URL: الرابط المختصر الذي يظهر في الرسائل بدل الطويل (اتركه فارغاً لاستخدام الرابط الكامل).
    EMAIL_LINK_IN_TEMPLATE: اجعله true بعد أن تضيف زر الرابط داخل قالب EmailJS (انظر README) فيُحذف الرابط الطويل من نص البريد. */
 const APP_URL = "https://aljameyah.com/";
+// رابط التطبيق في App Store (ضعه هنا بعد نشر التطبيق، مثل https://apps.apple.com/app/id1234567890). إن كان فارغاً تُشارَك روابط الموقع.
+const APP_STORE_URL = "";
 const APP_SHORT_URL = ""; // الرابط الرسمي الموحّد aljameyah.com يُستخدم في كل الرسائل والمشاركة (لا حاجة لرابط مختصر)
 const EMAIL_LINK_IN_TEMPLATE = false;
 const appUrl = () => APP_URL;
@@ -1939,15 +1941,16 @@ function openWaReminders() {
     <p class="text-[11px] text-slate-500">يفتح الزر محادثة واتساب جاهزة بالرسالة، وتضغط إرسال بنفسك.</p>`);
 }
 async function shareApp() {
+  const link = APP_STORE_URL || shareUrl();
   const text = 'سِواء — منصة التكافل والحلول المالية التشاركية: جمعيات، قطّات، ديون، وتعاونيات.. رتّبها، تتبعها، وسوّيها مع من تحب بكل وضوح وتنبيهات ذكية.';
   if (navigator.share) {
-    try { await navigator.share({ title: 'سِواء', text, url: shareUrl() }); return; }
+    try { await navigator.share({ title: 'سِواء', text, url: link }); return; }
     catch (e) { if (e && e.name === 'AbortError') return; }
   }
-  state.shareText = `${text}\n${shareUrl()}`;
-  showModal('مشاركة التطبيق', `<div class="space-y-3 text-xs"><div class="p-3 bg-slate-50 rounded-xl text-slate-600 break-words">${esc(text)}<br><span dir="ltr" class="text-emerald-700">${esc(shareUrl())}</span></div>
+  state.shareText = `${text}\n${link}`;
+  showModal('مشاركة التطبيق', `<div class="space-y-3 text-xs"><div class="p-3 bg-slate-50 rounded-xl text-slate-600 break-words">${esc(text)}<br><span dir="ltr" class="text-emerald-700">${esc(link)}</span></div>
     <div class="flex flex-wrap gap-2"><a class="btn b-pri" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(state.shareText)}"><i class="fa-brands fa-whatsapp"></i> واتساب</a>
-    <a class="btn b-sec" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(shareUrl())}&text=${encodeURIComponent(text)}"><i class="fa-brands fa-telegram"></i> تيليجرام</a>
+    <a class="btn b-sec" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}"><i class="fa-brands fa-telegram"></i> تيليجرام</a>
     <a class="btn b-sec" href="sms:?&body=${encodeURIComponent(state.shareText)}"><i class="fa-solid fa-comment-sms"></i> رسالة</a>
     <button class="btn b-sec" data-act="copy-share"><i class="fa-solid fa-copy"></i> نسخ الرابط</button></div></div>`);
 }
