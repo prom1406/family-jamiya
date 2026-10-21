@@ -57,6 +57,57 @@ jobs:
       - name: توليد الأيقونات
         run: npx capacitor-assets generate --ios
 
+      - name: ملف Firebase للإشعارات (GoogleService-Info.plist)
+        env:
+          FIREBASE_IOS_APP_ID: ${{ secrets.FIREBASE_IOS_APP_ID }}
+        run: |
+          if [ -z "$FIREBASE_IOS_APP_ID" ]; then
+            echo "::error::أضف السر FIREBASE_IOS_APP_ID (معرّف تطبيق iOS من Firebase ← إعدادات المشروع، شكله 1:508199870007:ios:xxxx). بدونه ينهار التطبيق عند الفتح."
+            exit 1
+          fi
+          python3 - <<'PY'
+          import os, re, plistlib
+          h = open("index.html", encoding="utf8").read()
+          blk = h[h.index("const firebaseConfig"):]
+          blk = blk[:blk.index("};")]
+          g = lambda k: re.search(k + r'\s*:\s*"([^"]+)"', blk).group(1)
+          d = {
+            "API_KEY": g("apiKey"), "GCM_SENDER_ID": g("messagingSenderId"), "PLIST_VERSION": "1",
+            "BUNDLE_ID": os.environ["BUNDLE_ID"], "PROJECT_ID": g("projectId"), "STORAGE_BUCKET": g("storageBucket"),
+            "IS_ADS_ENABLED": False, "IS_ANALYTICS_ENABLED": False, "IS_APPINVITE_ENABLED": True,
+            "IS_GCM_ENABLED": True, "IS_SIGNIN_ENABLED": True, "GOOGLE_APP_ID": os.environ["FIREBASE_IOS_APP_ID"].strip(),
+          }
+          with open("ios/App/App/GoogleService-Info.plist", "wb") as f:
+              plistlib.dump(d, f)
+          print("GoogleService-Info.plist جاهز:", d["PROJECT_ID"], d["GOOGLE_APP_ID"])
+          PY
+
+      - name: تمرير أحداث الإشعارات في AppDelegate
+        run: |
+          python3 - <<'PY'
+          p = "ios/App/App/AppDelegate.swift"
+          s = open(p, encoding="utf8").read()
+          if "capacitorDidRegisterForRemoteNotifications" not in s:
+              add = '''
+              func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+                  NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+              }
+
+              func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+                  NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+              }
+
+              func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+                  NotificationCenter.default.post(name: Notification.Name.init("didReceiveRemoteNotification"), object: completionHandler, userInfo: userInfo)
+              }
+          '''
+              i = s.rstrip().rfind("}")
+              s = s[:i] + add + "\n}\n"
+              open(p, "w", encoding="utf8").write(s)
+          print("AppDelegate OK")
+          PY
+          grep -c "capacitorDidRegisterForRemoteNotifications" ios/App/App/AppDelegate.swift
+
       - name: إعدادات المشروع (التوقيع وSign in with Apple)
         env:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -70,10 +121,13 @@ jobs:
           <dict>
             <key>com.apple.developer.applesignin</key>
             <array><string>Default</string></array>
+            <key>aps-environment</key>
+            <string>development</string>
           </dict>
           </plist>
           EOF
           /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" -c "Add :UIBackgroundModes:0 string remote-notification" ios/App/App/Info.plist
           ruby scripts/patch-ios.rb
 
       - name: مفتاح App Store Connect

@@ -2645,10 +2645,15 @@ document.addEventListener('visibilitychange', () => { if (state.user && ssGet('j
 
 
 /* ============ إشعارات النظام (تظهر خارج التطبيق على الجوال) ============ */
-const notifSupported = () => 'Notification' in window;
-const notifOn = () => notifSupported() && Notification.permission === 'granted' && lsGet('jm_notif') !== '0';
-const notifCanAsk = () => notifSupported() && Notification.permission === 'default' && (!isIOS() || isStandalone());
+/* داخل تطبيق iOS: إشعارات آبل (APNs عبر FCM) بإضافة FirebaseMessaging الأصلية؛ في المتصفح: Web Push كما كان. */
+const NP = () => window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.FirebaseMessaging;
+const nativePerm = () => state._nperm || 'prompt'; // granted | denied | prompt
+const notifSupported = () => IS_NATIVE_IOS || 'Notification' in window;
+const notifOn = () => IS_NATIVE_IOS ? (nativePerm() === 'granted' && lsGet('jm_notif') !== '0') : (notifSupported() && Notification.permission === 'granted' && lsGet('jm_notif') !== '0');
+const notifCanAsk = () => IS_NATIVE_IOS ? nativePerm() === 'prompt' : (notifSupported() && Notification.permission === 'default' && (!isIOS() || isStandalone()));
+const notifDenied = () => IS_NATIVE_IOS ? nativePerm() === 'denied' : (notifSupported() && Notification.permission === 'denied');
 async function showSysNotif(title, body, tag, jid) {
+  if (IS_NATIVE_IOS) return; // الإشعارات تصل من آبل (الخادم) حتى والتطبيق مغلق
   const opts = { body, tag, icon: 'icon-192.png', badge: 'icon-192.png', lang: 'ar', dir: 'rtl', data: { jid: jid || '', url: location.pathname } };
   try { const reg = await navigator.serviceWorker.getRegistration(); if (reg) return await reg.showNotification(title, opts); } catch (e) {}
   try { new Notification(title, opts); } catch (e) {}
@@ -2668,6 +2673,12 @@ function pushLocal(title, body, tag, jid) {
 const fromStaleApp = () => !isStandalone() && /^android-app:/.test(document.referrer || '');
 const NEW_HOST = new URL(APP_URL).hostname;
 function notifHelp(reason) {
+  if (IS_NATIVE_IOS) {
+    return showModal('تفعيل الإشعارات', `<div class="space-y-3 text-xs leading-relaxed">
+      <p class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">${notifDenied() ? 'الإشعارات مغلقة لسِواء في إعدادات جوالك.' : 'تعذّر تفعيل الإشعارات على هذا الجهاز.'}</p>
+      ${notifDenied() ? '<p>افتح <b>الإعدادات ← الإشعارات ← سِواء</b> وفعّل «السماح بالإشعارات»، ثم ارجع للتطبيق.</p>' : ''}
+      <button type="button" class="btn b-pri w-full" data-act="reg-push"><i class="fa-solid fa-rotate"></i> إعادة تسجيل الجهاز</button></div>`);
+  }
   const ios = isIOS(), denied = notifSupported() && Notification.permission === 'denied';
   const why = denied ? 'الإشعارات محظورة لهذا الموقع في إعدادات جوالك.' : reason === 'ios' ? 'على الآيفون لا تعمل الإشعارات إلا من التطبيق المثبّت على الشاشة الرئيسية.' : 'تعذّر تفعيل الإشعارات من هذه النافذة.';
   const steps = denied
@@ -2682,6 +2693,11 @@ function notifHelp(reason) {
     <button type="button" class="btn b-sec w-full" data-act="reg-push"><i class="fa-solid fa-rotate"></i> إعادة تسجيل الجهاز</button></div>`);
 }
 async function enableNotifs() {
+  if (IS_NATIVE_IOS) {
+    const r = await nativePushRegister(true, true);
+    if (r.ok) toast('تم تفعيل الإشعارات'); else if (nativePerm() === 'denied') notifHelp('denied'); else toast('تعذّر تفعيل الإشعارات: ' + r.err, 'error');
+    renderBanner(); if (state.view === 'profile') render(); return;
+  }
   if (!notifSupported()) return notifHelp('ios');
   if (isIOS() && !isStandalone()) return notifHelp('ios');
   let p = Notification.permission;
@@ -2694,7 +2710,7 @@ async function enableNotifs() {
   } else notifHelp(p === 'denied' ? 'denied' : 'stale'); // «default» بعد الطلب = لم تظهر النافذة (غالباً تطبيق قديم مثبّت على الدومين السابق)
   renderBanner(); if (state.view === 'profile') render();
 }
-function testNotif() { if (!notifOn()) return toast('فعّل الإشعارات أولاً', 'error'); showSysNotif('سِواء', 'هذا إشعار تجريبي. أغلق التطبيق أو انتقل لتطبيق آخر لتجربة ظهوره خارج الصفحة.', 'test_' + Date.now()); toast('أُرسل إشعار تجريبي', 'info'); }
+function testNotif() { if (!notifOn()) return toast('فعّل الإشعارات أولاً', 'error'); if (IS_NATIVE_IOS) return toast('الإشعارات مفعّلة ✓ ستصلك من آبل حتى والتطبيق مغلق', 'success'); showSysNotif('سِواء', 'هذا إشعار تجريبي. أغلق التطبيق أو انتقل لتطبيق آخر لتجربة ظهوره خارج الصفحة.', 'test_' + Date.now()); toast('أُرسل إشعار تجريبي', 'info'); }
 function notifyPays(j, pays) {
   const uid = state.user.uid;
   pays.forEach(p => {
@@ -2710,7 +2726,33 @@ function notifyAlerts() {
 /* ============ دفع الإشعارات للجوال المغلق (FCM) ============
    الصق هنا مفتاح الويب (Web Push certificate / VAPID) من: Firebase ← إعدادات المشروع ← Cloud Messaging */
 const VAPID_KEY = 'BG6l6SR11DQISd1WtcgOLJSS6rVbTN5uudknpGyt8yZBhYqCnjQpaJ9QKC6QQuILPbvtUWVpWnSroZFrSCJsYPM';
+// تطبيق iOS: طلب الإذن تلقائياً (نافذة آبل) ثم تسجيل رمز FCM في حساب المستخدم
+function nativePushListeners() {
+  const p = NP(); if (!p || state._npl) return; state._npl = true;
+  p.addListener('tokenReceived', e => { if (e && e.token && state.user) db.collection('users').doc(state.user.uid).set({ fcmTokens: FV.arrayUnion(e.token) }, { merge: true }).catch(() => {}); });
+  p.addListener('notificationActionPerformed', e => {
+    const d = (e && e.notification && e.notification.data) || {}, id = d.jid || d.jamiyaId || d.id;
+    if (id) { openNotifTarget(String(id)); setTimeout(() => { if (state.profile && !state.j && !state.view.startsWith('q')) openNotifTarget(String(id)); }, 1500); }
+  });
+}
+async function nativePushRegister(force, ask) {
+  try {
+    const p = NP(); if (!p || !state.user) return { ok: false, err: 'unsupported' };
+    nativePushListeners();
+    let perm = (await p.checkPermissions()).receive;
+    if (perm !== 'granted' && perm !== 'denied' && ask) perm = (await p.requestPermissions()).receive;
+    state._nperm = perm === 'granted' ? 'granted' : perm === 'denied' ? 'denied' : 'prompt';
+    if (state._nperm !== 'granted') { if (state.view === 'profile') render(); return { ok: false, err: 'permission-' + state._nperm }; }
+    if (lsGet('jm_notif') === null || force) lsSet('jm_notif', '1');
+    const tok = (await p.getToken()).token;
+    if (!tok) return { ok: false, err: 'no-token' };
+    const key = state.user.uid + ':' + tok;
+    if (force || state._pushReg !== key) { await db.collection('users').doc(state.user.uid).set({ fcmTokens: FV.arrayUnion(tok) }, { merge: true }); state._pushReg = key; }
+    return { ok: true };
+  } catch (e) { console.warn('native push', e.code || e.message); return { ok: false, err: e.code || e.message }; }
+}
 async function registerPush(force) {
+  if (IS_NATIVE_IOS) return nativePushRegister(!!force, true);
   try {
     if (!VAPID_KEY || !state.user || !notifOn() || !firebase.messaging || !(await firebase.messaging.isSupported())) return { ok: false, err: 'unsupported' };
     const reg = await navigator.serviceWorker.ready;
@@ -2724,6 +2766,15 @@ async function registerPush(force) {
 }
 // عند تسجيل الخروج: نفكّ ارتباط هذا الجهاز بالحساب ونُلغي رمزه، فيبدأ الحساب التالي برمز جديد نظيف
 async function unregisterPush() {
+  if (IS_NATIVE_IOS) {
+    try {
+      const p = NP(); if (!p || !state.user || nativePerm() !== 'granted') return;
+      const tok = (await p.getToken()).token;
+      if (tok) await db.collection('users').doc(state.user.uid).update({ fcmTokens: FV.arrayRemove(tok) });
+      await p.deleteToken(); state._pushReg = '';
+    } catch (e) { console.warn('unpush native', e.code || e.message); }
+    return;
+  }
   try {
     if (!state.user || !VAPID_KEY || !notifSupported() || Notification.permission !== 'granted' || !firebase.messaging || !(await firebase.messaging.isSupported())) return;
     const m = firebase.messaging(), reg = await navigator.serviceWorker.ready;
@@ -3252,7 +3303,7 @@ function vProfile() {
     <button class="btn b-pri w-full py-3" type="submit">حفظ التعديلات</button></form></div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-chart-simple text-teal-600"></i> نشاطي في الجمعيات</h4>${state.stats ? statsTiles(state.stats) : '<p class="text-xs text-slate-400">جارٍ حساب إحصاءاتك…</p>'}</div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-bell text-amber-500"></i> إشعارات الجوال</h4>
-      <p class="text-xs text-slate-500 leading-relaxed">${!notifSupported() ? 'هذا المتصفح لا يدعم الإشعارات.' : Notification.permission === 'denied' ? 'الإشعارات محظورة لهذا الموقع، فعّلها من إعدادات المتصفح.' : notifOn() ? 'الإشعارات مفعّلة ✓ ستصلك تنبيهات الدعوات والإيصالات والأعضاء الجدد وطلبات التعديل ورسائل الإدارة ومواعيد السداد.' : 'فعّلها لتصلك تنبيهات الدعوات والإيصالات ومواعيد السداد خارج التطبيق.'}${isIOS() && !isStandalone() ? ' على الآيفون يلزم تثبيت التطبيق أولاً.' : ''}</p>
+      <p class="text-xs text-slate-500 leading-relaxed">${!notifSupported() ? 'هذا المتصفح لا يدعم الإشعارات.' : notifDenied() ? (IS_NATIVE_IOS ? 'الإشعارات مغلقة لسِواء، فعّلها من الإعدادات ← الإشعارات ← سِواء.' : 'الإشعارات محظورة لهذا الموقع، فعّلها من إعدادات المتصفح.') : notifOn() ? 'الإشعارات مفعّلة ✓ ستصلك تنبيهات الدعوات والإيصالات والأعضاء الجدد وطلبات التعديل ورسائل الإدارة ومواعيد السداد.' : 'فعّلها لتصلك تنبيهات الدعوات والإيصالات ومواعيد السداد خارج التطبيق.'}${isIOS() && !isStandalone() ? ' على الآيفون يلزم تثبيت التطبيق أولاً.' : ''}</p>
       <div class="flex flex-wrap gap-2">${notifOn() ? '<button class="btn b-sec" data-act="test-notif"><i class="fa-solid fa-paper-plane"></i> إشعار تجريبي</button><button class="btn b-sec" data-act="reg-push"><i class="fa-solid fa-rotate"></i> إعادة تسجيل الجهاز</button>' : '<button class="btn b-pri" data-act="enable-notif"><i class="fa-solid fa-bell"></i> تفعيل الإشعارات</button>'}<button class="btn b-sec" data-act="notif-help"><i class="fa-solid fa-circle-question"></i> الإشعارات لا تعمل؟</button></div></div>
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-brands fa-whatsapp text-emerald-600"></i> تنبيهات واتساب</h4>
       <label class="flex items-start gap-2 text-xs leading-relaxed"><input type="checkbox" data-wa-optin class="mt-0.5 w-4 h-4 accent-teal-600" ${p.waOptIn !== false ? 'checked' : ''}> <span>أوافق على استلام تذكيرات السداد والاستلام عبر واتساب على رقم جوالي المسجّل. يمكنك إيقافها في أي وقت.</span></label></div>

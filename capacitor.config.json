@@ -5,5 +5,14 @@
   "ios": {
     "contentInset": "always",
     "backgroundColor": "#F5F7F5"
+  },
+  "plugins": {
+    "FirebaseMessaging": {
+      "presentationOptions": [
+        "alert",
+        "badge",
+        "sound"
+      ]
+    }
   }
 }

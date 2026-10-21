@@ -28,3 +28,13 @@ Actions ← **iOS → TestFlight** ← Run workflow. بعد دقائق يظهر 
 - حذف الحساب متوفر في الملف الشخصي (شرط 5.1.1(v)).
 - إبطال رمز Apple عند الحذف يحتاج Cloud Function (اختياري ومستحسن لاحقاً).
 - أضف رابط `privacy.html` كسياسة الخصوصية، وجهّز حساب تجريبي (بريد وكلمة مرور) لفريق المراجعة.
+
+## 6) إشعارات آبل (Push)
+1. developer.apple.com ← Identifiers ← `com.prom1406.sewaa` ← فعّل **Push Notifications** ← Save.
+2. Keys ← + ← فعّل **Apple Push Notifications service (APNs)** ← حمّل ملف `.p8` ودوّن **Key ID**.
+3. Firebase ← إعدادات المشروع ← General ← **Add app ← iOS** بالـ Bundle ID `com.prom1406.sewaa` (لا تحتاج تنزيل أي ملف).
+4. Firebase ← إعدادات المشروع ← **Cloud Messaging** ← Apple app configuration ← **APNs Authentication Key** ← Upload (ملف `.p8` + Key ID + Team ID).
+5. انسخ **App ID** لتطبيق iOS (شكله `1:508199870007:ios:xxxx`) وأضفه كسر في GitHub باسم `FIREBASE_IOS_APP_ID`.
+6. شغّل workflow من جديد. الـ workflow يولّد `GoogleService-Info.plist` تلقائياً، ويفشل برسالة واضحة إن غاب السر (بدلاً من بناء تطبيق ينهار).
+
+يُطلب إذن الإشعارات تلقائياً بعد تسجيل الدخول، ويُحفظ رمز الجهاز في `users/{uid}.fcmTokens` فيستخدمه الخادم الحالي كما هو.

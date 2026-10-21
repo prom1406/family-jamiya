@@ -20,5 +20,15 @@ target.build_configurations.each do |c|
   s['CURRENT_PROJECT_VERSION']     = build
   s['TARGETED_DEVICE_FAMILY']      = '1'
 end
+plist = 'ios/App/App/GoogleService-Info.plist'
+if File.exist?(plist)
+  grp = proj.main_group['App'] or abort('مجموعة App غير موجودة')
+  unless grp.files.any? { |f| f.path == 'GoogleService-Info.plist' }
+    ref = grp.new_reference('GoogleService-Info.plist')
+    target.resources_build_phase.add_file_reference(ref)
+  end
+else
+  abort('GoogleService-Info.plist غير موجود: التطبيق سينهار عند الفتح')
+end
 proj.save
 puts "patched: team=#{team} bundle=#{bundle} version=#{version} (#{build})"
