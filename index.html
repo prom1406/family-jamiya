@@ -2753,7 +2753,7 @@ const VAPID_KEY = 'BG6l6SR11DQISd1WtcgOLJSS6rVbTN5uudknpGyt8yZBhYqCnjQpaJ9QKC6QQ
 // تطبيق iOS: طلب الإذن تلقائياً (نافذة آبل) ثم تسجيل رمز FCM في حساب المستخدم
 function nativePushListeners() {
   const p = NP(); if (!p || state._npl) return; state._npl = true;
-  p.addListener('tokenReceived', e => { if (e && e.token && state.user) db.collection('users').doc(state.user.uid).set({ fcmTokens: FV.arrayUnion(e.token) }, { merge: true }).catch(() => {}); });
+  p.addListener('tokenReceived', e => { if (e && e.token && state.user) { state._tok = e.token; db.collection('users').doc(state.user.uid).set({ fcmTokens: FV.arrayUnion(e.token) }, { merge: true }).catch(() => {}); } });
   p.addListener('notificationActionPerformed', e => {
     const d = (e && e.notification && e.notification.data) || {}, id = d.jid || d.jamiyaId || d.id;
     if (id) { openNotifTarget(String(id)); setTimeout(() => { if (state.profile && !state.j && !state.view.startsWith('q')) openNotifTarget(String(id)); }, 1500); }
@@ -2770,6 +2770,7 @@ async function nativePushRegister(force, ask) {
     if (lsGet('jm_notif') === null || force) lsSet('jm_notif', '1');
     const tok = (await p.getToken()).token;
     if (!tok) return { ok: false, err: 'no-token' };
+    state._tok = tok; // يُستخدم في «الإقرار» حتى لا يكرر الخادم إشعاراً سلّمه التطبيق المفتوح
     const key = state.user.uid + ':' + tok;
     if (force || state._pushReg !== key) { await db.collection('users').doc(state.user.uid).set({ fcmTokens: FV.arrayUnion(tok) }, { merge: true }); state._pushReg = key; }
     return { ok: true };
