@@ -179,6 +179,16 @@ jobs:
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             archive
 
+      - name: فحص صلاحيات الإشعارات في البناء (تشخيص)
+        run: |
+          APP="build/App.xcarchive/Products/Applications/App.app"
+          echo "== Entitlements الموقّعة داخل التطبيق =="
+          codesign -d --entitlements :- "$APP" 2>&1 | grep -A1 -E "aps-environment|applesignin|application-identifier" || echo "لا يوجد aps-environment!"
+          echo "== ملف التوفير (Provisioning Profile) =="
+          security cms -D -i "$APP/embedded.mobileprovision" 2>/dev/null | grep -A1 -E "aps-environment|<key>Name</key>" || echo "لا يوجد ملف توفير"
+          echo "== ملف Firebase داخل التطبيق =="
+          ls -la "$APP/GoogleService-Info.plist" || echo "GoogleService-Info.plist غير موجود في التطبيق!"
+
       - name: Export ورفع إلى App Store Connect
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
