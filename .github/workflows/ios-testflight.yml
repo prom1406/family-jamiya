@@ -1,0 +1,123 @@
+name: iOS → TestFlight
+
+# يُشغَّل يدوياً فقط: Actions ثم iOS → TestFlight ثم Run workflow
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "رقم الإصدار الظاهر للمستخدم (MARKETING_VERSION)"
+        default: "1.0"
+        required: true
+
+env:
+  BUNDLE_ID: com.prom1406.siwa
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: تثبيت الحزم
+        run: npm install --no-audit --no-fund
+
+      - name: تجهيز ملفات الويب
+        run: npm run build:www
+
+      - name: تجهيز أيقونة التطبيق (1024، بدون شفافية)
+        run: |
+          pip3 install --quiet pillow --break-system-packages || pip3 install --quiet pillow
+          mkdir -p assets
+          python3 - <<'PY'
+          from PIL import Image
+          im = Image.open("icon-512.png").convert("RGBA")
+          bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
+          bg.alpha_composite(im)
+          bg.convert("RGB").resize((1024, 1024), Image.LANCZOS).save("assets/icon-only.png")
+          PY
+
+      - name: إنشاء مشروع iOS
+        run: |
+          npx cap add ios
+          npx cap sync ios
+
+      - name: توليد الأيقونات
+        run: npx capacitor-assets generate --ios
+
+      - name: إعدادات المشروع (التوقيع وSign in with Apple)
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MARKETING_VERSION: ${{ inputs.version }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          cat > ios/App/App/App.entitlements <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>com.apple.developer.applesignin</key>
+            <array><string>Default</string></array>
+          </dict>
+          </plist>
+          EOF
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" ios/App/App/Info.plist
+          ruby scripts/patch-ios.rb
+
+      - name: مفتاح App Store Connect
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s' "$ASC_KEY_P8" > "$RUNNER_TEMP/keys/AuthKey.p8"
+          echo "KEY_PATH=$RUNNER_TEMP/keys/AuthKey.p8" >> "$GITHUB_ENV"
+
+      - name: Archive
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          xcodebuild -workspace ios/App/App.xcworkspace -scheme App \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath build/App.xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            archive
+
+      - name: Export ورفع إلى App Store Connect
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cat > build/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath build/App.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist build/ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: حذف المفتاح
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keys"

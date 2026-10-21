@@ -646,13 +646,15 @@ const OFFLINE_CACHE = true;
 if (OFFLINE_CACHE) db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
 const OWNER_EMAIL = "mamydady87@gmail.com"; // بريد المالك: لا توجد كلمة مرور هنا، الهوية تُتحقق من Firebase
 const FV = firebase.firestore.FieldValue;
+// داخل تطبيق iOS (غلاف Capacitor)؟ يُستخدم لإظهار «الدخول عبر Apple» بدل جوجل (انظر doApple)
+const IS_NATIVE_IOS = !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform() && Capacitor.getPlatform && Capacitor.getPlatform() === 'ios');
 emailjs.init(EMAILJS_PUBLIC_KEY);
 
 const BANKS = ["مصرف الراجحي","البنك الأهلي السعودي","بنك الإنماء","بنك الرياض","بنك البلاد","بنك الجزيرة","السعودي الفرنسي","البنك العربي الوطني","البنك السعودي الأول","بنك رقمي / أخرى","كاش (نقداً)"];
 
 /* ============ الحالة ============ */
 const state = {
-  user: null, profile: null, isAdmin: false, view: 'loading', authMode: (function () { try { return localStorage.getItem('jm_email') ? 'login' : 'phone'; } catch (e) { return 'login'; } })(), phoneStep: (function () { try { return localStorage.getItem('jm_phone_pw') ? 'pw' : 'phone'; } catch (e) { return 'phone'; } })(), _phoneName: '', _phoneLabel: '',
+  user: null, profile: null, isAdmin: false, view: 'loading', authMode: (function () { try { return (IS_NATIVE_IOS || localStorage.getItem('jm_email')) ? 'login' : 'phone'; } catch (e) { return 'login'; } })(), phoneStep: (function () { try { return localStorage.getItem('jm_phone_pw') ? 'pw' : 'phone'; } catch (e) { return 'phone'; } })(), _phoneName: '', _phoneLabel: '',
   jamiyat: [], invites: [], activeId: null, j: null, members: {}, payments: [], jInvites: [],
   admin: { jamiyat: [], users: [], qattahs: [] }, unsubs: [], jUnsubs: [], pays: {}, payLs: {}, afterOpen: null
 };
@@ -1030,6 +1032,58 @@ async function doGoogle() {
   catch (e) {
     if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/web-storage-unsupported'].includes(e.code)) { try { return await auth.signInWithRedirect(prov); } catch (e2) { e = e2; } }
     toast(authErr(e), 'error');
+  }
+}
+/* ---- تطبيق iOS (Capacitor): الدخول بحساب Apple ----
+   داخل التطبيق يُخفى زر جوجل (جوجل يمنع نافذة تسجيله داخل WebView) ويظهر زر Apple بدلاً منه.
+   الدخول أصلي عبر AuthenticationServices، ثم نمرّر الرمز إلى Firebase JS SDK ليبقى كل شيء كما هو. */
+async function doApple() {
+  try {
+    const plugin = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.FirebaseAuthentication;
+    if (!plugin) throw new Error('إضافة الدخول بآبل غير متوفرة في هذه النسخة');
+    const res = await plugin.signInWithApple({ skipNativeAuth: true, scopes: ['email', 'name'] });
+    const c = res && res.credential;
+    if (!c || !c.idToken) throw new Error('لم يصل رمز التحقق من Apple');
+    const cred = new firebase.auth.OAuthProvider('apple.com').credential({ idToken: c.idToken, rawNonce: c.nonce });
+    const r = await auth.signInWithCredential(cred);
+    try { localStorage.setItem('jm_email', r.user.email || ''); } catch (e) {}
+  } catch (e) {
+    const msg = String((e && (e.message || e.code)) || '');
+    if (/cancel|1001|dismiss/i.test(msg)) return; // المستخدم أغلق النافذة
+    toast(e && e.code && String(e.code).startsWith('auth/') ? authErr(e) : 'تعذر الدخول عبر Apple: ' + msg, 'error');
+  }
+}
+/* ---- حذف الحساب من داخل التطبيق (شرط App Store 5.1.1(v)) ----
+   يحذف ملفه الشخصي وحجز رقم جواله ثم حساب Firebase. ما يخص الجمعيات المشتركة مع آخرين يبقى للمشرفين.
+   ملاحظة: إبطال رمز Apple (revoke) يحتاج خادماً/Cloud Function، انظر README-IOS.md. */
+async function deleteMyAccount() {
+  const u = auth.currentUser; if (!u) return;
+  if (!confirm('سيُحذف حسابك وبياناتك الشخصية نهائياً ولا يمكن التراجع عن ذلك. هل أنت متأكد؟')) return;
+  const typed = prompt('للتأكيد اكتب كلمة: حذف');
+  if (typed === null || typed.trim() !== 'حذف') return toast('لم يتم حذف الحساب', 'info');
+  try {
+    // إعادة التحقق من الهوية (يطلبها Firebase قبل الحذف)
+    const ids = (u.providerData || []).map(p => p && p.providerId);
+    if (ids.includes('apple.com') && IS_NATIVE_IOS) {
+      const res = await Capacitor.Plugins.FirebaseAuthentication.signInWithApple({ skipNativeAuth: true, scopes: ['email', 'name'] });
+      const c = res && res.credential; if (!c || !c.idToken) throw new Error('تعذر التحقق من Apple');
+      await u.reauthenticateWithCredential(new firebase.auth.OAuthProvider('apple.com').credential({ idToken: c.idToken, rawNonce: c.nonce }));
+    } else if (ids.includes('google.com')) {
+      await u.reauthenticateWithPopup(new firebase.auth.GoogleAuthProvider());
+    } else if (ids.includes('password') && u.email) {
+      const pw = prompt('اكتب كلمة المرور للتأكيد'); if (!pw) return;
+      await u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email, pw));
+    }
+    const ph = state.profile && state.profile.phone;
+    await Promise.race([unregisterPush(), new Promise(r => setTimeout(r, 3000))]).catch(() => {});
+    await db.collection('users').doc(u.uid).delete().catch(() => {});
+    if (ph) await db.collection('phones').doc(ph).delete().catch(() => {});
+    await u.delete();
+    toast('تم حذف حسابك نهائياً', 'success');
+  } catch (e) {
+    if (e && e.code === 'auth/requires-recent-login') return toast('لأمانك: سجّل الخروج ثم الدخول مجدداً ثم أعد المحاولة', 'error');
+    if (/cancel|1001|dismiss/i.test(String((e && (e.message || e.code)) || ''))) return;
+    toast('تعذر حذف الحساب: ' + ((e && e.message) || e), 'error');
   }
 }
 // الدخول برابط يصل البريد (بدون كلمة مرور): أبسط طريقة للمستخدم الجديد
@@ -2868,7 +2922,7 @@ function vAuth() {
   return `<div class="max-w-md mx-auto card p-6 sm:p-8">
     <div class="text-center mb-4"><img src="logo-full.jpg" alt="سِواء - منصة التكافل والحلول المالية التشاركية" width="112" height="112" class="w-24 h-24 mx-auto mb-1 object-contain" style="mix-blend-mode:multiply"><h2 class="text-xl font-black">${title}</h2></div>
     ${invite}${trustStrip()}${seg}
-    ${ph ? vPhoneForm() : `${m !== 'reset' ? `<button data-act="google" class="w-full mb-4 py-3.5 border-2 border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center justify-center gap-3"><img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="">${reg ? 'التسجيل بحساب جوجل (بضغطة واحدة)' : 'الدخول بحساب جوجل'}</button>
+    ${ph ? vPhoneForm() : `${m !== 'reset' ? `${IS_NATIVE_IOS ? `<button data-act="apple" class="w-full mb-4 py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-3" style="background:#000;color:#fff"><i class="fa-brands fa-apple text-lg"></i>${reg ? 'التسجيل عبر Apple' : 'تسجيل الدخول عبر Apple'}</button>` : `<button data-act="google" class="w-full mb-4 py-3.5 border-2 border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center justify-center gap-3"><img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="">${reg ? 'التسجيل بحساب جوجل (بضغطة واحدة)' : 'الدخول بحساب جوجل'}</button>`}
     <div class="flex items-center my-4"><div class="flex-grow border-t"></div><span class="px-3 text-xs text-slate-400">أو بالبريد</span><div class="flex-grow border-t"></div></div>` : ''}
     ${emailForm}
     ${m !== 'reset' ? `<button type="button" data-act="email-link" class="w-full mt-3 py-2.5 rounded-xl border border-dashed border-slate-300 text-xs font-semibold text-slate-600"><i class="fa-solid fa-wand-magic-sparkles"></i> أرسل لي رابط دخول بدون كلمة مرور</button>` : ''}
@@ -3203,7 +3257,10 @@ function vProfile() {
     <div class="card p-5 space-y-3"><h4 class="font-black text-sm"><i class="fa-solid fa-mobile-screen-button text-emerald-600"></i> التطبيق</h4>
       <p class="text-xs text-slate-500 leading-relaxed">${inst ? 'أنت تستخدم التطبيق المثبّت على جهازك ✓' : 'ثبّت سِواء على شاشتك الرئيسية لتعمل كتطبيق كامل وبسرعة أكبر.'}</p>
       <div class="flex flex-wrap gap-2">${inst ? '' : '<button class="btn b-pri" data-act="install-app"><i class="fa-solid fa-download"></i> تثبيت التطبيق</button>'}<button class="btn b-sec" data-act="share-app"><i class="fa-solid fa-share-nodes"></i> مشاركة التطبيق</button></div></div>
-    <button class="btn b-red w-full py-3 md:hidden" data-act="logout"><i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج</button></div>`;
+    <button class="btn b-red w-full py-3 md:hidden" data-act="logout"><i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج</button>
+    <div class="card p-5 space-y-3"><h4 class="font-black text-sm text-red-700"><i class="fa-solid fa-user-slash"></i> حذف الحساب</h4>
+      <p class="text-xs text-slate-500 leading-relaxed">يحذف حسابك وبياناتك الشخصية نهائياً من سِواء، ولا يمكن التراجع عن ذلك.</p>
+      <button class="btn b-red" data-act="del-account"><i class="fa-solid fa-trash"></i> حذف حسابي نهائياً</button></div></div>`;
 }
 
 /* ============ النوافذ المنبثقة ============ */
@@ -4369,7 +4426,7 @@ const actions = {
   'go-admin': () => { state.view = 'admin'; render(); loadAdmin(); },
   'logout': async () => { if (state.user) ssDel('jm_sess_' + state.user.uid); stopHeartbeat(); await Promise.race([unregisterPush(), new Promise(r => setTimeout(r, 3000))]); auth.signOut(); },
   'reg-push': async () => { const r = await registerPush(true); toast(r.ok ? 'سُجّل هذا الجهاز لإشعارات حسابك ✓' : 'تعذر تسجيل الجهاز: ' + r.err, r.ok ? 'success' : 'error'); },
-  'google': doGoogle,
+  'google': doGoogle, 'apple': doApple, 'del-account': deleteMyAccount,
   'toggle-pass': el => { const i = el.parentElement.querySelector('input'); if (i) { const show = i.type === 'password'; i.type = show ? 'text' : 'password'; el.innerHTML = show ? '<i class="fa-regular fa-eye-slash"></i>' : '<i class="fa-regular fa-eye"></i>'; } },
   'email-link': doEmailLink, 'verify-check': verifyCheckAction, 'auth-phone': () => { state.authMode = 'phone'; state.phoneStep = lsGet('jm_phone_pw') ? 'pw' : 'phone'; state._phoneConf = null; render(); }, 'auth-sms': () => { state.phoneStep = 'phone'; state._phoneConf = null; render(); }, 'auth-pw': () => { state.phoneStep = 'pw'; state._phoneConf = null; render(); }, 'set-pass': () => openSetPassword(), 'auth-phone-back': () => { state.phoneStep = 'phone'; state._phoneConf = null; render(); }, 'phone-verify': () => openPhoneVerify(), 'verify-resend': () => auth.currentUser.sendEmailVerification({ url: appUrl() }).then(() => toast('أُعيد إرسال رابط التفعيل')).catch(e => toast(authErr(e), 'error')),
   'open-details': () => needDetails(() => render()), 'dismiss-nudge': () => { lsSet('jm_nudge_x', '1'); render(); },
