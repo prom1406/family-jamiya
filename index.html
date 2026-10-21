@@ -1036,16 +1036,20 @@ async function doGoogle() {
 }
 /* ---- تطبيق iOS (Capacitor): الدخول بحساب Apple ----
    داخل التطبيق يُخفى زر جوجل (جوجل يمنع نافذة تسجيله داخل WebView) ويظهر زر Apple بدلاً منه.
-   الدخول أصلي عبر AuthenticationServices، ثم نمرّر الرمز إلى Firebase JS SDK ليبقى كل شيء كما هو. */
+   الدخول أصلي عبر AuthenticationServices (إضافة SignInWithApple)، ثم نمرّر الرمز إلى Firebase JS SDK ليبقى كل شيء كما هو. */
+async function appleNativeCredential() {
+  const plugin = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.SignInWithApple;
+  if (!plugin) throw new Error('إضافة الدخول بآبل غير متوفرة في هذه النسخة');
+  const raw = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, '0')).join('');
+  const hashed = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw)))).map(b => b.toString(16).padStart(2, '0')).join('');
+  const res = await plugin.authorize({ clientId: 'com.prom1406.sewaa', redirectURI: 'https://aljamiyahapp.firebaseapp.com/__/auth/handler', scopes: 'email name', state: raw.slice(0, 8), nonce: hashed });
+  const tok = res && res.response && res.response.identityToken;
+  if (!tok) throw new Error('لم يصل رمز التحقق من Apple');
+  return new firebase.auth.OAuthProvider('apple.com').credential({ idToken: tok, rawNonce: raw });
+}
 async function doApple() {
   try {
-    const plugin = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.FirebaseAuthentication;
-    if (!plugin) throw new Error('إضافة الدخول بآبل غير متوفرة في هذه النسخة');
-    const res = await plugin.signInWithApple({ skipNativeAuth: true, scopes: ['email', 'name'] });
-    const c = res && res.credential;
-    if (!c || !c.idToken) throw new Error('لم يصل رمز التحقق من Apple');
-    const cred = new firebase.auth.OAuthProvider('apple.com').credential({ idToken: c.idToken, rawNonce: c.nonce });
-    const r = await auth.signInWithCredential(cred);
+    const r = await auth.signInWithCredential(await appleNativeCredential());
     try { localStorage.setItem('jm_email', r.user.email || ''); } catch (e) {}
   } catch (e) {
     const msg = String((e && (e.message || e.code)) || '');
@@ -1065,9 +1069,7 @@ async function deleteMyAccount() {
     // إعادة التحقق من الهوية (يطلبها Firebase قبل الحذف)
     const ids = (u.providerData || []).map(p => p && p.providerId);
     if (ids.includes('apple.com') && IS_NATIVE_IOS) {
-      const res = await Capacitor.Plugins.FirebaseAuthentication.signInWithApple({ skipNativeAuth: true, scopes: ['email', 'name'] });
-      const c = res && res.credential; if (!c || !c.idToken) throw new Error('تعذر التحقق من Apple');
-      await u.reauthenticateWithCredential(new firebase.auth.OAuthProvider('apple.com').credential({ idToken: c.idToken, rawNonce: c.nonce }));
+      await u.reauthenticateWithCredential(await appleNativeCredential());
     } else if (ids.includes('google.com')) {
       await u.reauthenticateWithPopup(new firebase.auth.GoogleAuthProvider());
     } else if (ids.includes('password') && u.email) {

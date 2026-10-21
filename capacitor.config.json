@@ -5,11 +5,5 @@
   "ios": {
     "contentInset": "always",
     "backgroundColor": "#F5F7F5"
-  },
-  "plugins": {
-    "FirebaseAuthentication": {
-      "skipNativeAuth": true,
-      "providers": ["apple.com"]
-    }
   }
 }

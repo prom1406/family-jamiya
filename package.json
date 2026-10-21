@@ -11,8 +11,7 @@
   "dependencies": {
     "@capacitor/core": "^7.0.0",
     "@capacitor/ios": "^7.0.0",
-    "@capacitor-firebase/authentication": "^7.0.0",
-    "firebase": "^11.2.0"
+    "@capacitor-community/apple-sign-in": "^7.0.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.0.0",
