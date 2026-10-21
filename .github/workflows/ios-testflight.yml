@@ -19,6 +19,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: اختيار أحدث Xcode 26 (آبل تشترط iOS 26 SDK)
+        run: |
+          X=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$X" ]; then echo "لا يوجد Xcode 26 على هذا الجهاز:"; ls -d /Applications/Xcode*; exit 1; fi
+          sudo xcode-select -s "$X/Contents/Developer"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i "iphoneos"
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
