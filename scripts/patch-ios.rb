@@ -5,7 +5,7 @@ require 'xcodeproj'
 team    = ENV.fetch('TEAM_ID')
 version = ENV.fetch('MARKETING_VERSION', '1.0')
 build   = ENV.fetch('BUILD_NUMBER', '1')
-bundle  = ENV.fetch('BUNDLE_ID', 'com.prom1406.siwa')
+bundle  = ENV.fetch('BUNDLE_ID', 'com.prom1406.sewaa')
 
 proj = Xcodeproj::Project.open('ios/App/App.xcodeproj')
 target = proj.targets.find { |t| t.name == 'App' } or abort('target App غير موجود')

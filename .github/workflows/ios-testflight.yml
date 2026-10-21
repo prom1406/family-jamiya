@@ -10,7 +10,7 @@ on:
         required: true
 
 env:
-  BUNDLE_ID: com.prom1406.siwa
+  BUNDLE_ID: com.prom1406.sewaa
 
 jobs:
   build:

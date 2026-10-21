@@ -1,9 +1,9 @@
 # نشر سِواء على App Store (بدون Mac)
 
-Bundle ID: `com.prom1406.siwa`
+Bundle ID: `com.prom1406.sewaa`
 
 ## 1) في developer.apple.com
-1. Identifiers ← App IDs ← `com.prom1406.siwa` ← فعّل **Sign in with Apple**.
+1. Identifiers ← App IDs ← `com.prom1406.sewaa` ← فعّل **Sign in with Apple**.
 2. Users and Access ← Integrations ← App Store Connect API ← أنشئ مفتاحاً (صلاحية **App Manager**) وحمّل ملف `.p8` (مرة واحدة فقط) ودوّن **Key ID** و**Issuer ID**.
 3. Membership ← دوّن **Team ID**.
 
