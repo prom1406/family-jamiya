@@ -4332,7 +4332,7 @@ function famRemind() {
 /* ============ التوجيه والأحداث ============ */
 /* ============ تطبيق PWA: التثبيت والتحديث ============ */
 let deferredPrompt = null;
-const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || (window.matchMedia && matchMedia('(display-mode: minimal-ui)').matches) || navigator.standalone === true;
+const isStandalone = () => IS_NATIVE_IOS || (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || (window.matchMedia && matchMedia('(display-mode: minimal-ui)').matches) || navigator.standalone === true;
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const ibKey = 'jm_ib_dismiss';
 function ibDismissed() { try { return Date.now() - Number(localStorage.getItem(ibKey) || 0) < 3 * 86400000; } catch (e) { return false; } }
