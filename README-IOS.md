@@ -38,3 +38,9 @@ Actions ← **iOS → TestFlight** ← Run workflow. بعد دقائق يظهر 
 6. شغّل workflow من جديد. الـ workflow يولّد `GoogleService-Info.plist` تلقائياً، ويفشل برسالة واضحة إن غاب السر (بدلاً من بناء تطبيق ينهار).
 
 يُطلب إذن الإشعارات تلقائياً بعد تسجيل الدخول، ويُحفظ رمز الجهاز في `users/{uid}.fcmTokens` فيستخدمه الخادم الحالي كما هو.
+
+## 7) الدخول بجوجل داخل التطبيق
+1. في Firebase ← إعدادات المشروع ← General ← تطبيق iOS ← حمّل **GoogleService-Info.plist** (بعد تفعيل الدخول بجوجل في Authentication).
+2. ضعه في المستودع باسم `ios-config/GoogleService-Info.plist` (الملف لا يحتوي أسراراً؛ مفاتيح العميل عامة).
+3. الـ workflow يأخذ منه `CLIENT_ID` و`REVERSED_CLIENT_ID` تلقائياً، ويستخدم الملف نفسه للإشعارات (فلا حاجة للسر `FIREBASE_IOS_APP_ID`).
+4. زر جوجل يظهر داخل التطبيق بجانب زر Apple فقط إن وُجد `CLIENT_ID`.

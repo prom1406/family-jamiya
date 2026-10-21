@@ -13,6 +13,14 @@
         "badge",
         "sound"
       ]
+    },
+    "SocialLogin": {
+      "providers": {
+        "google": true,
+        "facebook": false,
+        "apple": false,
+        "twitter": false
+      }
     }
   }
 }

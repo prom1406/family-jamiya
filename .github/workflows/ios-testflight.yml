@@ -37,6 +37,24 @@ jobs:
       - name: تجهيز ملفات الويب
         run: npm run build:www
 
+      - name: ضبط الدخول بجوجل داخل التطبيق (من GoogleService-Info.plist)
+        run: |
+          python3 - <<'PY'
+          import os, plistlib, re
+          f = "ios-config/GoogleService-Info.plist"
+          if not os.path.exists(f):
+              print("::warning::لا يوجد ios-config/GoogleService-Info.plist: سيُخفى زر جوجل داخل التطبيق.")
+          else:
+              cid = plistlib.load(open(f, "rb")).get("CLIENT_ID", "")
+              if not cid:
+                  print("::warning::الملف لا يحتوي CLIENT_ID (فعّل الدخول بجوجل في Firebase ثم حمّل الملف من جديد): سيُخفى زر جوجل.")
+              else:
+                  p = "www/index.html"; h = open(p, encoding="utf8").read()
+                  new = h.replace("const GOOGLE_IOS_CLIENT_ID = '';", "const GOOGLE_IOS_CLIENT_ID = '%s';" % cid, 1)
+                  assert new != h, "لم يُعثر على GOOGLE_IOS_CLIENT_ID في index.html"
+                  open(p, "w", encoding="utf8").write(new); print("CLIENT_ID جاهز")
+          PY
+
       - name: تجهيز أيقونة التطبيق (1024، بدون شفافية)
         run: |
           pip3 install --quiet pillow --break-system-packages || pip3 install --quiet pillow
@@ -61,8 +79,13 @@ jobs:
         env:
           FIREBASE_IOS_APP_ID: ${{ secrets.FIREBASE_IOS_APP_ID }}
         run: |
+          if [ -f ios-config/GoogleService-Info.plist ]; then
+            cp ios-config/GoogleService-Info.plist ios/App/App/GoogleService-Info.plist
+            echo "استُخدم ios-config/GoogleService-Info.plist"
+            exit 0
+          fi
           if [ -z "$FIREBASE_IOS_APP_ID" ]; then
-            echo "::error::أضف السر FIREBASE_IOS_APP_ID (معرّف تطبيق iOS من Firebase ← إعدادات المشروع، شكله 1:508199870007:ios:xxxx). بدونه ينهار التطبيق عند الفتح."
+            echo "::error::ضع ملف GoogleService-Info.plist في ios-config/ أو أضف السر FIREBASE_IOS_APP_ID. بدونه ينهار التطبيق عند الفتح."
             exit 1
           fi
           python3 - <<'PY'
@@ -127,6 +150,10 @@ jobs:
           </plist>
           EOF
           /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" ios/App/App/Info.plist
+          RC=$(/usr/libexec/PlistBuddy -c "Print :REVERSED_CLIENT_ID" ios/App/App/GoogleService-Info.plist 2>/dev/null || true)
+          if [ -n "$RC" ]; then
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" -c "Add :CFBundleURLTypes:0 dict" -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $RC" ios/App/App/Info.plist
+          fi
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" -c "Add :UIBackgroundModes:0 string remote-notification" ios/App/App/Info.plist
           ruby scripts/patch-ios.rb
 

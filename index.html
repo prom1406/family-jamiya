@@ -647,6 +647,8 @@ if (OFFLINE_CACHE) db.enablePersistence({ synchronizeTabs: true }).catch(() => {
 const OWNER_EMAIL = "mamydady87@gmail.com"; // بريد المالك: لا توجد كلمة مرور هنا، الهوية تُتحقق من Firebase
 const FV = firebase.firestore.FieldValue;
 // داخل تطبيق iOS (غلاف Capacitor)؟ يُستخدم لإظهار «الدخول عبر Apple» بدل جوجل (انظر doApple)
+// معرّف عميل جوجل لتطبيق iOS (CLIENT_ID): يُملأ تلقائياً أثناء البناء من GoogleService-Info.plist. فارغ = يُخفى زر جوجل داخل التطبيق.
+const GOOGLE_IOS_CLIENT_ID = '';
 const IS_NATIVE_IOS = !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform() && Capacitor.getPlatform && Capacitor.getPlatform() === 'ios');
 emailjs.init(EMAILJS_PUBLIC_KEY);
 
@@ -722,6 +724,7 @@ function authErr(e) {
   const m = {
     'auth/email-already-in-use': 'هذا البريد مسجل مسبقاً، جرّب تسجيل الدخول.',
     'auth/invalid-email': 'صيغة البريد غير صحيحة.',
+    'auth/account-exists-with-different-credential': 'هذا البريد مسجّل بطريقة دخول أخرى (جوجل أو Apple أو بريد). ادخل بنفس الطريقة التي سجّلت بها أولاً.',
     'auth/weak-password': 'كلمة المرور ضعيفة (6 أحرف على الأقل).',
     'auth/invalid-credential': 'البريد أو كلمة المرور غير صحيحة.',
     'auth/wrong-password': 'كلمة المرور غير صحيحة.',
@@ -1029,6 +1032,7 @@ async function doReset(f) {
   catch (e) { toast(authErr(e), 'error'); }
 }
 async function doGoogle() {
+  if (IS_NATIVE_IOS) return doGoogleNative();
   const prov = new firebase.auth.GoogleAuthProvider();
   try { const r = await auth.signInWithPopup(prov); try { localStorage.setItem('jm_email', r.user.email || ''); } catch (e) {} }
   catch (e) {
@@ -1048,6 +1052,25 @@ async function appleNativeCredential() {
   const tok = res && res.response && res.response.identityToken;
   if (!tok) throw new Error('لم يصل رمز التحقق من Apple');
   return new firebase.auth.OAuthProvider('apple.com').credential({ idToken: tok, rawNonce: raw });
+}
+async function googleNativeCredential() {
+  const plugin = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.SocialLogin;
+  if (!plugin) throw new Error('إضافة الدخول بجوجل غير متوفرة في هذه النسخة');
+  await plugin.initialize({ google: { iOSClientId: GOOGLE_IOS_CLIENT_ID } });
+  const res = await plugin.login({ provider: 'google', options: { scopes: ['email', 'profile'] } });
+  const tok = res && res.result && res.result.idToken;
+  if (!tok) throw new Error('لم يصل رمز التحقق من جوجل');
+  return firebase.auth.GoogleAuthProvider.credential(tok);
+}
+async function doGoogleNative() {
+  try {
+    const r = await auth.signInWithCredential(await googleNativeCredential());
+    try { localStorage.setItem('jm_email', r.user.email || ''); } catch (e) {}
+  } catch (e) {
+    const msg = String((e && (e.message || e.code)) || '');
+    if (/cancel|dismiss|1001|-5\b/i.test(msg)) return; // المستخدم أغلق النافذة
+    toast(e && e.code && String(e.code).startsWith('auth/') ? authErr(e) : 'تعذر الدخول عبر جوجل: ' + msg, 'error');
+  }
 }
 async function doApple() {
   try {
@@ -1073,7 +1096,8 @@ async function deleteMyAccount() {
     if (ids.includes('apple.com') && IS_NATIVE_IOS) {
       await u.reauthenticateWithCredential(await appleNativeCredential());
     } else if (ids.includes('google.com')) {
-      await u.reauthenticateWithPopup(new firebase.auth.GoogleAuthProvider());
+      if (IS_NATIVE_IOS) await u.reauthenticateWithCredential(await googleNativeCredential());
+      else await u.reauthenticateWithPopup(new firebase.auth.GoogleAuthProvider());
     } else if (ids.includes('password') && u.email) {
       const pw = prompt('اكتب كلمة المرور للتأكيد'); if (!pw) return;
       await u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email, pw));
@@ -2978,7 +3002,7 @@ function vAuth() {
   return `<div class="max-w-md mx-auto card p-6 sm:p-8">
     <div class="text-center mb-4"><img src="logo-full.jpg" alt="سِواء - منصة التكافل والحلول المالية التشاركية" width="112" height="112" class="w-24 h-24 mx-auto mb-1 object-contain" style="mix-blend-mode:multiply"><h2 class="text-xl font-black">${title}</h2></div>
     ${invite}${trustStrip()}${seg}
-    ${ph ? vPhoneForm() : `${m !== 'reset' ? `${IS_NATIVE_IOS ? `<button data-act="apple" class="w-full mb-4 py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-3" style="background:#000;color:#fff"><i class="fa-brands fa-apple text-lg"></i>${reg ? 'التسجيل عبر Apple' : 'تسجيل الدخول عبر Apple'}</button>` : `<button data-act="google" class="w-full mb-4 py-3.5 border-2 border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center justify-center gap-3"><img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="">${reg ? 'التسجيل بحساب جوجل (بضغطة واحدة)' : 'الدخول بحساب جوجل'}</button>`}
+    ${ph ? vPhoneForm() : `${m !== 'reset' ? `${IS_NATIVE_IOS ? `<button data-act="apple" class="w-full mb-4 py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-3" style="background:#000;color:#fff"><i class="fa-brands fa-apple text-lg"></i>${reg ? 'التسجيل عبر Apple' : 'تسجيل الدخول عبر Apple'}</button>${GOOGLE_IOS_CLIENT_ID ? `<button data-act="google" class="w-full mb-4 mt-2 py-3.5 border-2 border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center justify-center gap-3"><img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="">${reg ? 'التسجيل بحساب جوجل (بضغطة واحدة)' : 'الدخول بحساب جوجل'}</button>` : ''}` : `<button data-act="google" class="w-full mb-4 py-3.5 border-2 border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 flex items-center justify-center gap-3"><img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="">${reg ? 'التسجيل بحساب جوجل (بضغطة واحدة)' : 'الدخول بحساب جوجل'}</button>`}
     <div class="flex items-center my-4"><div class="flex-grow border-t"></div><span class="px-3 text-xs text-slate-400">أو بالبريد</span><div class="flex-grow border-t"></div></div>` : ''}
     ${emailForm}
     ${m !== 'reset' ? `<button type="button" data-act="email-link" class="w-full mt-3 py-2.5 rounded-xl border border-dashed border-slate-300 text-xs font-semibold text-slate-600"><i class="fa-solid fa-wand-magic-sparkles"></i> أرسل لي رابط دخول بدون كلمة مرور</button>` : ''}
