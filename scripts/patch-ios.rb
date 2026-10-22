@@ -1,5 +1,5 @@
 # يعدّل مشروع Xcode الذي ولّده Capacitor أثناء البناء على GitHub Actions:
-# التوقيع التلقائي + Sign in with Apple (Entitlements) + رقم الإصدار والبناء + iPhone فقط.
+# التوقيع التلقائي + Sign in with Apple (Entitlements) + رقم الإصدار والبناء + iPhone وiPad.
 require 'xcodeproj'
 
 team    = ENV.fetch('TEAM_ID')
@@ -18,7 +18,7 @@ target.build_configurations.each do |c|
   s['PRODUCT_BUNDLE_IDENTIFIER']   = bundle
   s['MARKETING_VERSION']           = version
   s['CURRENT_PROJECT_VERSION']     = build
-  s['TARGETED_DEVICE_FAMILY']      = '1'
+  s['TARGETED_DEVICE_FAMILY']      = '1,2'
 end
 plist = 'ios/App/App/GoogleService-Info.plist'
 if File.exist?(plist)
