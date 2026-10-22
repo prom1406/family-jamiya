@@ -1669,7 +1669,7 @@ function homeAlerts() {
 }
 const ALERT_ST = [['bg-rose-50 border-rose-200', 'fa-triangle-exclamation text-rose-500'], ['bg-amber-50 border-amber-200', 'fa-clock text-amber-500'], ['bg-indigo-50 border-indigo-200', 'fa-gift text-indigo-500']];
 const alertCount = () => { try { return state.user && state.profile ? homeAlerts().length : 0; } catch (e) { return 0; } };
-const KIND_IC = { pay: 'fa-coins text-emerald-600', member: 'fa-user-plus text-sky-600', mod: 'fa-pen-to-square text-indigo-600', custom: 'fa-bullhorn text-teal-600', remind: 'fa-bell text-amber-500' , admin: 'fa-user-shield text-emerald-600', invite: 'fa-envelope-open-text text-sky-600' };
+const KIND_IC = { pay: 'fa-coins text-emerald-600', member: 'fa-user-plus text-sky-600', mod: 'fa-pen-to-square text-indigo-600', custom: 'fa-bullhorn text-teal-600', remind: 'fa-bell text-amber-500' , admin: 'fa-user-shield text-emerald-600', invite: 'fa-envelope-open-text text-sky-600', cycle: 'fa-rotate text-emerald-600' };
 const bellCount = () => alertCount() + unreadCount();
 function showAlertsModal(tab) {
   const A = homeAlerts(), N = state.inbox || [], un = unreadCount();
@@ -2960,11 +2960,14 @@ const unreadCount = () => (state.inbox || []).filter(n => n.read !== true).lengt
 function listenNotifs() {
   const uid = state.user.uid; state.nq = []; state.inbox = []; state._pruned = new Set();
   state.unsubs.push(db.collection('notifs').where('toUid', '==', uid).onSnapshot(s => {
-    state.inbox = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => nSecs(b) - nSecs(a));
+    const all = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => nSecs(b) - nSecs(a));
+    state.inbox = all.filter(n => n.kind !== 'chatmsg'); // رسائل الدردشة تُنبَّه فقط ولا تزاحم صندوق الإشعارات
+    all.filter(n => n.kind === 'chatmsg' && nSecs(n) && Date.now() / 1000 - nSecs(n) > 600 && !state._pruned.has(n.id)).forEach(n => { state._pruned.add(n.id); db.collection('notifs').doc(n.id).delete().catch(() => {}); });
     s.docChanges().forEach(c => {
       if (c.type !== 'added' || c.doc.metadata.hasPendingWrites) return;
       const n = { id: c.doc.id, ...c.doc.data() };
       // يُعرض محلياً إن لم يدفعه الخادم لجهاز المستخدم (أو لم يكن للمستخدم جهاز مسجّل)
+      if (n.kind === 'chatmsg' && state.chatUnsub && state.j && state.j.id === n.jid && document.visibilityState !== 'hidden') { c.doc.ref.update({ ack: FV.arrayUnion(...devKeys()), read: true }).catch(() => {}); return; } // الدردشة مفتوحة أمامه
       if (n.read !== true && !ackedHere(n) && (n.pushed !== true || n.noPush === true)) state.nq.push(n);
     });
     state.inbox.slice(30).forEach(n => { if (!state._pruned.has(n.id)) { state._pruned.add(n.id); db.collection('notifs').doc(n.id).delete().catch(() => {}); } }); // نحتفظ بآخر 30

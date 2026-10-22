@@ -4,7 +4,8 @@
    • onNotifCreated: عند إنشاء مستند في notifs يُرسل الإشعار فوراً (بعد 15 ثانية ليُسلّمه التطبيق المفتوح بنفسه).
    • onUserCreated / onInviteCreated: إشعار المالك بمشترك جديد، وإشعار المدعوّ بدعوة جديدة.
    • sweep: كل 5 دقائق يلتقط ما فاته (إشعارات لم تُرسل، مشتركون ودعوات).
-   • reminders: الساعة 8 و12 بتوقيت الرياض ينشئ التذكيرات التلقائية. */
+   • onChatCreated: رسالة جديدة في دردشة الجمعية ← إشعار لبقية الأعضاء.
+   • reminders: الساعة 8 و12 بتوقيت الرياض ينشئ التذكيرات التلقائية وإشعارات بداية الدورات. */
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const logger = require('firebase-functions/logger');
@@ -24,6 +25,8 @@ exports.onNotifCreated = onDocumentCreated({ document: 'notifs/{id}', region: RE
 });
 exports.onUserCreated = onDocumentCreated({ document: 'users/{uid}', region: REGION }, ev => core.notifyNewUser(ev.params.uid, ev.data.data()));
 exports.onInviteCreated = onDocumentCreated({ document: 'invites/{id}', region: REGION }, ev => core.notifyInvite(ev.params.id, ev.data.data(), ev.data.createTime.toMillis()));
+
+exports.onChatCreated = onDocumentCreated({ document: 'jamiyat/{jid}/chat/{mid}', region: REGION, maxInstances: 20 }, ev => core.chatNotify(ev.params.jid, ev.params.mid, ev.data.data()));
 
 // يلتقط ما فات المشغّلات (فشل مؤقت، مالك لم يسجّل بعد…)
 exports.sweep = onSchedule({ schedule: 'every 5 minutes', region: SCHED_REGION, timeoutSeconds: 300 }, async () => {

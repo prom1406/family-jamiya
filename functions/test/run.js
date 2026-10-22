@@ -103,6 +103,37 @@ const WEB = 'w'.repeat(30) + 'WEBTOKEN', IOS = 'i'.repeat(30) + 'IOSTOKEN';
     assert.deepStrictEqual(n.map(x => x.toUid), ['m1', 'm2']); assert.ok(n[0].body.includes('50')); assert.ok(n[1].body.includes('حدّد قيمتك'));
     Date.now = realNow;
   });
+  await t('chatNotify: يُشعر بقية الأعضاء (والمشرف) دون المرسل، ولا يتكرر', async () => {
+    const { db, core } = mk(); db.seed('users/uB', { name: 'بدر' });
+    db.seed('jamiyat/j1', { name: 'جمعية العائلة', creatorUid: 'uA', memberUids: ['uA', 'uB', 'uC'] });
+    const n1 = await core.chatNotify('j1', 'm1', { uid: 'uB', text: '  مرحبا   بالجميع  ' });
+    const n = db.all('notifs'); assert.strictEqual(n1, 2); assert.deepStrictEqual(n.map(x => x.toUid).sort(), ['uA', 'uC']);
+    assert.ok(n.every(x => x.kind === 'chatmsg' && x.jid === 'j1' && x.tag === 'chat_j1' && x.title.includes('جمعية العائلة') && x.body === 'بدر: مرحبا بالجميع'));
+    assert.strictEqual(await core.chatNotify('j1', 'm1', { uid: 'uB', text: 'x' }), 0); assert.strictEqual(db.all('notifs').length, 2);
+    assert.strictEqual(await core.chatNotify('nope', 'm2', { uid: 'uB', text: 'x' }), 0);
+  });
+  await t('reminderJob: بداية دورة جديدة تُشعر الجميع مع اسم المستلم، ولا تتكرر', async () => {
+    const { db, core } = mk(); at(2026, 10, 1); db.seed('users/uB', { name: 'بدر' });
+    db.seed('jamiyat/j1', { name: 'ج', startDate: '2026-10-01', frequency: 'monthly', count: 3, turns: ['uA', 'uB', 'uC'], lastDay: 25, payDay: 27, amount: 100, creatorUid: 'uA', memberUids: ['uA', 'uB', 'uC'] });
+    await core.reminderJob(); const c = db.all('notifs').filter(x => x.kind === 'cycle');
+    assert.deepStrictEqual(c.map(x => x.toUid).sort(), ['uA', 'uB', 'uC']); assert.ok(c.every(x => x.title.includes('دورة جديدة') && x.body.includes('انتهت الدورة 1 وبدأت الدورة 2 من 3') && x.body.includes('بدر')));
+    const total = db.all('notifs').length; await core.reminderJob(); assert.strictEqual(db.all('notifs').length, total);
+    Date.now = realNow;
+  });
+  await t('reminderJob: أسبوعية تبدأ كل 7 أيام، وتُعلن نهاية الجمعية بعد آخر دورة', async () => {
+    const { db, core } = mk(); at(2026, 9, 22); // 15 أكتوبر + 7 = بداية الدورة 2 (idx 1)
+    db.seed('jamiyat/w1', { name: 'أسبوعية', startDate: '2026-10-15', frequency: 'weekly', count: 4, turns: ['uA', 'uB', 'uC', 'uD'], lastDay: 3, payDay: 5, amount: 5, creatorUid: 'uA', memberUids: ['uA', 'uB', 'uC', 'uD'] });
+    await core.reminderJob(); assert.strictEqual(db.all('notifs').filter(x => x.kind === 'cycle' && x.body.includes('وبدأت الدورة 2 من 4')).length, 4);
+    at(2026, 10, 12); await core.reminderJob(); // 15 أكتوبر + 28 = 12 نوفمبر ← انتهاء
+    assert.strictEqual(db.all('notifs').filter(x => x.kind === 'cycle' && x.title.startsWith('انتهت جمعية')).length, 4);
+    Date.now = realNow;
+  });
+  await t('reminderJob: التعاون الشهري يُعلن بداية الشهر', async () => {
+    const { db, core } = mk(); at(2026, 10, 1);
+    db.seed('jamiyat/f1', { type: 'family', mode: 'monthly', name: 'تعاون', famStart: '2026-10', monthlyDay: 23, creatorUid: 'boss', memberUids: ['boss', 'm1'] });
+    await core.reminderJob(); assert.deepStrictEqual(db.all('notifs').filter(x => x.kind === 'cycle').map(x => x.toUid).sort(), ['boss', 'm1']);
+    Date.now = realNow;
+  });
   await t('واتساب: يُرسل فقط عند وجود الأسرار وموافقة المستخدم ونوع التذكير', async () => {
     const calls = []; const f = globalThis.fetch; globalThis.fetch = async (u, o) => { calls.push([u, JSON.parse(o.body)]); return { ok: true, text: async () => '{}' }; };
     try {

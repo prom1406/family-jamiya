@@ -93,6 +93,39 @@ async function notifyInvite(id, i, createdMs) {
   await b.commit();
 }
 
+
+/* ---------- دردشة الجمعية: كل رسالة تُشعر بقية الأعضاء ---------- */
+const audience = j => [...new Set([...(j.memberUids || []), j.creatorUid, j.deputyUid].filter(Boolean))];
+const userName = async (uid, cache) => { if (!(uid in cache)) { const s = await db.doc('users/' + uid).get(); cache[uid] = (s.exists && s.data().name) || ''; } return cache[uid]; };
+async function chatNotify(jid, mid, m) {
+  if (!m || !m.uid || !m.text) return 0;
+  try { await db.doc('autoRem/chat_' + mid).create({ at: FV.serverTimestamp() }); } catch (e) { return 0; } // لا تكرار إن أُعيد المشغّل
+  const js = await db.doc('jamiyat/' + jid).get(); if (!js.exists) return 0;
+  const j = { id: jid, ...js.data() }, to = audience(j).filter(u => u !== m.uid); if (!to.length) return 0;
+  const who = (await userName(m.uid, {})) || 'عضو', text = String(m.text).replace(/\s+/g, ' ').trim().slice(0, 140);
+  for (let i = 0; i < to.length; i += 200) {
+    const b = db.batch();
+    to.slice(i, i + 200).forEach(u => b.set(notifRef(), notifData(u, `دردشة «${j.name || 'الجمعية'}»`, `${who}: ${text}`, 'chatmsg', 'chat_' + jid, jid)));
+    await b.commit();
+  }
+  return to.length;
+}
+
+/* ---------- بداية دورة جديدة / نهاية الجمعية ---------- */
+async function cycleItems(j, idx, tms, items, names) {
+  const cs = Math.round((tms - L.dayIn(j, idx, 1)) / L.DAYMS); if (cs < 0 || cs > 1) return; // يوم البداية (ويوم بعده تحسباً لفوات التشغيل)
+  const to = audience(j); if (!to.length) return;
+  if (idx >= j.count) { to.forEach(u => items.push({ key: `${j.id}_cend_${u}`, to: u, kind: 'cycle', title: `انتهت جمعية «${j.name}»`, body: `اكتملت جميع الدورات (${j.count}). جزاكم الله خيراً`, jid: j.id, tag: `cy_${j.id}_end` })); return; }
+  const rec = j.turns && j.turns[idx], rn = rec ? await userName(rec, names) : '';
+  const body = `${idx === 0 ? 'الدورة 1' : `انتهت الدورة ${idx} وبدأت الدورة ${idx + 1}`} من ${j.count}${rn ? ` — المستلم: ${rn}` : ''}`;
+  to.forEach(u => items.push({ key: `${j.id}_c${idx}_${u}`, to: u, kind: 'cycle', title: idx === 0 ? `بدأت جمعية «${j.name}»` : `دورة جديدة في «${j.name}»`, body, jid: j.id, tag: `cy_${j.id}_${idx}` }));
+}
+async function famCycleItems(j, today, items) {
+  if (j.mode !== 'monthly' || j.closed || today.d > 2) return;
+  const k = L.famCycle(j, today); if (k < 0) return;
+  audience(j).forEach(u => items.push({ key: `${j.id}_fc${k}_${u}`, to: u, kind: 'cycle', title: `شهر جديد في «${j.name}»`, body: 'بدأت دورة هذا الشهر من التعاون، راجع مساهمتك من التطبيق', jid: j.id, tag: `cy_${j.id}_f${k}` }));
+}
+
 /* ---------- التذكيرات التلقائية (نفس منطق التطبيق) ---------- */
 async function famReminders(j, today, items) {
   if (j.mode !== 'monthly' || j.closed || !j.famStart || !j.monthlyDay) return;
@@ -115,11 +148,12 @@ async function famReminders(j, today, items) {
 async function reminderJob() {
   const rt = new Date(Date.now() + 3 * 3600000), today = { y: rt.getUTCFullYear(), m: rt.getUTCMonth(), d: rt.getUTCDate() }, tms = Date.UTC(today.y, today.m, today.d);
   const jams = (await db.collection('jamiyat').limit(300).get()).docs.map(d => ({ id: d.id, ...d.data() }));
-  const items = []; // { key, to, title, body, jid, tag }
+  const items = [], names = {}; // { key, to, title, body, jid, tag, kind? }
   for (const j of jams) {
-    if (j.type === 'family') { await famReminders(j, today, items); continue; }
+    if (j.type === 'family') { await famCycleItems(j, today, items); await famReminders(j, today, items); continue; }
     if (!j.startDate || !j.count || !Array.isArray(j.turns)) continue;
-    const idx = L.monthIdx(j, today); if (idx < 0 || idx >= j.count) continue;
+    const idx = L.monthIdx(j, today); if (idx < 0 || idx > j.count) continue;
+    await cycleItems(j, idx, tms, items, names); if (idx >= j.count) continue;
     const dd = Math.round((L.dayIn(j, idx, j.lastDay) - tms) / L.DAYMS), pd = Math.round((L.dayIn(j, idx, j.payDay) - tms) / L.DAYMS);
     const stage = dd === 2 ? 'pre2' : dd === 0 ? 'due' : dd === -1 ? 'late1' : dd === -3 ? 'late3' : dd === -7 ? 'late7' : '';
     const recvStage = pd === 1 ? 'recv1' : pd === 0 ? 'recv0' : '';
@@ -145,12 +179,12 @@ async function reminderJob() {
   const fresh = items.filter(x => !sent.has(x.key)); if (!fresh.length) return 0;
   for (let i = 0; i < fresh.length; i += 200) {
     const b = db.batch();
-    fresh.slice(i, i + 200).forEach(x => { b.set(db.doc('autoRem/' + x.key), { at: FV.serverTimestamp() }); b.set(notifRef(), notifData(x.to, x.title, x.body, 'remind', x.tag, x.jid)); });
+    fresh.slice(i, i + 200).forEach(x => { b.set(db.doc('autoRem/' + x.key), { at: FV.serverTimestamp() }); b.set(notifRef(), notifData(x.to, x.title, x.body, x.kind || 'remind', x.tag, x.jid)); });
     await b.commit();
   }
   logger.info('reminders created', fresh.length);
   return fresh.length;
 }
 
-return { notifRef, notifData, claim, deliver, notifyNewUser, notifyInvite, reminderJob };
+return { notifRef, notifData, claim, deliver, notifyNewUser, notifyInvite, reminderJob, chatNotify };
 };

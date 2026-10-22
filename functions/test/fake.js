@@ -11,6 +11,7 @@ function makeDb() {
   const docRef = path => { const ref = { id: path.split('/').pop(), path,
     get: async () => snap(path, ref),
     set: async d => { store.set(path, { data: apply({}, d), t: store.get(path)?.t || Date.now() }); },
+    create: async d => { if (store.has(path)) { const e = new Error('ALREADY_EXISTS'); e.code = 6; throw e; } store.set(path, { data: apply({}, d), t: Date.now() }); },
     update: async d => { const r = store.get(path); if (!r) throw new Error('NOT_FOUND ' + path); r.data = apply(r.data, d); },
     collection: n => colRef(path + '/' + n) }; return ref; };
   const colRef = (path, filters = [], lim = 1e9) => ({ path,
