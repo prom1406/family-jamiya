@@ -3,7 +3,7 @@
   "appName": "سِواء",
   "webDir": "www",
   "ios": {
-    "contentInset": "always",
+    "contentInset": "never",
     "backgroundColor": "#F5F7F5"
   },
   "plugins": {
