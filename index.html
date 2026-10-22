@@ -12,6 +12,7 @@
 <meta name="format-detection" content="telephone=no">
 <title>سِواء</title>
 <meta name="theme-color" content="#0f4c3a">
+<script>(function(){var m='auto';try{m=localStorage.getItem('jm_theme')||'auto'}catch(e){}var mq=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)');function ap(){var d=m==='dark'||(m==='auto'&&!!mq&&mq.matches),h=document.documentElement;h.classList.toggle('dark',d);var t=document.querySelector('meta[name=theme-color]');if(t)t.setAttribute('content',d?'#0b1512':'#0f4c3a')}window.__applyTheme=function(x){m=x;ap()};ap();if(mq){if(mq.addEventListener)mq.addEventListener('change',ap);else if(mq.addListener)mq.addListener(ap)}})();</script>
 <meta name="description" content="سِواء — منصة التكافل والحلول المالية التشاركية">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -588,6 +589,98 @@ button.wz-sb{cursor:pointer;min-height:48px}
 .pf-tx small{display:block;font-size:.72rem;color:#64748b;margin-top:2px;line-height:1.5}
 .pf-chev{color:#cbd5e1;font-size:.8rem}
 </style>
+<style id="dark-style">
+html.dark{--bg:#0b1512;--surface:#13211c;--ink:#e7efeb;--muted:#93a89f;--line:#243a32;--line-2:#2c463c;--brand-soft:#173329;--brand-line:#245240;--gold-soft:#3a2418;--wz-soft:#12352c;--wz-line:#2c463c;--wz-ink:#e7efeb;--wz-mut:#9bb0a7;--wz-dk:#7ee0b4;--wz-main:#12957f;color-scheme:dark}
+html.dark body{background:radial-gradient(700px 360px at 100% -6%,rgba(15,177,107,.16) 0,transparent 62%),radial-gradient(640px 340px at -8% 4%,rgba(99,102,241,.14) 0,transparent 58%),#0b1512!important;color:#e7efeb}
+/* surfaces */
+html.dark .app-header,html.dark body .app-header{background:rgba(11,21,18,.88)!important;border-bottom:1px solid #1d312a!important;box-shadow:none!important}
+html.dark .card,html.dark .jcard,html.dark body .sw-card,html.dark body .sw-quick,html.dark .pf-group,html.dark .wz-tile,html.dark .sheet,html.dark .wz-card,html.dark .wz-opt{background:#13211c!important;border-color:#243a32!important;color:#e7efeb}
+html.dark .wz-card.on,html.dark .wz-opt.on{background:var(--wz-soft)!important;border-color:var(--wz-main)!important}
+html.dark .wz-row,html.dark .wz-notes p,html.dark .wz-note.slate{background:#182822;border-color:#243a32;color:#c4d3cc}
+html.dark .wz-note.amber{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.35);color:#fcd34d}
+html.dark .wz-alert{background:rgba(244,63,94,.14);border-color:rgba(244,63,94,.4);color:#fda4af}
+html.dark .wz-dot{background:#13211c;color:#9bb0a7}
+html.dark .wz-sl,html.dark .wz-or,html.dark .wz-ic-sum,html.dark .wz-x{color:#9bb0a7}
+html.dark .wz-fields label{color:#dbe6e1}
+html.dark .wz-x:hover{background:#1d302a}
+html.dark .wz-bar{background:rgba(11,21,18,.94)!important;border-color:#243a32!important}
+html.dark .tabbar,html.dark body .tabbar{background:rgba(15,27,22,.95)!important;border-color:#243a32!important;box-shadow:0 -8px 24px -14px rgba(0,0,0,.6)!important}
+html.dark .tab{color:#8aa096}
+html.dark .tab.on,html.dark body .tab.on{color:#5fd3a0}
+html.dark .tab.on::before{background:rgba(95,211,160,.16)}
+html.dark .sheet::before{background:#2c463c!important}
+html.dark .sheet-wrap{background:rgba(0,0,0,.62)}
+/* inputs */
+html.dark .inp,html.dark input.inp,html.dark select.inp,html.dark textarea.inp,html.dark body .inp{background:#0f1c17!important;border-color:#2c463c!important;color:#e7efeb!important}
+html.dark .inp:focus{background:#13211c!important;border-color:#0fb16b!important;box-shadow:0 0 0 3px rgba(15,177,107,.22)!important}
+html.dark .inp::placeholder,html.dark input::placeholder,html.dark textarea::placeholder{color:#6a8077}
+html.dark select option{background:#13211c;color:#e7efeb}
+html.dark .wz-fields [aria-invalid=true]{background:#0f1c17}
+/* buttons */
+html.dark .b-sec,html.dark body .b-sec{background:#1a2d26!important;color:#8be0b8!important;border-color:#27443a!important;box-shadow:none!important}
+html.dark .b-sec:hover{background:#21382f!important}
+html.dark .b-white,html.dark body .b-white{background:#1a2d26!important;color:#8be0b8!important;border-color:#27443a!important}
+html.dark .b-red,html.dark body .b-red{background:rgba(244,63,94,.14)!important;color:#fb7185!important;border:0!important}
+html.dark .achip{background:#1a2d26!important;color:#8be0b8!important;border-color:#27443a!important}
+html.dark .emo{background:#1a2d26;border-color:transparent}
+html.dark .toast.info{background:#223a31}
+html.dark .ibar{background:#13211c;border:1px solid #243a32}
+/* profile */
+html.dark .pf-title,html.dark .pf-tx small{color:#93a89f}
+html.dark .pf-row:active{background:#182822}
+html.dark .pf-row+.pf-row{border-top-color:#1d312a}
+html.dark .pf-ic{background:#173329;color:#5fd3a0}
+html.dark .pf-ic.warn{background:rgba(245,158,11,.16);color:#fbbf24}
+html.dark .pf-ic.red{background:rgba(244,63,94,.16);color:#fb7185}
+html.dark .pf-chev{color:#4b6359}
+html.dark .sw-ic.i1{background:#173329;color:#5fd3a0}
+html.dark .sw-ic.i2{background:rgba(230,90,44,.18);color:#fb923c}
+html.dark .sw-ic.i3{background:rgba(59,130,246,.18);color:#93c5fd}
+html.dark .sw-ic.i4{background:rgba(139,92,246,.18);color:#c4b5fd}
+html.dark .sw-bdg.or{background:rgba(230,90,44,.18);color:#fb923c}
+html.dark .sw-bdg.g{background:#173329;color:#5fd3a0}
+html.dark .sw-bdg.gr{background:#1d302a;color:#93a89f}
+/* Tailwind utilities */
+html.dark .text-slate-900,html.dark .text-slate-800{color:#e7efeb}
+html.dark .text-slate-700{color:#d0ddd7}
+html.dark .text-slate-600{color:#b2c4bb}
+html.dark .text-slate-500{color:#9bb0a7}
+html.dark .text-slate-400{color:#8aa096}
+html.dark .text-slate-300{color:#5d7068}
+html.dark .bg-white{background-color:#13211c}
+html.dark .bg-slate-50{background-color:#182822}
+html.dark .bg-slate-100,html.dark .hover\:bg-slate-100:hover{background-color:#1d302a}
+html.dark .bg-slate-200{background-color:#243a32}
+html.dark .hover\:bg-slate-50:hover{background-color:#1d302a}
+html.dark .border-slate-100,html.dark .border-slate-200{border-color:#243a32}
+html.dark .border-slate-300{border-color:#2c463c}
+html.dark .bg-emerald-50,html.dark .bg-teal-50{background-color:rgba(16,185,129,.12)}
+html.dark .bg-emerald-100,html.dark .bg-teal-100{background-color:rgba(16,185,129,.2)}
+html.dark body .text-emerald-500,html.dark body .text-emerald-600,html.dark body .text-emerald-700,html.dark body .text-emerald-800,html.dark body .text-emerald-900,html.dark body .text-teal-600,html.dark body .text-teal-700,html.dark body .text-teal-900{color:#5fd3a0}
+html.dark .border-emerald-100,html.dark .border-emerald-200,html.dark .border-teal-100,html.dark .border-teal-200{border-color:rgba(16,185,129,.3)}
+html.dark .bg-amber-50{background-color:rgba(245,158,11,.12)}
+html.dark .bg-amber-100{background-color:rgba(245,158,11,.2)}
+html.dark .text-amber-900,html.dark .text-amber-800,html.dark .text-amber-700{color:#fcd34d}
+html.dark .text-amber-600,html.dark .text-amber-500,html.dark .text-orange-700{color:#fbbf24}
+html.dark .border-amber-100,html.dark .border-amber-200{border-color:rgba(245,158,11,.35)}
+html.dark .bg-rose-50{background-color:rgba(244,63,94,.12)}
+html.dark .bg-rose-100{background-color:rgba(244,63,94,.2)}
+html.dark .text-rose-500,html.dark .text-rose-600,html.dark .text-rose-700,html.dark .text-rose-800,html.dark .text-rose-900{color:#fb7185}
+html.dark .border-rose-200{border-color:rgba(244,63,94,.4)}
+html.dark .bg-sky-50{background-color:rgba(14,165,233,.12)}
+html.dark .bg-sky-100{background-color:rgba(14,165,233,.2)}
+html.dark .text-sky-400,html.dark .text-sky-500,html.dark .text-sky-600,html.dark .text-sky-700,html.dark .text-sky-800,html.dark .text-sky-900{color:#7dd3fc}
+html.dark .border-sky-100,html.dark .border-sky-200{border-color:rgba(14,165,233,.35)}
+html.dark .bg-violet-50,html.dark .bg-indigo-50{background-color:rgba(139,92,246,.14)}
+html.dark .bg-violet-100{background-color:rgba(139,92,246,.22)}
+html.dark .text-violet-600,html.dark .text-violet-700,html.dark .text-violet-900,html.dark .text-indigo-500,html.dark .text-indigo-600,html.dark .text-indigo-700,html.dark .text-indigo-800,html.dark .text-indigo-900{color:#c4b5fd}
+html.dark .border-violet-100,html.dark .border-indigo-200{border-color:rgba(139,92,246,.35)}
+html.dark .bg-slate-900{background-color:#0a1210;border:1px solid #243a32}
+html.dark hr,html.dark .divide-y>*+*{border-color:#243a32}
+html.dark table th,html.dark table td{border-color:#243a32}
+html.dark ::-webkit-scrollbar-thumb{background:#2c463c}
+html.dark img.logo{background:#fff}
+</style>
 </head>
 <body class="text-slate-800 antialiased">
 
@@ -649,6 +742,10 @@ if (LANG === 'en' && window.I18N_EN) (function () {
   const _c = window.confirm.bind(window), _a = window.alert.bind(window);
   window.confirm = m => _c(tr(m)); window.alert = m => _a(tr(m));
 })();
+const themeMode = () => { try { return localStorage.getItem('jm_theme') || 'auto'; } catch (e) { return 'auto'; } };
+const themeLabel = () => ({ auto: 'تلقائي (حسب جهازك)', dark: 'داكن', light: 'فاتح' })[themeMode()];
+const themeCycle = () => { const n = { auto: 'dark', dark: 'light', light: 'auto' }[themeMode()]; try { localStorage.setItem('jm_theme', n); } catch (e) {} if (window.__applyTheme) window.__applyTheme(n); render(); };
+const themeBtn = () => `<button class="btn b-sec" data-act="theme-cycle" aria-label="المظهر"><i class="fa-solid ${document.documentElement.classList.contains('dark') ? 'fa-sun' : 'fa-moon'}"></i></button>`;
 const setLang = l => { try { localStorage.setItem('jm_lang', l); } catch (e) {} location.reload(); };
 const langBtn = () => `<button class="btn b-sec" data-act="lang-toggle" aria-label="Language"><i class="fa-solid fa-language"></i> ${LANG === 'en' ? 'عربي' : 'EN'}</button>`;
 /* ============ الإعدادات ============ */
@@ -2943,7 +3040,7 @@ function renderNav() {
   const instBtn = canInst ? '<button class="btn b-pri" data-act="install-app" aria-label="تثبيت التطبيق"><i class="fa-solid fa-download"></i><span class="hidden sm:inline"> تثبيت</span></button>' : '';
   const shareBtn = '<button class="btn b-sec" data-act="share-app" aria-label="مشاركة التطبيق"><i class="fa-solid fa-share-nodes"></i><span class="hidden sm:inline"> مشاركة</span></button>';
   const hh = document.querySelector('.app-header h1');
-  if (!state.user || !state.profile) { nav.innerHTML = langBtn() + instBtn + shareBtn; sub.textContent = 'منصة التكافل والحلول المالية التشاركية'; tb.classList.add('hide'); document.body.classList.remove('sw-home'); if (hh) hh.textContent = 'سِواء'; return; }
+  if (!state.user || !state.profile) { nav.innerHTML = themeBtn() + langBtn() + instBtn + shareBtn; sub.textContent = 'منصة التكافل والحلول المالية التشاركية'; tb.classList.add('hide'); document.body.classList.remove('sw-home'); if (hh) hh.textContent = 'سِواء'; return; }
   sub.textContent = state.profile.name;
   const swHome = state.view === 'home' && !maintOn();
   document.body.classList.toggle('sw-home', swHome);
@@ -3517,6 +3614,7 @@ function vProfile() {
     <section class="pf-group">
       <div class="pf-title">المزيد</div>
       ${row('fa-box-archive', '', 'الأرشيف', archN ? nf(archN) + ' عنصر منتهٍ' : 'لا توجد عناصر منتهية', 'go-archive')}
+      ${row('fa-circle-half-stroke', '', 'المظهر', themeLabel(), 'theme-cycle')}
       ${row('fa-share-nodes', '', 'مشاركة سِواء', 'أرسل التطبيق لأصدقائك', 'share-app')}
     </section>
 
@@ -4720,7 +4818,7 @@ const actions = {
   'alert-remind': (el) => { closeModal(); state.afterOpen = { id: el.dataset.id, act: 'wa-remind' }; openJamiya(el.dataset.id); },
   'cancel-inv': (el) => cancelInvite(el.dataset.id),
   'order-modal': openOrderModal,
-  'wa-remind': openWaReminders, 'share-app': shareApp, 'lang-toggle': () => setLang(LANG === 'en' ? 'ar' : 'en'), 'retry-boot': () => { state.view = 'loading'; render(); bootUser(auth.currentUser); },
+  'wa-remind': openWaReminders, 'share-app': shareApp, 'theme-cycle': themeCycle, 'lang-toggle': () => setLang(LANG === 'en' ? 'ar' : 'en'), 'retry-boot': () => { state.view = 'loading'; render(); bootUser(auth.currentUser); },
   'copy-share': () => navigator.clipboard.writeText(state.shareText).then(() => toast('تم نسخ الرابط')).catch(() => toast('تعذر النسخ', 'error')),
   'od-up': (el) => orderMove(+el.dataset.i, -1), 'od-down': (el) => orderMove(+el.dataset.i, 1),
   'od-shuffle': orderShuffle, 'od-save': orderSave,
