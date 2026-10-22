@@ -1,0 +1,12 @@
+{
+  "name": "siwaa-functions",
+  "private": true,
+  "description": "مرسل إشعارات سِواء (Firebase Cloud Functions)",
+  "main": "index.js",
+  "engines": { "node": "22" },
+  "scripts": { "test": "node test/run.js" },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.3.0"
+  }
+}

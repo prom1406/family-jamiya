@@ -4,3 +4,6 @@ ios/
 build/
 *.p8
 .DS_Store
+functions/node_modules/
+functions/.env
+functions/.env.*
