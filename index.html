@@ -694,6 +694,108 @@ html.dark table th,html.dark table td{border-color:#243a32}
 html.dark ::-webkit-scrollbar-thumb{background:#2c463c}
 html.dark img.logo{background:#fff}
 </style>
+<style id="ap-style">
+/* ===== صفحة الحساب (تصميم جديد) ===== */
+.ap{max-width:36rem;margin:0 auto;display:flex;flex-direction:column;gap:1rem;padding-bottom:1.5rem}
+.ap [hidden]{display:none!important}
+.ap-hero{position:relative;overflow:hidden;border-radius:26px;padding:1.25rem;color:#fff;background:linear-gradient(135deg,#0f4c3a 0%,#1e5a46 55%,#0f9e74 140%);box-shadow:0 20px 40px -22px rgba(15,76,58,.75)}
+.ap-hero::before{content:"";position:absolute;width:240px;height:240px;border-radius:50%;background:rgba(255,255,255,.08);top:-120px;left:-90px;pointer-events:none}
+.ap-hero::after{content:"";position:absolute;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.05);bottom:-80px;right:-40px;pointer-events:none}
+.ap-top,.ap-stats,.ap-prog{position:relative;z-index:1}
+.ap-top{display:flex;align-items:center;gap:1rem;min-width:0}
+.ap-avw{position:relative;width:72px;height:72px;flex:none}
+.ap-ring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.ap-ring .bg{fill:none;stroke:rgba(255,255,255,.2);stroke-width:4}
+.ap-ring .fg{fill:none;stroke:#fff;stroke-width:4;stroke-linecap:round;transition:stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1)}
+.ap-av{position:absolute;inset:8px;border-radius:50%;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.2rem;overflow:hidden}
+.ap-av img{width:100%;height:100%;object-fit:cover}
+.ap-name{font-weight:900;font-size:1.12rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ap-sub{font-size:.75rem;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.ap-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:1.1rem}
+.ap-stat{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:.7rem .4rem;text-align:center}
+.ap-stat i{font-size:.8rem;opacity:.8}
+.ap-stat b{display:block;font-size:1.05rem;font-weight:900;margin-top:.3rem;font-variant-numeric:tabular-nums}
+.ap-stat span{display:block;font-size:.66rem;opacity:.85;margin-top:2px}
+.ap-prog{margin-top:1rem}
+.ap-prog-h{display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:.4rem;opacity:.92}
+.ap-bar{height:6px;border-radius:99px;background:rgba(255,255,255,.22);overflow:hidden}
+.ap-bar i{display:block;height:100%;border-radius:99px;background:#fff;transition:width .9s cubic-bezier(.2,.8,.2,1)}
+.ap-miss{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.7rem}
+.ap-chip{display:inline-flex;align-items:center;gap:.35rem;padding:.3rem .65rem;border-radius:99px;font-size:.7rem;font-weight:800;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);color:#fff;transition:transform .15s,background .2s}
+.ap-chip:active{transform:scale(.96);background:rgba(255,255,255,.26)}
+.ap-done{margin-top:.7rem;font-size:.72rem;font-weight:800;opacity:.95}
+.ap-email:empty{display:none}
+.ap-tabs{display:flex;gap:.3rem;overflow-x:auto;scrollbar-width:none;padding:.3rem;background:var(--brand-soft);border-radius:18px}
+.ap-tabs::-webkit-scrollbar{display:none}
+.ap-tab{flex:1 0 auto;display:flex;flex-direction:column;align-items:center;gap:.25rem;padding:.55rem .7rem;border-radius:14px;font-size:.72rem;font-weight:800;color:var(--muted);background:transparent;border:0;white-space:nowrap;transition:background .25s,color .25s,box-shadow .25s,transform .15s}
+.ap-tab i{font-size:.95rem}
+.ap-tab:active{transform:scale(.97)}
+.ap-tab.on{background:var(--surface);color:var(--brand-dark);box-shadow:0 6px 16px -8px rgba(15,23,42,.35)}
+.ap-panel{display:flex;flex-direction:column;gap:1rem;animation:apIn .35s cubic-bezier(.2,.8,.2,1)}
+@keyframes apIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.ap-form{display:flex;flex-direction:column;gap:1rem}
+.ap-card{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:1rem;box-shadow:0 1px 2px rgba(15,23,42,.04),0 10px 26px -20px rgba(15,23,42,.25);display:flex;flex-direction:column;gap:.8rem}
+.ap-card.list{padding:.15rem 0;gap:0;overflow:hidden}
+.ap-card.ap-dz{border-color:rgba(220,38,38,.3);background:rgba(254,242,242,.55);box-shadow:none}
+.ap-card h4{font-weight:900;font-size:.92rem;color:#b91c1c;display:flex;align-items:center;gap:.4rem}
+.ap-card.ap-dz p{font-size:.76rem;color:var(--muted);line-height:1.7}
+.ap-hint{font-size:.74rem;font-weight:800;color:var(--brand-dark);display:flex;align-items:center;gap:.4rem}
+.ap-note{font-size:.7rem;color:var(--muted);line-height:1.7}
+.ap-row{display:flex;align-items:center;gap:.8rem;width:100%;padding:.9rem 1rem;background:none;border:0;text-align:start;font-family:inherit;color:inherit;cursor:pointer;transition:background .15s}
+.ap-row+.ap-row{border-top:1px solid var(--line)}
+.ap-row:active{background:var(--brand-soft)}
+.ap-ic{width:38px;height:38px;border-radius:13px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--brand-soft);color:var(--brand-dark);font-size:.92rem}
+.ap-ic.warn{background:rgba(245,158,11,.14);color:#b45309}
+.ap-ic.red{background:rgba(220,38,38,.12);color:#b91c1c}
+.ap-tx{flex:1;min-width:0;display:block}
+.ap-tx b{display:block;font-size:.88rem;font-weight:800}
+.ap-tx small{display:block;font-size:.72rem;color:var(--muted);margin-top:2px;line-height:1.55}
+.ap-chev{color:var(--line-2);font-size:.8rem}
+.ap-sw{cursor:pointer}
+.ap-list{display:flex;flex-direction:column;gap:.5rem}
+.ap-list .ap-sw{border:1px solid var(--line);border-radius:16px;padding:.8rem .9rem}
+.ap-switch{position:relative;width:46px;height:27px;flex:none}
+.ap-switch input{position:absolute;inset:0;width:100%;height:100%;opacity:0;margin:0;cursor:pointer;z-index:1}
+.ap-switch i{position:absolute;inset:0;border-radius:99px;background:var(--line-2);transition:background .25s}
+.ap-switch i::after{content:"";position:absolute;top:3px;right:3px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
+.ap-switch input:checked+i{background:var(--brand)}
+.ap-switch input:checked+i::after{transform:translateX(-19px)}
+.ap-switch input:focus-visible+i{box-shadow:0 0 0 3px rgba(30,90,70,.3)}
+.ap-f{position:relative;background:var(--bg);border:1.5px solid var(--line);border-radius:16px;padding:.6rem .95rem .65rem;transition:border-color .2s,box-shadow .25s,transform .2s,background .2s}
+.ap-f:focus-within{border-color:var(--brand);background:var(--surface);box-shadow:0 0 0 4px rgba(30,90,70,.12);transform:translateY(-1px)}
+.ap-f label{display:block;font-size:.7rem;font-weight:800;color:var(--muted);transition:color .2s}
+.ap-f label small{font-weight:600;opacity:.8}
+.ap-f:focus-within label{color:var(--brand)}
+.ap-f input,.ap-f select{display:block;width:100%;margin-top:.2rem;background:transparent;border:0;outline:0;font:inherit;font-size:15px;font-weight:700;color:var(--ink);padding:.1rem 0}
+.ap-f select{appearance:auto}
+.ap-iban input{letter-spacing:.08em;text-align:left;padding-left:1.7rem;font-variant-numeric:tabular-nums}
+.ap-okic{position:absolute;left:.95rem;bottom:.85rem;color:#10b981;opacity:0;transform:scale(.5);transition:opacity .25s,transform .3s cubic-bezier(.2,.8,.2,1)}
+.ap-iban[data-ok="1"] .ap-okic{opacity:1;transform:scale(1)}
+.ap-save{padding-top:.2rem}
+.ap-save .btn{border-radius:16px;font-weight:900;box-shadow:0 12px 24px -14px rgba(15,76,58,.7);transition:transform .15s}
+.ap-save .btn:active{transform:scale(.98)}
+.ap-danger{display:flex;flex-direction:column;gap:.9rem;margin-top:.2rem}
+.ap-btn-warn{width:100%;display:flex;align-items:center;justify-content:center;gap:.5rem;padding:.85rem;border-radius:16px;background:transparent;color:#b91c1c;border:1.5px solid rgba(220,38,38,.4);font-weight:900;font-family:inherit;font-size:.9rem;transition:background .2s,color .2s,border-color .2s,transform .15s}
+.ap-btn-warn:active{transform:scale(.98)}
+.ap-btn-warn.armed{background:#dc2626;color:#fff;border-color:#dc2626}
+.ap-ack{display:flex;align-items:center;gap:.5rem;font-size:.8rem;font-weight:800;cursor:pointer}
+.ap-ack input{width:18px;height:18px;accent-color:#dc2626}
+.ap-btn-del{width:100%;padding:.85rem;border-radius:16px;background:#dc2626;color:#fff;font-weight:900;font-family:inherit;border:0;box-shadow:0 12px 22px -14px rgba(220,38,38,.8);transition:opacity .25s,transform .15s,box-shadow .25s}
+.ap-btn-del:active:not(:disabled){transform:scale(.98)}
+.ap-btn-del:disabled{opacity:.38;box-shadow:none;cursor:not-allowed}
+/* الوضع الداكن */
+html.dark .ap-tab.on{background:#1a2d26;color:#8be0b8;box-shadow:none}
+html.dark .ap-card.ap-dz{background:rgba(244,63,94,.08);border-color:rgba(244,63,94,.35)}
+html.dark .ap-card h4{color:#fb7185}
+html.dark .ap-ic.warn{background:rgba(245,158,11,.16);color:#fbbf24}
+html.dark .ap-ic.red{background:rgba(244,63,94,.16);color:#fb7185}
+html.dark .ap-btn-warn{color:#fb7185;border-color:rgba(244,63,94,.45)}
+html.dark .ap-btn-warn.armed{color:#fff}
+html.dark .ap-f input,html.dark .ap-f select{color:var(--ink)}
+html.dark .ap-f select option{background:#13211c;color:#e7efeb}
+html.dark .ap-iban[data-ok="1"] .ap-okic{color:#5fd3a0}
+@media (prefers-reduced-motion:reduce){.ap *,.ap *::before,.ap *::after{animation:none!important;transition:none!important}}
+</style>
 </head>
 <body class="text-slate-800 antialiased">
 
@@ -3588,73 +3690,184 @@ function vArchive() {
   </div>`;
 }
 
+/* ============ صفحة الحساب (تصميم جديد): لوحة مصغرة + تبويبات + إدخال محسّن ============ */
+const AP_TABS = [
+  { id: 'data', ic: 'fa-id-card', t: 'بياناتي' },
+  { id: 'privacy', ic: 'fa-user-shield', t: 'الخصوصية' },
+  { id: 'notif', ic: 'fa-bell', t: 'الإشعارات' },
+  { id: 'security', ic: 'fa-lock', t: 'الأمان' },
+  { id: 'general', ic: 'fa-sliders', t: 'عام' }
+];
+const AP_FORM_TABS = ['data', 'privacy', 'notif'];
+const fmtIban = v => String(v || '').replace(/\s+/g, '').toUpperCase().slice(0, 24).replace(/(.{4})(?=.)/g, '$1 ');
+const ibanOk = v => /^SA\d{22}$/.test(String(v || '').replace(/\s+/g, ''));
+const apRow = (ic, tone, title, sub, act, attrs = '') => `<button type="button" class="ap-row" data-act="${act}" ${attrs}>
+  <span class="ap-ic ${tone}"><i class="fa-solid ${ic}"></i></span>
+  <span class="ap-tx"><b>${title}</b>${sub ? `<small>${sub}</small>` : ''}</span>
+  <i class="fa-solid fa-chevron-left ap-chev"></i></button>`;
+const apSwitch = (name, checked, title, sub) => `<label class="ap-row ap-sw">
+  <span class="ap-tx"><b>${title}</b>${sub ? `<small>${sub}</small>` : ''}</span>
+  <span class="ap-switch"><input type="checkbox" name="${name}" ${checked ? 'checked' : ''}><i></i></span></label>`;
+
 function vProfile() {
   const p = state.profile || {}, u = state.user, st = state.stats;
   if (!statsFresh()) setTimeout(() => loadMyStats(), 0);
+  const tab = state.apTab || 'data';
   const name = String(p.name || '').trim() || 'عضو سِواء';
   const ini = name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('') || '؟';
-  const on = notifOn(), lockOn = !!lockCfg();
+  const on = notifOn(), lockOn = !!lockCfg(), cash = String(p.bank || '').startsWith('كاش');
   const archN = (state.jamiyatArch || []).length + (QT.arch || []).length + (DB.arch || []).length;
-  const checks = [name.length >= 3, validPhone(p.phone), !!p.bank, String(p.bank || '').startsWith('كاش') || validIban(p.iban), !!realEmail(u), on];
-  const pct = Math.round(checks.filter(Boolean).length / checks.length * 100);
+  const items = [
+    { ok: name !== 'عضو سِواء' && name.length >= 3, t: 'الاسم', to: 'data' },
+    { ok: validPhone(p.phone), t: 'رقم الجوال', to: 'data' },
+    { ok: !!p.bank, t: 'البنك', to: 'data' },
+    { ok: cash || validIban(p.iban), t: 'الآيبان', to: 'data' },
+    { ok: !!realEmail(u), t: 'البريد الإلكتروني', to: 'top' },
+    { ok: on, t: 'الإشعارات', to: 'notif' }
+  ];
+  const pct = Math.round(items.filter(i => i.ok).length / items.length * 100);
+  const missing = items.filter(i => !i.ok);
   const sv = (x, f = v => nf(v)) => x == null ? '—' : f(x);
+  const R = 33, C = 2 * Math.PI * R;
   const nSub = !notifSupported() ? 'غير مدعومة في هذا المتصفح' : notifDenied() ? (IS_NATIVE_IOS ? 'مغلقة من إعدادات الجهاز' : 'محظورة من إعدادات المتصفح') : on ? 'مفعّلة ✓ تصلك التنبيهات خارج التطبيق' : 'فعّلها لتصلك التنبيهات خارج التطبيق';
-  const row = (ic, tone, title, sub, act) => `<button type="button" class="pf-row" data-act="${act}"><span class="pf-ic ${tone}"><i class="fa-solid ${ic}"></i></span><span class="pf-tx"><b>${title}</b>${sub ? `<small>${sub}</small>` : ''}</span><i class="fa-solid fa-chevron-left pf-chev"></i></button>`;
-  return `<div class="pf fade">
-    <section class="pf-hero">
-      <div class="pf-top"><div class="pf-av">${esc(ini)}</div>
-        <div class="min-w-0 flex-1"><div class="pf-name">${esc(name)}</div><div class="pf-sub" dir="ltr">${esc(p.email || (u && u.email) || '')}</div></div></div>
-      <div class="pf-stats">
-        <div class="pf-stat"><b>${sv(st && st.n)}</b><span>جمعياتي</span></div>
-        <div class="pf-stat"><b>${sv(st && st.pct, v => v + '%')}</b><span>الالتزام</span></div>
-        <div class="pf-stat"><b>${sv(st && st.sup)}</b><span>أشرفت عليها</span></div>
+  const sel = BANKS.includes(p.bank) ? p.bank : (p.bank ? OTHER_BANK : undefined);
+  const panel = (id, html) => `<div class="ap-panel" data-ap-panel="${id}" ${id === tab ? '' : 'hidden'}>${html}</div>`;
+
+  const hero = `<section class="ap-hero">
+    <div class="ap-top">
+      <div class="ap-avw">
+        <svg class="ap-ring" viewBox="0 0 72 72" aria-hidden="true"><circle class="bg" cx="36" cy="36" r="${R}"/><circle class="fg" cx="36" cy="36" r="${R}" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - pct / 100)).toFixed(1)}"/></svg>
+        <div class="ap-av">${u && u.photoURL && /^https:/.test(u.photoURL) ? `<img src="${esc(u.photoURL)}" alt="">` : esc(ini)}</div>
       </div>
-      <div class="pf-prog"><div class="pf-prog-h"><span>اكتمال ملفك</span><b>${pct}%</b></div><div class="pf-bar"><i style="width:${pct}%"></i></div></div>
-    </section>
-
-    ${emailCardHtml()}
-
-    <section class="pf-group">
-      <div class="pf-title">بياناتي الشخصية والبنكية</div>
-      <div class="pf-body">
-        <form id="f-profile" class="space-y-3">
-          <div><label class="text-xs font-semibold block mb-1">الاسم</label><input name="name" class="inp" value="${esc(p.name)}" required></div>
-          ${bankFields(p)}
-          <button class="btn b-pri w-full py-3" type="submit">حفظ التعديلات</button>
-        </form>
+      <div class="min-w-0 flex-1">
+        <div class="ap-name">${esc(name)}</div>
+        ${p.phone ? `<div class="ap-sub" dir="ltr">${esc(p.phone)}</div>` : ''}
+        <div class="ap-sub" dir="ltr">${esc(p.email || (u && u.email) || '')}</div>
       </div>
-    </section>
+    </div>
+    <div class="ap-stats">
+      <div class="ap-stat"><i class="fa-solid fa-people-group"></i><b>${sv(st && st.n)}</b><span>جمعياتي</span></div>
+      <div class="ap-stat"><i class="fa-solid fa-chart-line"></i><b>${sv(st && st.pct, v => v + '%')}</b><span>الالتزام</span></div>
+      <div class="ap-stat"><i class="fa-solid fa-user-shield"></i><b>${sv(st && st.sup)}</b><span>أشرفت عليها</span></div>
+    </div>
+    <div class="ap-prog">
+      <div class="ap-prog-h"><span>اكتمال ملفك</span><b>${pct}%</b></div>
+      <div class="ap-bar"><i style="width:${pct}%"></i></div>
+      ${missing.length
+        ? `<div class="ap-miss">${missing.slice(0, 3).map(i => `<button type="button" class="ap-chip" data-act="${i.to === 'top' ? 'ap-go-email' : 'ap-tab'}" data-tab="${i.to}"><i class="fa-solid fa-plus"></i> ${esc(i.t)}</button>`).join('')}</div>`
+        : '<div class="ap-done"><i class="fa-solid fa-circle-check"></i> ملفك مكتمل</div>'}
+    </div>
+  </section>`;
 
-    <section class="pf-group">
-      <div class="pf-title">الإشعارات</div>
-      ${on ? row('fa-bell', '', 'إشعار تجريبي', nSub, 'test-notif') : row('fa-bell', 'warn', 'تفعيل الإشعارات', nSub, 'enable-notif')}
-      ${on ? row('fa-rotate', '', 'إعادة تسجيل الجهاز', 'استخدمه إذا توقفت الإشعارات', 'reg-push') : ''}
-      ${row('fa-circle-question', '', 'الإشعارات لا تعمل؟', 'خطوات الإصلاح خطوة بخطوة', 'notif-help')}
-    </section>
+  const tabs = `<nav class="ap-tabs" role="tablist">${AP_TABS.map(t => `<button type="button" role="tab" class="ap-tab ${t.id === tab ? 'on' : ''}" data-act="ap-tab" data-tab="${t.id}"><i class="fa-solid ${t.ic}"></i><span>${t.t}</span></button>`).join('')}</nav>`;
 
-    <section class="pf-group">
-      <div class="pf-title">الأمان</div>
-      ${lockOn
-        ? row('fa-lock', '', 'قفل التطبيق', 'مفعّل على هذا الجهاز ✓ · تغيير الرمز', 'lock-change')
-          + row('fa-lock-open', 'red', 'إيقاف القفل', 'سيُفتح التطبيق بدون رمز', 'lock-off')
-        : row('fa-lock', 'warn', 'قفل التطبيق', 'رمز من 4 إلى 6 أرقام عند فتح التطبيق', 'lock-on')}
-    </section>
+  const dataPanel = `<div class="ap-card">
+    <div class="ap-f"><label>الاسم الكامل</label><input name="name" maxlength="60" value="${esc(p.name)}" autocomplete="name"></div>
+    <div class="ap-f"><label>رقم الجوال</label><input name="phone" dir="ltr" inputmode="numeric" value="${esc(p.phone)}" placeholder="05xxxxxxxx" autocomplete="tel"></div>
+    <div class="ap-f"><label>البنك أو المحفظة</label><select name="bank">${bankOpts(sel)}</select></div>
+    <div class="ap-f ${sel === OTHER_BANK ? '' : 'hide'}" data-other><label>اسم البنك أو المحفظة</label><input name="bankOther" placeholder="اكتب الاسم" value="${esc(BANKS.includes(p.bank) ? '' : p.bank)}"></div>
+    <div class="ap-f ap-iban" data-ok="${ibanOk(p.iban) ? '1' : ''}"><label>الآيبان <small>(اتركه فارغاً للكاش)</small></label>
+      <input name="iban" dir="ltr" value="${esc(fmtIban(p.iban))}" placeholder="SA00 0000 0000 0000 0000 0000" autocomplete="off" spellcheck="false"><i class="fa-solid fa-circle-check ap-okic"></i></div>
+  </div>`;
 
-    ${passCardHtml()}
+  const privacyPanel = `<div class="ap-card" data-identity>
+    <p class="ap-hint"><i class="fa-solid fa-user-shield"></i> تحكّم بما يراه بقية أعضاء جمعياتك عنك</p>
+    <div class="ap-f"><label>الكنية (اختياري)</label><input name="nick" maxlength="30" value="${esc(p.nick)}" placeholder="مثال: أبو محمد"></div>
+    <div class="ap-f"><label>ما الذي يظهر للأعضاء؟</label><select name="showAs"><option value="name" ${p.showAs === 'nick' ? '' : 'selected'}>إظهار الاسم</option><option value="nick" ${p.showAs === 'nick' ? 'selected' : ''}>إظهار الكنية</option></select></div>
+    <div class="ap-list">${apSwitch('showPhone', p.showPhone, 'إظهار رقم جوالي', 'لبقية أعضاء الجمعية')}${apSwitch('showEmail', p.showEmail, 'إظهار بريدي الإلكتروني', 'لبقية أعضاء الجمعية')}</div>
+    <p class="ap-hint" data-preview></p>
+    <p class="ap-note">مشرف الجمعية يرى جميع بياناتك (الجوال والبريد والبنك) دائماً، أما الاسم والكنية فيظهر له ما اخترته أنت.</p>
+  </div>`;
 
-    <section class="pf-group">
-      <div class="pf-title">المزيد</div>
-      ${row('fa-box-archive', '', 'الأرشيف', archN ? nf(archN) + ' عنصر منتهٍ' : 'لا توجد عناصر منتهية', 'go-archive')}
-      ${row('fa-circle-half-stroke', '', 'المظهر', themeLabel(), 'theme-cycle')}
-      ${row('fa-share-nodes', '', 'مشاركة سِواء', 'أرسل التطبيق لأصدقائك', 'share-app')}
-    </section>
+  const notifPanel = `<div class="ap-card list">
+    ${apSwitch('waOptIn', p.waOptIn !== false, 'تنبيهات واتساب', 'استلام تنبيهات السداد والدعوات على رقم جوالك')}
+    ${on ? apRow('fa-bell', '', 'إشعار تجريبي', nSub, 'test-notif') : apRow('fa-bell', 'warn', 'تفعيل الإشعارات', nSub, 'enable-notif')}
+    ${on ? apRow('fa-rotate', '', 'إعادة تسجيل الجهاز', 'استخدمه إذا توقفت الإشعارات', 'reg-push') : ''}
+    ${apRow('fa-circle-question', '', 'الإشعارات لا تعمل؟', 'خطوات الإصلاح خطوة بخطوة', 'notif-help')}
+  </div>`;
 
-    <section class="pf-group">
-      ${row('fa-right-from-bracket', '', 'تسجيل الخروج', '', 'logout')}
-      ${row('fa-user-slash', 'red', 'حذف الحساب نهائياً', 'يحذف بياناتك الشخصية ولا يمكن التراجع', 'del-account')}
-    </section>
+  const securityPanel = `<div class="ap-card list">
+    ${lockOn
+      ? apRow('fa-lock', '', 'قفل التطبيق', 'مفعّل على هذا الجهاز ✓ · تغيير الرمز', 'lock-change')
+        + apRow('fa-lock-open', 'red', 'إيقاف القفل', 'سيُفتح التطبيق بدون رمز', 'lock-off')
+      : apRow('fa-lock', 'warn', 'قفل التطبيق', 'رمز من 4 إلى 6 أرقام عند فتح التطبيق', 'lock-on')}
+  </div>
+  ${passCardHtml()}`;
+
+  const generalPanel = `<div class="ap-card list">
+    ${apRow('fa-box-archive', '', 'الأرشيف', archN ? nf(archN) + ' عنصر منتهٍ' : 'لا توجد عناصر منتهية', 'go-archive')}
+    ${apRow('fa-circle-half-stroke', '', 'المظهر', themeLabel(), 'theme-cycle')}
+    ${apRow('fa-share-nodes', '', 'مشاركة سِواء', 'أرسل التطبيق لأصدقائك', 'share-app')}
+  </div>
+  <div class="ap-danger">
+    <button type="button" class="ap-btn-warn" data-act="ap-confirm" data-target="logout"><i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج</button>
+    <div class="ap-card ap-dz">
+      <h4><i class="fa-solid fa-triangle-exclamation"></i> منطقة الخطر</h4>
+      <p>حذف الحساب يزيل بياناتك الشخصية نهائياً، ولا يمكن التراجع عنه.</p>
+      <label class="ap-ack"><input type="checkbox" data-del-ack> أفهم أن الحذف نهائي</label>
+      <button type="button" class="ap-btn-del" data-act="del-account" disabled><i class="fa-solid fa-user-slash"></i> حذف الحساب نهائياً</button>
+    </div>
+  </div>`;
+
+  return `<div class="ap fade">
+    ${hero}
+    <div class="ap-email">${emailCardHtml()}</div>
+    ${tabs}
+    <form id="f-profile" class="ap-form" autocomplete="on">
+      ${panel('data', dataPanel)}
+      ${panel('privacy', privacyPanel)}
+      ${panel('notif', notifPanel)}
+      <div class="ap-save" data-ap-panel="savebar" ${AP_FORM_TABS.includes(tab) ? '' : 'hidden'}>
+        <button class="btn b-pri w-full py-3" type="submit"><i class="fa-solid fa-floppy-disk"></i> حفظ التعديلات</button>
+      </div>
+    </form>
+    ${panel('security', securityPanel)}
+    ${panel('general', generalPanel)}
   </div>`;
 }
+
+const AP_ACTIONS = {
+  'ap-tab': el => {
+    const root = el.closest('.ap'); if (!root) return;
+    const t = el.dataset.tab; state.apTab = t;
+    root.querySelectorAll('.ap-tab').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+    root.querySelectorAll('[data-ap-panel]').forEach(pn => {
+      const id = pn.dataset.apPanel;
+      pn.hidden = id === 'savebar' ? !AP_FORM_TABS.includes(t) : id !== t;
+    });
+    if (el.closest('.ap-hero')) root.querySelector('.ap-tabs').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
+  'ap-go-email': () => { const el = document.querySelector('.ap-email'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); },
+  // إجراء حساس: نقرتان متتاليتان خلال 4 ثوانٍ
+  'ap-confirm': el => {
+    if (el._apArmed) {
+      clearTimeout(el._apT); el._apArmed = false;
+      const fn = actions[el.dataset.target]; if (fn) fn(el);
+      return;
+    }
+    el._apArmed = true; el._apHtml = el.innerHTML;
+    el.classList.add('armed');
+    el.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> اضغط مرة أخرى للتأكيد';
+    el._apT = setTimeout(() => { el._apArmed = false; el.classList.remove('armed'); el.innerHTML = el._apHtml; }, 4000);
+  }
+};
+
+// تنسيق الآيبان تلقائياً (SA00 0000 …) وإظهار علامة الصحة عند اكتمال الرقم
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.name === 'iban' && t.form && t.form.id === 'f-profile') {
+    const f = fmtIban(t.value); if (f !== t.value) t.value = f;
+    const box = t.closest('.ap-iban'); if (box) box.dataset.ok = ibanOk(f) ? '1' : '';
+  }
+});
+// تفعيل زر الحذف بعد تأكيد الفهم
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.matches && t.matches('[data-del-ack]')) {
+    const btn = t.closest('.ap-dz') && t.closest('.ap-dz').querySelector('.ap-btn-del');
+    if (btn) btn.disabled = !t.checked;
+  }
+});
 
 /* ============ النوافذ المنبثقة ============ */
 function showModal(title, body) {
@@ -4900,6 +5113,7 @@ const actions = {
 Object.assign(actions, QT_ACTIONS);
 Object.assign(actions, DB_ACTIONS);
 Object.assign(actions, ARCH_ACTIONS);
+Object.assign(actions, AP_ACTIONS);
 Object.assign(actions, { 'jam-cycle-save': jamCycleSave });
 Object.assign(actions, WZ_ACTIONS);
 document.addEventListener('click', e => {
