@@ -796,6 +796,7 @@ html.dark .ap-f select option{background:#13211c;color:#e7efeb}
 html.dark .ap-iban[data-ok="1"] .ap-okic{color:#5fd3a0}
 @media (prefers-reduced-motion:reduce){.ap *,.ap *::before,.ap *::after{animation:none!important;transition:none!important}}
 </style>
+<style id="tap-fix">[data-act]{cursor:pointer;-webkit-tap-highlight-color:transparent}</style>
 </head>
 <body class="text-slate-800 antialiased">
 
@@ -1214,9 +1215,9 @@ async function maybeRestoreProfile() {
 function startListeners() {
   const uid = state.user.uid, email = realEmail(state.user), phone = phone05FromUser(state.user), ver = isVerified(state.user);
   let invA = [], invB = [], jA = [], jB = [];
-  const mergeJ = () => { const m = new Map(); [...jA, ...jB].forEach(x => m.set(x.id, x)); setJamiyat([...m.values()]); maybeRestoreProfile(); syncPayListeners(); schedStats(); if (state.view === 'home') render(); else renderNav(); };
+  const mergeJ = () => { const m = new Map(); [...jA, ...jB].forEach(x => m.set(x.id, x)); setJamiyat([...m.values()]); maybeRestoreProfile(); syncPayListeners(); schedStats(); if (state.view === 'home') render(true); else renderNav(); };
   const merge = () => { const m = new Map(); [...invA, ...invB].forEach(i => m.set(i.id, i)); state.invites = [...m.values()];
-    state.invites.forEach(i => pushLocal('دعوة جديدة للانضمام', `دعاك ${i.inviterName || ''} إلى جمعية «${i.jamiyaName || ''}»`, 'inv_' + i.id)); if (state.view === 'home') render(); };
+    state.invites.forEach(i => pushLocal('دعوة جديدة للانضمام', `دعاك ${i.inviterName || ''} إلى جمعية «${i.jamiyaName || ''}»`, 'inv_' + i.id)); if (state.view === 'home') render(true); };
   state.unsubs.push(
     db.collection('jamiyat').where('memberUids', 'array-contains', uid).onSnapshot(s => {
       jA = s.docs.map(d => ({ id: d.id, ...d.data() })); mergeJ();
@@ -1452,7 +1453,7 @@ function openPhoneVerify() {
   showModal('وثّق جوالك', `<div class="space-y-3">
     <p class="text-xs text-slate-600 leading-relaxed">أرسل رمز تحقق إلى جوالك. بعد التوثيق لا تحتاج تفعيل البريد.</p>
     <form id="f-phone-send" class="space-y-3">
-      <input name="phone" class="inp" dir="ltr" type="tel" inputmode="numeric" autocomplete="tel" placeholder="05xxxxxxxx" required>
+      <input name="phone" class="inp" dir="ltr" type="tel" inputmode="numeric" autocomplete="tel" placeholder="05xxxxxxxx" value="${esc(normPhone(state.profile && state.profile.phone))}" required>
       <div id="pv-recaptcha"></div>
       <button class="btn b-pri w-full py-3" type="submit">أرسل الرمز</button>
     </form>
@@ -1651,15 +1652,16 @@ async function handleInvite(f) {
   } catch (e) { toast('تعذر إنشاء الدعوة: ' + e.message, 'error'); }
 }
 function inviteText(i, forEmail = false) {
-  const who = i.phone ? `رقم جوالك (${i.phone})` : `هذا البريد (${i.email})`;
-  return `السلام عليكم ${i.name}،\nدعاك ${i.inviterName} ${i.family ? 'للمشاركة في تعاون عائلي "' + i.jamiyaName + '".' : 'للانضمام إلى جمعية "' + i.jamiyaName + '" بقيمة اشتراك ' + i.amount + ' ريال ' + (i.every || 'شهرياً') + '.'}\n\nبالتطبيق تعرف دورك ومتى تقبض ومتى تسدد، وتصلك تذكيرات تلقائية، دون تنزيل ودون رسوم.\nلقبول الدعوة افتح الرابط أدناه، وأنشئ حساباً أو سجّل الدخول بنفس ${who}:${forEmail ? mailLink() : '\n' + shareUrl() + (i.jamiyaId ? '?j=' + encodeURIComponent(i.jamiyaId) : '')}`;
+  const who = i.phone ? `رقم جوالك (${i.phone}) بعد توثيقه` : `هذا البريد (${i.email})`;
+  const verifyNote = i.phone ? '\n\n⚠️ مهم: لا تظهر هذه الدعوة إلا بعد توثيق رقم جوالك برمز SMS. بعد تسجيل الدخول اضغط: حسابي ← بياناتي ← وثّق جوالك، وأدخل الرقم نفسه.' : '';
+  return `السلام عليكم ${i.name}،\nدعاك ${i.inviterName} ${i.family ? 'للمشاركة في تعاون عائلي "' + i.jamiyaName + '".' : 'للانضمام إلى جمعية "' + i.jamiyaName + '" بقيمة اشتراك ' + i.amount + ' ريال ' + (i.every || 'شهرياً') + '.'}\n\nبالتطبيق تعرف دورك ومتى تقبض ومتى تسدد، وتصلك تذكيرات تلقائية، دون تنزيل ودون رسوم.\nلقبول الدعوة افتح الرابط أدناه، وأنشئ حساباً أو سجّل الدخول بنفس ${who}:${verifyNote}${forEmail ? mailLink() : '\n' + shareUrl() + (i.jamiyaId ? '?j=' + encodeURIComponent(i.jamiyaId) : '')}`;
 }
 // نافذة إرسال الدعوة: واتساب أولاً، ثم البريد (إن وُجد) أو النسخ
 function showInviteShare(i, fresh) {
   state.lastInvite = i;
   if (fresh) logEvent('growth_invite_created', { jid: i.jamiyaId || '' });
   showModal(fresh ? 'تم إنشاء الدعوة' : 'إرسال الدعوة', `<div class="space-y-3 text-xs">
-    <p class="text-slate-600 leading-relaxed">${fresh ? 'الدعوة محفوظة. ' : ''}ستظهر لـ <b>${esc(i.name)}</b> تلقائياً عند التسجيل أو الدخول بنفس رقم الجوال <b dir="ltr">${esc(i.phone || '')}</b>${i.email ? ' أو بنفس البريد' : ''}. أرسل له الرابط الآن:</p>
+    <p class="text-slate-600 leading-relaxed">${fresh ? 'الدعوة محفوظة. ' : ''}${i.phone ? `ستظهر لـ <b>${esc(i.name)}</b> بعد تسجيل الدخول <b>وتوثيق</b> رقم جواله <b dir="ltr">${esc(i.phone)}</b> برمز SMS. <b class="text-amber-700">الرقم يجب أن يكون موثّقاً لظهور الدعوة</b>، وإن دخل بالبريد فعليه توثيق جواله من «بياناتي».` : `ستظهر لـ <b>${esc(i.name)}</b> تلقائياً عند التسجيل أو الدخول بالبريد <b dir="ltr">${esc(i.email || '')}</b>.`} أرسل له الرابط الآن:</p>
     <div class="p-3 bg-slate-50 rounded-xl text-slate-600 whitespace-pre-line leading-relaxed">${esc(inviteText(i))}</div>
     <div class="flex flex-wrap gap-2">
       ${i.phone ? `<a class="btn b-pri flex-1" target="_blank" rel="noopener" href="${waLink(i.phone, inviteText(i))}"><i class="fa-brands fa-whatsapp"></i> إرسال عبر واتساب</a>` : ''}
@@ -1937,16 +1939,16 @@ function openJamiya(id) {
       state.j = { id: s.id, ...s.data() };
       if ((state.j.creatorUid === state.user.uid || (state.j.deputyUid && state.j.deputyUid === state.user.uid)) && !state.jInviteSub) subscribeInvites(id);
       syncWishes(); syncShareReqs(); syncPledges(); syncGuests(); if (state.chatUnsub) paintChat();
-      render(); }, e => toast(e.message, 'error')),
-    ref.collection('members').onSnapshot(s => { state.members = {}; s.docs.forEach(d => state.members[d.id] = d.data()); state.gotM = true; autoLinkGuests(); if (state.view === 'jamiya') render(); runAfterOpen(); }),
-    ref.collection('payments').onSnapshot(s => { state.payments = s.docs.map(d => ({ id: d.id, ...d.data() })); state.gotP = true; state.pays[id] = state.payments; if (state.view === 'jamiya') render(); runAfterOpen(); })
+      render(true); }, e => toast(e.message, 'error')),
+    ref.collection('members').onSnapshot(s => { state.members = {}; s.docs.forEach(d => state.members[d.id] = d.data()); state.gotM = true; autoLinkGuests(); if (state.view === 'jamiya') render(true); runAfterOpen(); }),
+    ref.collection('payments').onSnapshot(s => { state.payments = s.docs.map(d => ({ id: d.id, ...d.data() })); state.gotP = true; state.pays[id] = state.payments; if (state.view === 'jamiya') render(true); runAfterOpen(); })
   );
 }
 function subscribeInvites(id) {
   state.jInviteSub = true;
   const asCreator = state.j && state.j.creatorUid === state.user.uid; // النائب يرى الدعوات التي أرسلها هو فقط
   state.jUnsubs.push(db.collection('invites').where('jamiyaId', '==', id).where(asCreator ? 'creatorUid' : 'invitedBy', '==', state.user.uid).onSnapshot(s => {
-    state.jInvites = s.docs.map(d => ({ id: d.id, ...d.data() })); autoLinkGuests(); if (state.view === 'jamiya') render();
+    state.jInvites = s.docs.map(d => ({ id: d.id, ...d.data() })); autoLinkGuests(); if (state.view === 'jamiya') render(true);
   }, e => { if (e.code !== 'permission-denied') toast('خطأ في الدعوات: ' + e.message, 'error'); }));
 }
 
@@ -3154,13 +3156,15 @@ function openNotifTarget(id) {
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { const d = e.data; if (d && d.type === 'open-jamiya' && d.jid) openNotifTarget(d.jid); });
 
 /* ============ الواجهات ============ */
-function render() {
+function render(soft) {
   syncPayListeners();
   renderNav();
   const v = state.view, app = $('app');
   const views = { loading: vLoading, auth: vAuth, verify: vVerify, complete: vComplete, loaderr: vLoadErr, home: vHome, follow: vFollow, create: vCreate, jamiya: vJamiya, profile: vProfile, archive: vArchive, admin: vAdmin, qattah: qtView, debt: dbView, debtNew: dbNewView };
   if (maintOn()) { $('tabbar').classList.add('hide'); app.innerHTML = vMaint(); return; }
-  app.innerHTML = `<div class="fade">${annHtml()}${(views[v] || vLoading)()}</div>`;
+  const html = `<div class="fade">${annHtml()}${(views[v] || vLoading)()}</div>`;
+  if (soft && state._lastHtml === html && state._lv === v) return; // لا تغيير: لا نعيد الرسم حتى لا تضيع النقرات
+  state._lastHtml = html; app.innerHTML = html;
   trackView(v);
   app.querySelectorAll('form').forEach(fm => { if (fm.querySelector('[data-identity]')) updPreview(fm); });
   if (state._lv !== v) { state._lv = v; window.scrollTo(0, 0); }
@@ -3633,7 +3637,7 @@ async function refreshAccount(user) {
     const adm = await db.collection('admins').doc(user.uid).get({ source: 'server' }).catch(() => ({ exists: false }));
     state.isAdmin = adm.exists || (lc(user.email) === OWNER_EMAIL && user.emailVerified);
     if (!state.isAdmin && await isBlockedNow()) return;
-    renderNav(); if (state.view === 'home') render();
+    renderNav(); if (state.view === 'home') render(true);
   } catch (e) {}
 }
 
@@ -3730,6 +3734,7 @@ function vProfile() {
   const sv = (x, f = v => nf(v)) => x == null ? '—' : f(x);
   const R = 33, C = 2 * Math.PI * R;
   const nSub = !notifSupported() ? 'غير مدعومة في هذا المتصفح' : notifDenied() ? (IS_NATIVE_IOS ? 'مغلقة من إعدادات الجهاز' : 'محظورة من إعدادات المتصفح') : on ? 'مفعّلة ✓ تصلك التنبيهات خارج التطبيق' : 'فعّلها لتصلك التنبيهات خارج التطبيق';
+  const phoneVerified = !!phone05FromUser(u);
   const sel = BANKS.includes(p.bank) ? p.bank : (p.bank ? OTHER_BANK : undefined);
   const panel = (id, html) => `<div class="ap-panel" data-ap-panel="${id}" ${id === tab ? '' : 'hidden'}>${html}</div>`;
 
@@ -3761,7 +3766,8 @@ function vProfile() {
 
   const tabs = `<nav class="ap-tabs" role="tablist">${AP_TABS.map(t => `<button type="button" role="tab" class="ap-tab ${t.id === tab ? 'on' : ''}" data-act="ap-tab" data-tab="${t.id}"><i class="fa-solid ${t.ic}"></i><span>${t.t}</span></button>`).join('')}</nav>`;
 
-  const dataPanel = `<div class="ap-card">
+  const dataPanel = `${phoneVerified ? '' : `<div class="ap-card list">${apRow('fa-mobile-screen', 'warn', 'وثّق جوالك', 'لتصلك دعوات الجمعيات المرسلة إلى رقمك', 'phone-verify')}</div>`}
+  <div class="ap-card">
     <div class="ap-f"><label>الاسم الكامل</label><input name="name" maxlength="60" value="${esc(p.name)}" autocomplete="name"></div>
     <div class="ap-f"><label>رقم الجوال</label><input name="phone" dir="ltr" inputmode="numeric" value="${esc(p.phone)}" placeholder="05xxxxxxxx" autocomplete="tel"></div>
     <div class="ap-f"><label>البنك أو المحفظة</label><select name="bank">${bankOpts(sel)}</select></div>
@@ -5114,6 +5120,7 @@ Object.assign(actions, QT_ACTIONS);
 Object.assign(actions, DB_ACTIONS);
 Object.assign(actions, ARCH_ACTIONS);
 Object.assign(actions, AP_ACTIONS);
+Object.assign(actions, { 'phone-verify': () => openPhoneVerify() });
 Object.assign(actions, { 'jam-cycle-save': jamCycleSave });
 Object.assign(actions, WZ_ACTIONS);
 document.addEventListener('click', e => {
