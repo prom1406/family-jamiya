@@ -1442,7 +1442,11 @@ function verifyBanner() {
 
 /* ---- توثيق الجوال بديلاً عن البريد: رمز SMS يُربط بحساب الدخول الحالي فيُعدّ الحساب موثّقاً ---- */
 let phoneVerifier = null;
+// مهلة لعمليات الجوال: إن علق reCAPTCHA أو الشبكة يظهر سبب واضح بدل انتظار بلا نهاية
+const withTimeout = (p, ms = 25000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error('timeout'), { code: 'auth/client-timeout' })), ms))]);
 const phoneAuthErr = e => ({
+  'auth/client-timeout': 'لم يكتمل التحقق من الأمان (reCAPTCHA) خلال 25 ثانية. تأكد من الإنترنت وأعد المحاولة [client-timeout]',
+  'auth/internal-error': 'تعذر إرسال الرمز الآن، أعد المحاولة بعد قليل [internal-error]',
   'auth/invalid-phone-number': 'رقم الجوال غير صحيح',
   'auth/missing-phone-number': 'اكتب رقم الجوال',
   'auth/too-many-requests': 'محاولات كثيرة، انتظر قليلاً ثم أعد المحاولة',
@@ -1453,7 +1457,7 @@ const phoneAuthErr = e => ({
   'auth/captcha-check-failed': 'تعذر التحقق من الأمان، أعد المحاولة',
   'auth/quota-exceeded': 'تجاوزت حد الرسائل المسموح، حاول لاحقاً',
   'auth/operation-not-allowed': 'أرسلنا الطلب لكن Firebase يمنع الرسائل إلى هذه الدولة. فعّل السعودية (+966) في Authentication ← Settings ← SMS region policy'
-}[e && e.code]) || (e && e.message === 'PHONE_TAKEN' ? PHONE_TAKEN_MSG : authErr(e));
+}[e && e.code]) || (e && e.message === 'PHONE_TAKEN' ? PHONE_TAKEN_MSG : authErr(e) + (e && e.code ? ' [' + e.code + ']' : ''));
 function openPhoneVerify() {
   if (!state.user) return;
   showModal('وثّق جوالك', `<div class="space-y-3">
@@ -1476,9 +1480,9 @@ async function sendPhoneCode(f) {
     if (phone05FromUser(auth.currentUser) === p) { toast('هذا هو رقمك الموثّق الحالي', 'info'); btn.disabled = false; return; }
     phoneVerifier = freshRecaptcha(phoneVerifier, 'pv-recaptcha');
     if (phone05FromUser(auth.currentUser)) { // تغيير رقم موثّق
-      const vid = await new firebase.auth.PhoneAuthProvider().verifyPhoneNumber('+966' + p.slice(1), phoneVerifier);
+      const vid = await withTimeout(new firebase.auth.PhoneAuthProvider().verifyPhoneNumber('+966' + p.slice(1), phoneVerifier));
       state._phoneConf = { confirm: code => auth.currentUser.updatePhoneNumber(firebase.auth.PhoneAuthProvider.credential(vid, code)) };
-    } else state._phoneConf = await auth.currentUser.linkWithPhoneNumber('+966' + p.slice(1), phoneVerifier);
+    } else state._phoneConf = await withTimeout(auth.currentUser.linkWithPhoneNumber('+966' + p.slice(1), phoneVerifier));
     state._phoneP = p;
     f.classList.add('hide'); $('f-phone-code').classList.remove('hide');
     toast('أرسلنا رمز التحقق إلى جوالك', 'success');
@@ -1524,7 +1528,7 @@ async function sendAuthCode(f) {
   btn.disabled = true;
   try {
     authVerifier = freshRecaptcha(authVerifier, 'auth-recaptcha');
-    state._phoneConf = await auth.signInWithPhoneNumber('+966' + p.slice(1), authVerifier);
+    state._phoneConf = await withTimeout(auth.signInWithPhoneNumber('+966' + p.slice(1), authVerifier));
     state._phoneP = p; state._phoneLabel = p; state._phoneName = (f.name.value || '').trim();
     state.phoneStep = 'code'; render();
     toast('أرسلنا رمز التحقق إلى جوالك', 'success');
