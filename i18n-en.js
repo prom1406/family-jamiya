@@ -1216,4 +1216,6 @@ window.I18N_EN = {
 "مغلقة من إعدادات الجهاز": "Turned off in device settings",
 "محظورة من إعدادات المتصفح": "Blocked in browser settings",
 "عضو سِواء": "Siwaa member",
+"وثّق جوالك": "Verify your mobile",
+"لتصلك دعوات الجمعيات المرسلة إلى رقمك": "To receive association invitations sent to your number",
 };
