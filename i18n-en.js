@@ -1218,4 +1218,13 @@ window.I18N_EN = {
 "عضو سِواء": "Siwaa member",
 "وثّق جوالك": "Verify your mobile",
 "لتصلك دعوات الجمعيات المرسلة إلى رقمك": "To receive association invitations sent to your number",
+"خطوة واحدة قبل المتابعة": "One step before you continue",
+"وثّق رقم جوالك لتفعيل خدمات سِواء": "Verify your mobile number to activate Siwaa services",
+"توثيق الجوال برمز SMS يُفعّل الجمعيات والقطات والديون والدعوات، ولن يُطلب منك مرة أخرى بعده. الدعوات المرسلة بالجوال تظهر لك فقط بعد توثيقه.": "Verifying your mobile with an SMS code activates associations, pots, debts and invitations, and you will not be asked again. Invitations sent to your mobile appear only after verification.",
+"أرسل رمز التحقق": "Send verification code",
+"رمز التحقق (6 أرقام)": "Verification code (6 digits)",
+"تأكيد وفتح التطبيق": "Confirm and open the app",
+"رقم الجوال الموثّق": "Verified mobile number",
+"موثّق": "Verified",
+"تغيير الرقم عبر توثيق جديد": "Change number by verifying a new one",
 };
