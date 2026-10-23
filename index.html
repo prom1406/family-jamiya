@@ -886,8 +886,13 @@ const EMAILJS_TEMPLATE_ID = "template_mr4lkca";
 firebase.initializeApp(firebaseConfig);
 // App Check: يثبت أن الطلبات من تطبيقنا (reCAPTCHA Enterprise). الإجبار (Enforcement) يُفعَّل لاحقاً بعد مراقبة الطلبات
 const APPCHECK_SITE_KEY = '6Lem2_ctAAAAAFliRUsxWe8I99mXkUD7PIWzfT1E';
-try { firebase.appCheck().activate(new firebase.appCheck.ReCaptchaEnterpriseProvider(APPCHECK_SITE_KEY), true); }
-catch (e) { console.warn('App Check غير مفعّل:', e && e.message); }
+// معطّل مؤقتاً: تحميله مع reCAPTCHA Enterprise الخاص بحماية SMS في الصفحة نفسها يعلّق إرسال رمز الجوال (client-timeout).
+// الإجبار (Enforcement) غير مفعّل أصلاً، فلا أثر على الأمان الحالي. أعد true بعد حل التعارض.
+const ENABLE_APP_CHECK = false;
+if (ENABLE_APP_CHECK) {
+  try { firebase.appCheck().activate(new firebase.appCheck.ReCaptchaEnterpriseProvider(APPCHECK_SITE_KEY), true); }
+  catch (e) { console.warn('App Check غير مفعّل:', e && e.message); }
+}
 const auth = firebase.auth(), db = firebase.firestore();
 
 // ذاكرة محلية: عند إعادة فتح التطبيق تُحتسب التغييرات فقط بدل إعادة قراءة كل المستندات.
