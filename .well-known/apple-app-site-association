@@ -1,0 +1,24 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "RR2L8VA7XM.com.prom1406.sewaa"
+        ],
+        "components": [
+          {
+            "/": "/privacy.html",
+            "exclude": true
+          },
+          {
+            "/": "/__/*",
+            "exclude": true
+          },
+          {
+            "/": "/*"
+          }
+        ]
+      }
+    ]
+  }
+}

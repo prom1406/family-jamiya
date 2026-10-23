@@ -8,6 +8,10 @@ on:
         description: "رقم الإصدار الظاهر للمستخدم (MARKETING_VERSION)"
         default: "1.0"
         required: true
+      universal_links:
+        description: "تفعيل الروابط الذكية (فعّل Associated Domains في App ID أولاً)"
+        type: boolean
+        default: false
 
 env:
   BUNDLE_ID: com.prom1406.sewaa
@@ -34,8 +38,14 @@ jobs:
       - name: تثبيت الحزم
         run: npm install --no-audit --no-fund
 
-      - name: تجهيز ملفات الويب
-        run: npm run build:www
+      - name: تجهيز ملفات الويب (مع تضمين المكتبات محلياً)
+        run: |
+          if npm run build:native; then
+            echo "✓ المكتبات مضمّنة محلياً"
+          else
+            echo "::warning::تعذر تضمين المكتبات محلياً؛ سيُبنى التطبيق بالمصادر الخارجية (CDN) كما كان"
+            npm run build:www
+          fi
 
       - name: ضبط الدخول بجوجل داخل التطبيق (من GoogleService-Info.plist)
         run: |
@@ -65,6 +75,20 @@ jobs:
           bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
           bg.alpha_composite(im)
           bg.convert("RGB").resize((1024, 1024), Image.LANCZOS).save("assets/icon-only.png")
+          # شاشة البداية: فاتحة وداكنة (تتبع مظهر الجهاز)
+          def splash(color, tile, name):
+              S = 2732
+              canvas = Image.new("RGB", (S, S), color)
+              logo = im.resize((620, 620), Image.LANCZOS)
+              if tile:
+                  from PIL import ImageDraw
+                  t = Image.new("RGBA", (780, 780), (0, 0, 0, 0))
+                  ImageDraw.Draw(t).rounded_rectangle((0, 0, 779, 779), radius=170, fill=(255, 255, 255, 255))
+                  canvas.paste(t, ((S - 780) // 2, (S - 780) // 2), t)
+              canvas.paste(logo, ((S - 620) // 2, (S - 620) // 2), logo)
+              canvas.save("assets/" + name)
+          splash((245, 247, 245), False, "splash.png")
+          splash((11, 21, 18), True, "splash-dark.png")
           PY
 
       - name: إنشاء مشروع iOS
@@ -136,6 +160,7 @@ jobs:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           MARKETING_VERSION: ${{ inputs.version }}
           BUILD_NUMBER: ${{ github.run_number }}
+          UNIVERSAL_LINKS: ${{ inputs.universal_links }}
         run: |
           cat > ios/App/App/App.entitlements <<'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
@@ -149,6 +174,9 @@ jobs:
           </dict>
           </plist>
           EOF
+          if [ "$UNIVERSAL_LINKS" = "true" ]; then
+            /usr/libexec/PlistBuddy -c "Add :com.apple.developer.associated-domains array" -c "Add :com.apple.developer.associated-domains:0 string applinks:aljameyah.com" ios/App/App/App.entitlements
+          fi
           /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" ios/App/App/Info.plist
           RC=$(/usr/libexec/PlistBuddy -c "Print :REVERSED_CLIENT_ID" ios/App/App/GoogleService-Info.plist 2>/dev/null || true)
           if [ -n "$RC" ]; then

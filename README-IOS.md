@@ -44,3 +44,13 @@ Actions ← **iOS → TestFlight** ← Run workflow. بعد دقائق يظهر 
 2. ضعه في المستودع باسم `ios-config/GoogleService-Info.plist` (الملف لا يحتوي أسراراً؛ مفاتيح العميل عامة).
 3. الـ workflow يأخذ منه `CLIENT_ID` و`REVERSED_CLIENT_ID` تلقائياً، ويستخدم الملف نفسه للإشعارات (فلا حاجة للسر `FIREBASE_IOS_APP_ID`).
 4. زر جوجل يظهر داخل التطبيق بجانب زر Apple فقط إن وُجد `CLIENT_ID`.
+
+## 8) الروابط الذكية (Universal Links)
+تجعل روابط `https://aljameyah.com/?join=…` و`?j=…` (ورابط الدعوة في واتساب) تفتح التطبيق مباشرة بدل Safari.
+1. developer.apple.com ← Identifiers ← `com.prom1406.sewaa` ← فعّل **Associated Domains** ← Save.
+2. GitHub ← Actions ← iOS → TestFlight ← Run workflow ← فعّل الخيار **universal_links**.
+3. الملف `.well-known/apple-app-site-association` (ومعه `.nojekyll`) يُنشر مع الموقع تلقائياً على aljameyah.com.
+4. للتجربة: أرسل لنفسك الرابط في ملاحظات أو رسالة واضغطه (الروابط المكتوبة في شريط Safari لا تفتح التطبيق، وهذا طبيعي).
+
+## 9) المكتبات المحلية داخل التطبيق
+بناء iOS يضمّن Tailwind والأيقونات والخط وFirebase داخل التطبيق (`scripts/vendor-native.js`) فيعمل أسرع وبلا اعتماد على مواقع خارجية. إن فشل التضمين يرجع البناء تلقائياً للمصادر الخارجية ويظهر تحذير في خطوة «تجهيز ملفات الويب». نسخة الويب لا تتأثر.

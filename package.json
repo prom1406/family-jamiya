@@ -6,7 +6,8 @@
   "scripts": {
     "build:www": "bash scripts/build-www.sh",
     "cap:add:ios": "npx cap add ios",
-    "cap:sync": "npm run build:www && npx cap sync ios"
+    "cap:sync": "npm run build:native && npx cap sync ios",
+    "build:native": "bash scripts/build-www.sh && mkdir -p build && node scripts/vendor-native.js"
   },
   "dependencies": {
     "@capacitor/core": "^7.0.0",
@@ -14,10 +15,16 @@
     "@capacitor-community/apple-sign-in": "^7.0.0",
     "@capacitor-firebase/messaging": "^7.0.0",
     "firebase": "^11.2.0",
-    "@capgo/capacitor-social-login": "^7.20.0"
+    "@capgo/capacitor-social-login": "^7.20.0",
+    "@capacitor/status-bar": "^7.0.0",
+    "@capacitor/app": "^7.0.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.0.0",
-    "@capacitor/assets": "^3.0.5"
+    "@capacitor/assets": "^3.0.5",
+    "tailwindcss": "3.4.17",
+    "@fortawesome/fontawesome-free": "6.4.0",
+    "@fontsource/cairo": "^5.0.0",
+    "@emailjs/browser": "^3.12.1"
   }
 }

@@ -791,6 +791,21 @@ const FV = firebase.firestore.FieldValue;
 // معرّف عميل جوجل لتطبيق iOS (CLIENT_ID): يُملأ تلقائياً أثناء البناء من GoogleService-Info.plist. فارغ = يُخفى زر جوجل داخل التطبيق.
 const GOOGLE_IOS_CLIENT_ID = '';
 const IS_NATIVE_IOS = !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform() && Capacitor.getPlatform && Capacitor.getPlatform() === 'ios');
+// شريط الحالة الأصلي: نص فاتح فوق الخلفيات الداكنة (الوضع الداكن أو رأس الرئيسية الأخضر)، ونص داكن فوق الفاتحة
+function syncStatusBar() {
+  try {
+    const sb = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.StatusBar; if (!sb) return;
+    sb.setStyle({ style: (document.documentElement.classList.contains('dark') || (document.body && document.body.classList.contains('sw-home'))) ? 'DARK' : 'LIGHT' });
+  } catch (e) {}
+}
+if (IS_NATIVE_IOS) {
+  try {
+    const mo = new MutationObserver(syncStatusBar), opt = { attributes: true, attributeFilter: ['class'] };
+    mo.observe(document.documentElement, opt);
+    const go = () => { mo.observe(document.body, opt); syncStatusBar(); };
+    document.body ? go() : document.addEventListener('DOMContentLoaded', go);
+  } catch (e) {}
+}
 emailjs.init(EMAILJS_PUBLIC_KEY);
 
 const BANKS = ["مصرف الراجحي","البنك الأهلي السعودي","بنك الإنماء","بنك الرياض","بنك البلاد","بنك الجزيرة","السعودي الفرنسي","البنك العربي الوطني","البنك السعودي الأول","بنك رقمي / أخرى","كاش (نقداً)"];
@@ -1535,7 +1550,7 @@ async function handleInvite(f) {
 }
 function inviteText(i, forEmail = false) {
   const who = i.phone ? `رقم جوالك (${i.phone})` : `هذا البريد (${i.email})`;
-  return `السلام عليكم ${i.name}،\nدعاك ${i.inviterName} ${i.family ? 'للمشاركة في تعاون عائلي "' + i.jamiyaName + '".' : 'للانضمام إلى جمعية "' + i.jamiyaName + '" بقيمة اشتراك ' + i.amount + ' ريال ' + (i.every || 'شهرياً') + '.'}\n\nبالتطبيق تعرف دورك ومتى تقبض ومتى تسدد، وتصلك تذكيرات تلقائية، دون تنزيل ودون رسوم.\nلقبول الدعوة افتح الرابط أدناه، وأنشئ حساباً أو سجّل الدخول بنفس ${who}:${forEmail ? mailLink() : '\n' + shareUrl()}`;
+  return `السلام عليكم ${i.name}،\nدعاك ${i.inviterName} ${i.family ? 'للمشاركة في تعاون عائلي "' + i.jamiyaName + '".' : 'للانضمام إلى جمعية "' + i.jamiyaName + '" بقيمة اشتراك ' + i.amount + ' ريال ' + (i.every || 'شهرياً') + '.'}\n\nبالتطبيق تعرف دورك ومتى تقبض ومتى تسدد، وتصلك تذكيرات تلقائية، دون تنزيل ودون رسوم.\nلقبول الدعوة افتح الرابط أدناه، وأنشئ حساباً أو سجّل الدخول بنفس ${who}:${forEmail ? mailLink() : '\n' + shareUrl() + (i.jamiyaId ? '?j=' + encodeURIComponent(i.jamiyaId) : '')}`;
 }
 // نافذة إرسال الدعوة: واتساب أولاً، ثم البريد (إن وُجد) أو النسخ
 function showInviteShare(i, fresh) {
@@ -4031,6 +4046,7 @@ function copyJoinLink() {
   copyText(joinUrl(j.joinCode), 'تم نسخ رابط الانضمام');
 }
 async function checkPendingJoin() {
+  const op = lsGet('jm_open'); if (op && state.user && state.profile && !state.isAdmin) { try { localStorage.removeItem('jm_open'); } catch (e) {} openJamLink(op); }
   const code = lsGet('jm_join'); if (!code || !state.user || !state.profile || state.isAdmin) return;
   try { localStorage.removeItem('jm_join'); } catch (e) {}
   try {
@@ -4717,12 +4733,35 @@ function ibDismissed() { try { return Date.now() - Number(localStorage.getItem(i
   try {
     const q = new URLSearchParams(location.search), c = q.get('join');
     if (c && /^[a-z0-9]{8,20}$/i.test(c)) localStorage.setItem('jm_join', c);
-    if (q.has('join')) { q.delete('join'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '')); }
+    const jj = q.get('j'); if (jj && /^[A-Za-z0-9_-]{6,40}$/.test(jj)) localStorage.setItem('jm_open', jj);
+    if (q.has('join') || q.has('j')) { q.delete('join'); q.delete('j'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '')); }
   } catch (e) {}
 })();
-(async function () { // معاينة الدعوة على شاشة الدخول ليعرف الزائر إلى ماذا يُدعى
+async function previewJoinLink() { // معاينة الدعوة على شاشة الدخول ليعرف الزائر إلى ماذا يُدعى
   try { const c = localStorage.getItem('jm_join'); if (!c) return; const sn = await db.collection('joinLinks').doc(c).get(); if (sn.exists) { state.joinPreview = sn.data(); if (state.view === 'auth') render(); } } catch (e) {}
-})();
+}
+previewJoinLink();
+// فتح جمعية من رابط (?j=): بعد تحميل جمعيات المستخدم، وإن لم يكن عضواً بعد فدعوته تنتظره في الرئيسية
+function openJamLink(id, tries = 0) {
+  if (!state.user || !state.profile) { try { localStorage.setItem('jm_open', id); } catch (e) {} return; }
+  if (state.jamiyat.some(x => x.id === id)) return openJamiya(id);
+  if (tries < 10) return setTimeout(() => openJamLink(id, tries + 1), 600);
+  toast('لم تنضم لهذه الجمعية بعد: اقبل الدعوة من الصفحة الرئيسية', 'info');
+}
+// روابط iOS الذكية: https://aljameyah.com/?join=… أو ?j=… تفتح التطبيق مباشرة
+function handleDeepLink(url) {
+  try {
+    const q = new URL(url).searchParams, c = q.get('join'), j = q.get('j');
+    if (c && /^[a-z0-9]{8,20}$/i.test(c)) { localStorage.setItem('jm_join', c); if (state.user && state.profile) checkPendingJoin(); else previewJoinLink(); }
+    else if (j && /^[A-Za-z0-9_-]{6,40}$/.test(j)) openJamLink(j);
+  } catch (e) {}
+}
+if (IS_NATIVE_IOS) {
+  try {
+    const A = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.App;
+    if (A) { A.addListener('appUrlOpen', e => handleDeepLink(e && e.url)); if (A.getLaunchUrl) A.getLaunchUrl().then(r => { if (r && r.url) handleDeepLink(r.url); }).catch(() => {}); }
+  } catch (e) {}
+}
 function launchAction() {
   try { const a = new URLSearchParams(location.search).get('action'); if (a) history.replaceState(null, '', location.pathname); return a === 'create' ? 'create' : null; } catch (e) { return null; }
 }
