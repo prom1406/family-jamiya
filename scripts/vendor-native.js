@@ -31,11 +31,11 @@ for (const w of [300, 400, 600, 700, 900]) {
 if (!/arabic/.test(css)) throw new Error('لم يُستخرج الخط العربي');
 fs.writeFileSync(path.join(v, 'cairo', 'cairo.css'), css);
 
-/* 4) EmailJS من npm، وFirebase (نفس إصدار الويب 10.8.0) من موقع Google */
+/* 4) EmailJS من npm، وFirebase (نفس إصدار الويب 11.10.0) من موقع Google */
 fs.copyFileSync(nm('@emailjs/browser/dist/email.min.js'), path.join(v, 'email.min.js'));
 (async () => {
   for (const n of ['app', 'auth', 'firestore', 'messaging', 'app-check']) {
-    const r = await fetch(`https://www.gstatic.com/firebasejs/10.8.0/firebase-${n}-compat.js`);
+    const r = await fetch(`https://www.gstatic.com/firebasejs/11.10.0/firebase-${n}-compat.js`);
     if (!r.ok) throw new Error('تعذر تنزيل firebase-' + n + ' ' + r.status);
     fs.writeFileSync(path.join(v, `firebase-${n}-compat.js`), Buffer.from(await r.arrayBuffer()));
   }
