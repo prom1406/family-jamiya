@@ -797,6 +797,12 @@ html.dark .ap-iban[data-ok="1"] .ap-okic{color:#5fd3a0}
 @media (prefers-reduced-motion:reduce){.ap *,.ap *::before,.ap *::after{animation:none!important;transition:none!important}}
 </style>
 <style id="tap-fix">[data-act]{cursor:pointer;-webkit-tap-highlight-color:transparent}</style>
+<style id="ap-lock-style">
+.ap-lock .ap-ro{display:flex;justify-content:space-between;align-items:center;gap:.5rem;font-size:15px;font-weight:700;color:var(--ink);padding:.2rem 0 .1rem}
+.ap-badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.68rem;font-weight:800;color:#047857;background:rgba(16,185,129,.12);border-radius:99px;padding:.2rem .55rem;flex:none}
+.ap-link{background:none;border:0;color:var(--brand);font-weight:800;font-size:.75rem;padding:.35rem 0 .1rem;font-family:inherit;cursor:pointer}
+html.dark .ap-badge{color:#6ee7b7}
+</style>
 </head>
 <body class="text-slate-800 antialiased">
 
@@ -1467,8 +1473,12 @@ async function sendPhoneCode(f) {
   if (!validPhone(p)) return toast('رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
   btn.disabled = true;
   try {
+    if (phone05FromUser(auth.currentUser) === p) { toast('هذا هو رقمك الموثّق الحالي', 'info'); btn.disabled = false; return; }
     phoneVerifier = freshRecaptcha(phoneVerifier, 'pv-recaptcha');
-    state._phoneConf = await auth.currentUser.linkWithPhoneNumber('+966' + p.slice(1), phoneVerifier);
+    if (phone05FromUser(auth.currentUser)) { // تغيير رقم موثّق
+      const vid = await new firebase.auth.PhoneAuthProvider().verifyPhoneNumber('+966' + p.slice(1), phoneVerifier);
+      state._phoneConf = { confirm: code => auth.currentUser.updatePhoneNumber(firebase.auth.PhoneAuthProvider.credential(vid, code)) };
+    } else state._phoneConf = await auth.currentUser.linkWithPhoneNumber('+966' + p.slice(1), phoneVerifier);
     state._phoneP = p;
     f.classList.add('hide'); $('f-phone-code').classList.remove('hide');
     toast('أرسلنا رمز التحقق إلى جوالك', 'success');
@@ -2193,7 +2203,7 @@ async function submitDelete(f) {
 async function saveProfile(f) {
   const bank = resolveBank(f); if (bank === null) return;
   const idn = readIdentity(f), ie = identityErr(idn); if (ie) return toast(ie, 'error');
-  const upd = { name: f.name.value.trim(), phone: normPhone(f.phone.value), bank, iban: fixIban(f.iban.value), waOptIn: f.waOptIn.checked, ...idn };
+  const upd = { name: f.name.value.trim(), phone: phone05FromUser(state.user) || (state.profile && state.profile.phone) || '', bank, iban: fixIban(f.iban.value), waOptIn: f.waOptIn.checked, ...idn };
   if (upd.name.length < 3) return toast('الاسم قصير', 'error');
   if (!validPhone(upd.phone)) return toast('رقم الجوال غير صحيح', 'error');
   if (!upd.bank.startsWith('كاش') && !validIban(upd.iban)) return toast('الآيبان غير صحيح', 'error');
@@ -3159,8 +3169,9 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('mess
 function render(soft) {
   syncPayListeners();
   renderNav();
-  const v = state.view, app = $('app');
-  const views = { loading: vLoading, auth: vAuth, verify: vVerify, complete: vComplete, loaderr: vLoadErr, home: vHome, follow: vFollow, create: vCreate, jamiya: vJamiya, profile: vProfile, archive: vArchive, admin: vAdmin, qattah: qtView, debt: dbView, debtNew: dbNewView };
+  const v0 = state.view, app = $('app');
+  const v = (phoneGated() && !['loading', 'auth', 'loaderr'].includes(v0)) ? 'phonegate' : v0;
+  const views = { phonegate: vPhoneGate, loading: vLoading, auth: vAuth, verify: vVerify, complete: vComplete, loaderr: vLoadErr, home: vHome, follow: vFollow, create: vCreate, jamiya: vJamiya, profile: vProfile, archive: vArchive, admin: vAdmin, qattah: qtView, debt: dbView, debtNew: dbNewView };
   if (maintOn()) { $('tabbar').classList.add('hide'); app.innerHTML = vMaint(); return; }
   const html = `<div class="fade">${annHtml()}${(views[v] || vLoading)()}</div>`;
   if (soft && state._lastHtml === html && state._lv === v) return; // لا تغيير: لا نعيد الرسم حتى لا تضيع النقرات
@@ -3177,7 +3188,7 @@ function renderNav() {
   const instBtn = canInst ? '<button class="btn b-pri" data-act="install-app" aria-label="تثبيت التطبيق"><i class="fa-solid fa-download"></i><span class="hidden sm:inline"> تثبيت</span></button>' : '';
   const shareBtn = '<button class="btn b-sec" data-act="share-app" aria-label="مشاركة التطبيق"><i class="fa-solid fa-share-nodes"></i><span class="hidden sm:inline"> مشاركة</span></button>';
   const hh = document.querySelector('.app-header h1');
-  if (!state.user || !state.profile) { nav.innerHTML = themeBtn() + langBtn() + instBtn + shareBtn; sub.textContent = 'منصة التكافل والحلول المالية التشاركية'; tb.classList.add('hide'); document.body.classList.remove('sw-home'); if (hh) hh.textContent = 'سِواء'; return; }
+  if (!state.user || !state.profile || phoneGated()) { nav.innerHTML = themeBtn() + langBtn() + instBtn + shareBtn; sub.textContent = 'منصة التكافل والحلول المالية التشاركية'; tb.classList.add('hide'); document.body.classList.remove('sw-home'); if (hh) hh.textContent = 'سِواء'; return; }
   sub.textContent = state.profile.name;
   const swHome = state.view === 'home' && !maintOn();
   document.body.classList.toggle('sw-home', swHome);
@@ -3713,6 +3724,31 @@ const apSwitch = (name, checked, title, sub) => `<label class="ap-row ap-sw">
   <span class="ap-tx"><b>${title}</b>${sub ? `<small>${sub}</small>` : ''}</span>
   <span class="ap-switch"><input type="checkbox" name="${name}" ${checked ? 'checked' : ''}><i></i></span></label>`;
 
+// بوابة توثيق الجوال: كل من لديه ملف شخصي ولا يملك جوالاً موثّقاً يرى هذه الشاشة فقط
+function phoneGated() { return !!(state.user && state.profile && !phone05FromUser(state.user)); }
+function vPhoneGate() {
+  const pre = esc(normPhone((state.profile || {}).phone));
+  return `<div class="ap fade">
+    <section class="ap-hero">
+      <div class="ap-top"><div class="ap-avw"><div class="ap-av"><i class="fa-solid fa-mobile-screen-button"></i></div></div>
+        <div class="min-w-0 flex-1"><div class="ap-name">خطوة واحدة قبل المتابعة</div><div class="ap-sub">وثّق رقم جوالك لتفعيل خدمات سِواء</div></div></div>
+    </section>
+    <div class="ap-card">
+      <p class="ap-note">توثيق الجوال برمز SMS يُفعّل الجمعيات والقطات والديون والدعوات، ولن يُطلب منك مرة أخرى بعده. الدعوات المرسلة بالجوال تظهر لك فقط بعد توثيقه.</p>
+      <form id="f-phone-send" class="ap-form">
+        <div class="ap-f"><label>رقم الجوال</label><input name="phone" type="tel" dir="ltr" inputmode="numeric" autocomplete="tel" placeholder="05xxxxxxxx" value="${pre}" required></div>
+        <div id="pv-recaptcha"></div>
+        <button class="btn b-pri w-full py-3" type="submit">أرسل رمز التحقق</button>
+      </form>
+      <form id="f-phone-code" class="ap-form hide">
+        <div class="ap-f"><label>رمز التحقق (6 أرقام)</label><input name="code" dir="ltr" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="------" required></div>
+        <button class="btn b-pri w-full py-3" type="submit">تأكيد وفتح التطبيق</button>
+      </form>
+    </div>
+    <button type="button" class="ap-btn-warn" data-act="ap-confirm" data-target="logout"><i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج</button>
+  </div>`;
+}
+
 function vProfile() {
   const p = state.profile || {}, u = state.user, st = state.stats;
   if (!statsFresh()) setTimeout(() => loadMyStats(), 0);
@@ -3769,7 +3805,10 @@ function vProfile() {
   const dataPanel = `${phoneVerified ? '' : `<div class="ap-card list">${apRow('fa-mobile-screen', 'warn', 'وثّق جوالك', 'لتصلك دعوات الجمعيات المرسلة إلى رقمك', 'phone-verify')}</div>`}
   <div class="ap-card">
     <div class="ap-f"><label>الاسم الكامل</label><input name="name" maxlength="60" value="${esc(p.name)}" autocomplete="name"></div>
-    <div class="ap-f"><label>رقم الجوال</label><input name="phone" dir="ltr" inputmode="numeric" value="${esc(p.phone)}" placeholder="05xxxxxxxx" autocomplete="tel"></div>
+    <div class="ap-f ap-lock"><label>رقم الجوال الموثّق</label>
+      <div class="ap-ro"><span dir="ltr">${esc(phone05FromUser(u) || p.phone || '')}</span>${phone05FromUser(u) ? '<span class="ap-badge"><i class="fa-solid fa-circle-check"></i> موثّق</span>' : ''}</div>
+      <input type="hidden" name="phone" value="${esc(phone05FromUser(u) || p.phone || '')}">
+      <button type="button" class="ap-link" data-act="phone-change"><i class="fa-solid fa-arrow-rotate-right"></i> تغيير الرقم عبر توثيق جديد</button></div>
     <div class="ap-f"><label>البنك أو المحفظة</label><select name="bank">${bankOpts(sel)}</select></div>
     <div class="ap-f ${sel === OTHER_BANK ? '' : 'hide'}" data-other><label>اسم البنك أو المحفظة</label><input name="bankOther" placeholder="اكتب الاسم" value="${esc(BANKS.includes(p.bank) ? '' : p.bank)}"></div>
     <div class="ap-f ap-iban" data-ok="${ibanOk(p.iban) ? '1' : ''}"><label>الآيبان <small>(اتركه فارغاً للكاش)</small></label>
@@ -5120,7 +5159,7 @@ Object.assign(actions, QT_ACTIONS);
 Object.assign(actions, DB_ACTIONS);
 Object.assign(actions, ARCH_ACTIONS);
 Object.assign(actions, AP_ACTIONS);
-Object.assign(actions, { 'phone-verify': () => openPhoneVerify() });
+Object.assign(actions, { 'phone-verify': () => openPhoneVerify(), 'phone-change': () => openPhoneVerify() });
 Object.assign(actions, { 'jam-cycle-save': jamCycleSave });
 Object.assign(actions, WZ_ACTIONS);
 document.addEventListener('click', e => {
