@@ -73,4 +73,73 @@ jobs:
           grep -n "android:icon" android/app/src/main/AndroidManifest.xml || true
           ls -la android/app/src/main/res/mipmap-anydpi-v26/ 2>/dev/null || echo "لا توجد أيقونة تكيّفية"
 
-      - name: ملف Firebase للأندرويد
+      - name: ملف Firebase للأندرويد (google-services.json)
+        run: |
+          if [ ! -f android-config/google-services.json ]; then
+            echo "::error::ضع android-config/google-services.json في المستودع (من Firebase ← تطبيق Android)."
+            exit 1
+          fi
+          cp android-config/google-services.json android/app/google-services.json
+
+      - name: فك مفتاح التوقيع
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          echo "KS_PATH=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+
+      - name: تعديل الإصدار والتوقيع ومستوى SDK
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: ${{ inputs.version_name }}
+          TARGET_SDK: "35"
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KS_KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: python3 scripts/patch-android.py
+
+      - name: بناء ملف AAB للنشر
+        env:
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KS_KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease --no-daemon
+          ls -la app/build/outputs/bundle/release/
+
+      - name: بناء APK للتجربة المباشرة
+        env:
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KS_KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon
+
+      - name: حفظ APK كأثر للتحميل
+        uses: actions/upload-artifact@v4
+        with:
+          name: sewaa-apk-${{ github.run_number }}
+          path: android/app/build/outputs/apk/release/app-release.apk
+
+      - name: حفظ ملف AAB كأثر للتحميل
+        uses: actions/upload-artifact@v4
+        with:
+          name: sewaa-aab-${{ github.run_number }}
+          path: android/app/build/outputs/bundle/release/app-release.aab
+
+      - name: رفع إلى Google Play
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ env.PACKAGE }}
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          track: ${{ inputs.track }}
+          status: completed
+          releaseName: ${{ inputs.version_name }} (${{ github.run_number }})
+
+      - name: حذف مفتاح التوقيع
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload.jks"
