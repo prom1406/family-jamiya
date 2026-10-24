@@ -45,88 +45,32 @@ jobs:
           [ -d android ] || npx cap add android
           npx cap sync android
 
-      - name: تجهيز أيقونة المصدر (1024×1024)
+      - name: تجهيز أيقونة Android التكيّفية
         run: |
           pip3 install --quiet pillow --break-system-packages || pip3 install --quiet pillow
           mkdir -p assets
           python3 - <<'PY'
           from PIL import Image
-          im = Image.open("icon-512.png").convert("RGBA")
-          bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
-          bg.alpha_composite(im)
-          bg.convert("RGB").resize((1024, 1024), Image.LANCZOS).save("assets/icon-only.png")
+          src = Image.open("icon-512.png").convert("RGBA")
+          # الطبقة الأمامية: الشعار داخل منطقة آمنة بخلفية شفافة
+          fg = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
+          logo = src.resize((620, 620), Image.LANCZOS)
+          fg.paste(logo, ((1024 - 620) // 2, (1024 - 620) // 2), logo)
+          fg.save("assets/icon-foreground.png")
+          # الطبقة الخلفية: لون فاتح
+          Image.new("RGBA", (1024, 1024), (255, 255, 255, 255)).save("assets/icon-background.png")
+          # أيقونة عامة للنسخ القديمة
+          base = Image.new("RGBA", (1024, 1024), (255, 255, 255, 255))
+          base.alpha_composite(fg)
+          base.convert("RGB").save("assets/icon-only.png")
           PY
 
-      - name: توليد أيقونات Android من الشعار
+      - name: توليد أيقونات Android
         run: npx capacitor-assets generate --android
 
-      - name: ملف Firebase للأندرويد (google-services.json)
+      - name: تحقق من أيقونة المشروع
         run: |
-          if [ ! -f android-config/google-services.json ]; then
-            echo "::error::ضع android-config/google-services.json في المستودع (من Firebase ← تطبيق Android)."
-            exit 1
-          fi
-          cp android-config/google-services.json android/app/google-services.json
+          grep -n "android:icon" android/app/src/main/AndroidManifest.xml || true
+          ls -la android/app/src/main/res/mipmap-anydpi-v26/ 2>/dev/null || echo "لا توجد أيقونة تكيّفية"
 
-      - name: فك مفتاح التوقيع
-        env:
-          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
-        run: |
-          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
-          echo "KS_PATH=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
-
-      - name: تعديل الإصدار والتوقيع ومستوى SDK
-        env:
-          VERSION_CODE: ${{ github.run_number }}
-          VERSION_NAME: ${{ inputs.version_name }}
-          TARGET_SDK: "35"
-          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KS_KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: python3 scripts/patch-android.py
-
-      - name: بناء ملف AAB للنشر
-        env:
-          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KS_KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew bundleRelease --no-daemon
-          ls -la app/build/outputs/bundle/release/
-
-      - name: بناء APK للتجربة المباشرة
-        env:
-          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KS_KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          cd android
-          ./gradlew assembleRelease --no-daemon
-
-      - name: حفظ APK كأثر للتحميل
-        uses: actions/upload-artifact@v4
-        with:
-          name: sewaa-apk-${{ github.run_number }}
-          path: android/app/build/outputs/apk/release/app-release.apk
-
-      - name: حفظ ملف AAB كأثر للتحميل
-        uses: actions/upload-artifact@v4
-        with:
-          name: sewaa-aab-${{ github.run_number }}
-          path: android/app/build/outputs/bundle/release/app-release.aab
-
-      - name: رفع إلى Google Play
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: ${{ env.PACKAGE }}
-          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
-          track: ${{ inputs.track }}
-          status: completed
-          releaseName: ${{ inputs.version_name }} (${{ github.run_number }})
-
-      - name: حذف مفتاح التوقيع
-        if: always()
-        run: rm -f "$RUNNER_TEMP/upload.jks"
+      - name: ملف Firebase للأندرويد
