@@ -351,6 +351,10 @@ body .border-emerald-100,body .border-emerald-200{border-color:var(--brand-line)
 
 /* التجاوب: منع تجاوز العناصر لعرض الشاشة */
 main,.sheet{min-width:0;overflow-wrap:anywhere}
+/* منع اتساع الصفحة أفقياً (كانت الشاشة تتحرك يميناً ويساراً): عناصر الشبكة تنكمش بدل أن توسّع الصفحة */
+.grid>*,.card,#app>*{min-width:0}
+.card{max-width:100%}
+body{overflow-x:hidden}
 main img,.sheet img,main table,.sheet table{max-width:100%}
 
 /* ===== v9 — Modern Banking UI: أخضر عميق، بطاقات ناعمة، أزرار واضحة (طبقة أنماط فقط، بلا تغيير في HTML أو JavaScript) ===== */
