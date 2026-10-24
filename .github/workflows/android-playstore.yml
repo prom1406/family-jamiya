@@ -81,6 +81,21 @@ jobs:
           ./gradlew bundleRelease --no-daemon
           ls -la app/build/outputs/bundle/release/
 
+      - name: بناء APK للتجربة المباشرة
+        env:
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KS_KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon
+
+      - name: حفظ APK كأثر للتحميل
+        uses: actions/upload-artifact@v4
+        with:
+          name: sewaa-apk-${{ github.run_number }}
+          path: android/app/build/outputs/apk/release/app-release.apk
+
       - name: حفظ ملف AAB كأثر للتحميل
         uses: actions/upload-artifact@v4
         with:
