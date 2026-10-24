@@ -1334,7 +1334,7 @@ async function googleNativeCredential() {
   const plugin = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.SocialLogin;
   if (!plugin) throw new Error('إضافة الدخول بجوجل غير متوفرة في هذه النسخة');
   await plugin.initialize({ google: { iOSClientId: GOOGLE_IOS_CLIENT_ID, webClientId: GOOGLE_WEB_CLIENT_ID } });
-  const res = await plugin.login({ provider: 'google', options: { scopes: ['email', 'profile'] } });
+  const res = await plugin.login({ provider: 'google', options: {} });
   const tok = res && res.result && res.result.idToken;
   if (!tok) throw new Error('لم يصل رمز التحقق من جوجل');
   return firebase.auth.GoogleAuthProvider.credential(tok);
