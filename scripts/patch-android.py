@@ -10,13 +10,21 @@ vcode = os.environ['VERSION_CODE']
 vname = os.environ['VERSION_NAME']
 target_sdk = os.environ.get('TARGET_SDK', '35')
 
-# 1) مستويات SDK (Google Play يشترط targetSdk حديثاً)
+# 1) مستويات SDK و Android Gradle Plugin
+COMPILE_SDK = os.environ.get('COMPILE_SDK', '36')
+target_sdk = os.environ.get('TARGET_SDK', '35')
 if vars_gradle.exists():
     t = vars_gradle.read_text(encoding='utf8')
     t = re.sub(r'targetSdkVersion\s*=\s*\d+', f'targetSdkVersion = {target_sdk}', t)
-    t = re.sub(r'compileSdkVersion\s*=\s*\d+', f'compileSdkVersion = {target_sdk}', t)
+    t = re.sub(r'compileSdkVersion\s*=\s*\d+', f'compileSdkVersion = {COMPILE_SDK}', t)
     vars_gradle.write_text(t, encoding='utf8')
-    print('variables.gradle: targetSdk =', target_sdk)
+    print('variables.gradle: compileSdk =', COMPILE_SDK, 'targetSdk =', target_sdk)
+
+rt = top_gradle.read_text(encoding='utf8')
+rt2 = re.sub(r"com\.android\.tools\.build:gradle:[\d.]+", "com.android.tools.build:gradle:8.9.1", rt)
+if rt2 != rt:
+    top_gradle.write_text(rt2, encoding='utf8')
+    print('AGP -> 8.9.1')
 
 # 2) Google Services plugin (لإشعارات FCM و Google Sign-In)
 t = top_gradle.read_text(encoding='utf8')
