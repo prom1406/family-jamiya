@@ -45,6 +45,21 @@ jobs:
           [ -d android ] || npx cap add android
           npx cap sync android
 
+      - name: تجهيز أيقونة المصدر (1024×1024)
+        run: |
+          pip3 install --quiet pillow --break-system-packages || pip3 install --quiet pillow
+          mkdir -p assets
+          python3 - <<'PY'
+          from PIL import Image
+          im = Image.open("icon-512.png").convert("RGBA")
+          bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
+          bg.alpha_composite(im)
+          bg.convert("RGB").resize((1024, 1024), Image.LANCZOS).save("assets/icon-only.png")
+          PY
+
+      - name: توليد أيقونات Android من الشعار
+        run: npx capacitor-assets generate --android
+
       - name: ملف Firebase للأندرويد (google-services.json)
         run: |
           if [ ! -f android-config/google-services.json ]; then
