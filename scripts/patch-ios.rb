@@ -19,6 +19,7 @@ target.build_configurations.each do |c|
   s['MARKETING_VERSION']           = version
   s['CURRENT_PROJECT_VERSION']     = build
   s['TARGETED_DEVICE_FAMILY']      = '1,2'
+  s['IPHONEOS_DEPLOYMENT_TARGET']    = '15.0' # يتطلبه reCAPTCHA Enterprise
   ld = Array(s['OTHER_LDFLAGS']).join(' ').split
   s['OTHER_LDFLAGS'] = (['$(inherited)'] + ld + ['-ObjC']).uniq # يلزم Firebase Auth/reCAPTCHA
 end

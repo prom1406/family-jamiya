@@ -94,6 +94,19 @@ jobs:
       - name: إنشاء مشروع iOS
         run: |
           npx cap add ios
+          # توثيق الجوال الأصلي مع حماية SMS يحتاج مكتبة reCAPTCHA Enterprise (وتتطلب iOS 15 أو أحدث)
+          python3 - <<'PY'
+          import re
+          p = "ios/App/Podfile"
+          s = open(p, encoding="utf8").read()
+          s, n = re.subn(r"platform :ios, '[0-9.]+'", "platform :ios, '15.0'", s, count=1)
+          assert n == 1, "لم يُعثر على platform :ios في Podfile"
+          if "RecaptchaEnterprise" not in s:
+              assert "# Add your Pods here" in s, "لم يُعثر على موضع إضافة الحزم في Podfile"
+              s = s.replace("# Add your Pods here", "# Add your Pods here\n  pod 'RecaptchaEnterprise', '~> 18.9'", 1)
+          open(p, "w", encoding="utf8").write(s)
+          PY
+          cat ios/App/Podfile
           npx cap sync ios
 
       - name: توليد الأيقونات
