@@ -53,4 +53,19 @@ assert n3 == 1, 'لم يُعثر على buildTypes.release'
 app_gradle.write_text(a, encoding='utf8')
 
 print('versionCode', vcode, 'versionName', vname)
+
+# 5) توحيد إصدار androidx.browser (تعارض بين capgo و androidbrowserhelper)
+root_extra = """
+allprojects {
+    configurations.all {
+        resolutionStrategy {
+            force 'androidx.browser:browser:1.9.0'
+        }
+    }
+}
+"""
+rt = top_gradle.read_text(encoding='utf8')
+if 'androidx.browser:browser:1.9.0' not in rt:
+    top_gradle.write_text(rt + root_extra, encoding='utf8')
+
 print('patch-android: OK')
