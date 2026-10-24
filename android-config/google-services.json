@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "508199870007",
+    "project_id": "aljamiyahapp",
+    "storage_bucket": "aljamiyahapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:508199870007:android:1d3b62e85c52afef93e9b2",
+        "android_client_info": {
+          "package_name": "com.prom1406.sewaa"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "508199870007-5jhjajgpnpfduhmfqjbj4b63hsib8c1s.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBE4mTrIzkRLE98z-tua7DL-_2KqYAkDrI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "508199870007-5jhjajgpnpfduhmfqjbj4b63hsib8c1s.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "508199870007-l3ppoahkmano7efa8vviimm5u0jdd5c7.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.prom1406.sewaa"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
