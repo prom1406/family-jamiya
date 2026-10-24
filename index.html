@@ -1482,6 +1482,7 @@ const phoneAuthErr = e => ({
   'auth/invalid-verification-code': 'الرمز غير صحيح',
   'auth/code-expired': 'انتهت صلاحية الرمز، اطلب رمزاً جديداً',
   'auth/credential-already-in-use': 'هذا الجوال مرتبط بحساب آخر',
+  'auth/account-exists-with-different-credential': 'هذا الجوال مسجّل بحساب سِواء آخر. سجّل الخروج ثم ادخل برقم الجوال',
   'auth/provider-already-linked': 'حسابك موثّق بجوال بالفعل',
   'auth/captcha-check-failed': 'تعذر التحقق من الأمان، أعد المحاولة',
   'auth/quota-exceeded': 'تجاوزت حد الرسائل المسموح، حاول لاحقاً',
@@ -1544,7 +1545,16 @@ async function confirmPhoneCode(f) {
     closeModal(); toast('تم توثيق جوالك ✓', 'success');
     const n = state._afterVerify; state._afterVerify = null;
     if (n) n(); else render();
-  } catch (e) { toast(phoneAuthErr(e), 'error'); }
+  } catch (e) {
+    // الجوال مسجّل مسبقاً بحساب آخر: نعرض الدخول بذلك الحساب بدل رسالة خطأ تقنية
+    const cred = e && (e.credential || (firebase.auth.PhoneAuthProvider.credentialFromError && firebase.auth.PhoneAuthProvider.credentialFromError(e)));
+    if (e && ['auth/credential-already-in-use', 'auth/account-exists-with-different-credential'].includes(e.code) && cred) {
+      if (confirm('هذا الجوال مسجّل بحساب سِواء آخر. هل تريد الدخول بذلك الحساب بدلاً من الحساب الحالي؟')) {
+        try { state._phoneConf = null; await auth.signInWithCredential(cred); closeModal(); }
+        catch (e2) { toast(phoneAuthErr(e2), 'error'); }
+      }
+    } else toast(phoneAuthErr(e), 'error');
+  }
   finally { btn.disabled = false; }
 }
 
