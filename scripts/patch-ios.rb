@@ -19,6 +19,8 @@ target.build_configurations.each do |c|
   s['MARKETING_VERSION']           = version
   s['CURRENT_PROJECT_VERSION']     = build
   s['TARGETED_DEVICE_FAMILY']      = '1,2'
+  ld = Array(s['OTHER_LDFLAGS']).join(' ').split
+  s['OTHER_LDFLAGS'] = (['$(inherited)'] + ld + ['-ObjC']).uniq # يلزم Firebase Auth/reCAPTCHA
 end
 plist = 'ios/App/App/GoogleService-Info.plist'
 if File.exist?(plist)

@@ -155,6 +155,23 @@ jobs:
           PY
           grep -c "capacitorDidRegisterForRemoteNotifications" ios/App/App/AppDelegate.swift
 
+      - name: تمرير روابط reCAPTCHA لتوثيق الجوال الأصلي في AppDelegate
+        run: |
+          python3 - <<'PY'
+          p = "ios/App/App/AppDelegate.swift"
+          s = open(p, encoding="utf8").read()
+          if "Auth.auth().canHandle" not in s:
+              for imp in ("import FirebaseAuth", "import FirebaseCore"):
+                  if imp not in s:
+                      s = s.replace("import Capacitor", "import Capacitor\n" + imp, 1)
+              ret = "return ApplicationDelegateProxy.shared.application(app, open: url, options: options)"
+              assert ret in s, "لم يُعثر على application(_:open:options:) في AppDelegate"
+              s = s.replace(ret, "if FirebaseApp.app() != nil, Auth.auth().canHandle(url) { return true }\n        " + ret, 1)
+              open(p, "w", encoding="utf8").write(s)
+          print("AppDelegate auth url OK")
+          PY
+          grep -n "canHandle\|import Firebase" ios/App/App/AppDelegate.swift
+
       - name: إعدادات المشروع (التوقيع وSign in with Apple)
         env:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}

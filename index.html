@@ -1449,6 +1449,23 @@ function verifyBanner() {
 let phoneVerifier = null;
 // مهلة لعمليات الجوال: إن علق reCAPTCHA أو الشبكة يظهر سبب واضح بدل انتظار بلا نهاية
 const withTimeout = (p, ms = 25000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error('timeout'), { code: 'auth/client-timeout' })), ms))]);
+// داخل تطبيق iOS لا يعمل reCAPTCHA الويب (النطاق capacitor://localhost)، فيُرسَل الرمز عبر Firebase الأصلي
+// ثم يُكمل الدخول/الربط بمكتبة الويب باستخدام verificationId (الإضافة مضبوطة بـ skipNativeAuth)
+const nativeAuthPlugin = () => window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.FirebaseAuthentication;
+const useNativePhone = () => IS_NATIVE_IOS && !!nativeAuthPlugin();
+function nativeSendCode(phoneE164) {
+  const P = nativeAuthPlugin(), hs = [];
+  return new Promise(async (resolve, reject) => {
+    let t;
+    const done = (fn, v) => { clearTimeout(t); hs.forEach(h => { try { h.remove(); } catch (_) {} }); fn(v); };
+    t = setTimeout(() => done(reject, Object.assign(new Error('timeout'), { code: 'auth/client-timeout' })), 60000);
+    try {
+      hs.push(await P.addListener('phoneCodeSent', ev => done(resolve, ev && ev.verificationId)));
+      hs.push(await P.addListener('phoneVerificationFailed', ev => done(reject, Object.assign(new Error((ev && ev.message) || 'native phone verification failed'), { code: 'auth/native-failed' }))));
+      await P.signInWithPhoneNumber({ phoneNumber: phoneE164, timeout: 0 });
+    } catch (e) { done(reject, e); }
+  });
+}
 const phoneAuthErr = e => ({
   'auth/client-timeout': 'لم يكتمل التحقق من الأمان (reCAPTCHA) خلال 25 ثانية. تأكد من الإنترنت وأعد المحاولة [client-timeout]',
   'auth/internal-error': 'تعذر إرسال الرمز الآن، أعد المحاولة بعد قليل [internal-error]',
@@ -1483,11 +1500,18 @@ async function sendPhoneCode(f) {
   btn.disabled = true;
   try {
     if (phone05FromUser(auth.currentUser) === p) { toast('هذا هو رقمك الموثّق الحالي', 'info'); btn.disabled = false; return; }
+    const e164 = '+966' + p.slice(1), changing = !!phone05FromUser(auth.currentUser);
+    if (useNativePhone()) {
+      const vid = await nativeSendCode(e164);
+      const cred = code => firebase.auth.PhoneAuthProvider.credential(vid, code);
+      state._phoneConf = { confirm: code => changing ? auth.currentUser.updatePhoneNumber(cred(code)) : auth.currentUser.linkWithCredential(cred(code)) };
+    } else {
     phoneVerifier = freshRecaptcha(phoneVerifier, 'pv-recaptcha');
     if (phone05FromUser(auth.currentUser)) { // تغيير رقم موثّق
       const vid = await withTimeout(new firebase.auth.PhoneAuthProvider().verifyPhoneNumber('+966' + p.slice(1), phoneVerifier));
       state._phoneConf = { confirm: code => auth.currentUser.updatePhoneNumber(firebase.auth.PhoneAuthProvider.credential(vid, code)) };
     } else state._phoneConf = await withTimeout(auth.currentUser.linkWithPhoneNumber('+966' + p.slice(1), phoneVerifier));
+    }
     state._phoneP = p;
     f.classList.add('hide'); $('f-phone-code').classList.remove('hide');
     toast('أرسلنا رمز التحقق إلى جوالك', 'success');
@@ -1532,8 +1556,13 @@ async function sendAuthCode(f) {
   if (!validPhone(p)) return toast('رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
   btn.disabled = true;
   try {
-    authVerifier = freshRecaptcha(authVerifier, 'auth-recaptcha');
-    state._phoneConf = await withTimeout(auth.signInWithPhoneNumber('+966' + p.slice(1), authVerifier));
+    if (useNativePhone()) {
+      const vid = await nativeSendCode('+966' + p.slice(1));
+      state._phoneConf = { confirm: code => auth.signInWithCredential(firebase.auth.PhoneAuthProvider.credential(vid, code)) };
+    } else {
+      authVerifier = freshRecaptcha(authVerifier, 'auth-recaptcha');
+      state._phoneConf = await withTimeout(auth.signInWithPhoneNumber('+966' + p.slice(1), authVerifier));
+    }
     state._phoneP = p; state._phoneLabel = p; state._phoneName = (f.name.value || '').trim();
     state.phoneStep = 'code'; render();
     toast('أرسلنا رمز التحقق إلى جوالك', 'success');

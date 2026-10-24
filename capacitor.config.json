@@ -21,6 +21,12 @@
         "apple": false,
         "twitter": false
       }
+    },
+    "FirebaseAuthentication": {
+      "providers": [
+        "phone"
+      ],
+      "skipNativeAuth": true
     }
   }
 }
