@@ -92,7 +92,7 @@ jobs:
         env:
           VERSION_CODE: ${{ github.run_number }}
           VERSION_NAME: ${{ inputs.version_name }}
-          TARGET_SDK: "35"
+          TARGET_SDK: "36"
           KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KS_KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
