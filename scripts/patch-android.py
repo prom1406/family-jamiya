@@ -75,5 +75,12 @@ allprojects {
 rt = top_gradle.read_text(encoding='utf8')
 if 'androidx.browser:browser:1.9.0' not in rt:
     top_gradle.write_text(rt + root_extra, encoding='utf8')
-
+# 6) رفع minSdkVersion إلى 24 (متطلب Play Automatic Protection)
+MIN_SDK = os.environ.get('MIN_SDK', '24')
+vt = vars_gradle.read_text(encoding='utf8')
+vt2 = re.sub(r'minSdkVersion\s*=\s*\d+', f'minSdkVersion = {MIN_SDK}', vt)
+if vt2 != vt:
+    vars_gradle.write_text(vt2, encoding='utf8')
+    print('minSdkVersion =', MIN_SDK)
+    
 print('patch-android: OK')
