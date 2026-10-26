@@ -50,17 +50,25 @@ jobs:
           pip3 install --quiet pillow --break-system-packages || pip3 install --quiet pillow
           mkdir -p assets
           python3 - <<'PY'
-          from PIL import Image
-          src = Image.open("icon-512.png").convert("RGBA")
-          # الطبقة الأمامية: الشعار داخل منطقة آمنة بخلفية شفافة
+          from PIL import Image, ImageChops
+          src = Image.open("icon-512.png").convert("RGB")
+          BG = src.getpixel((2, 2))  # لون خلفية الشعار نفسه، فلا يظهر مربع حوله
+          # قص الشعار على حدود محتواه الفعلية
+          bbox = ImageChops.difference(src, Image.new("RGB", src.size, BG)).getbbox()
+          logo = src.crop(bbox).convert("RGBA")
+          # المنطقة الآمنة للأيقونة التكيفية = 66% من 1024
+          SAFE = int(1024 * 0.62)
+          ratio = min(SAFE / logo.width, SAFE / logo.height)
+          logo = logo.resize((int(logo.width * ratio), int(logo.height * ratio)), Image.LANCZOS)
+          # الطبقة الخلفية بنفس لون خلفية الشعار
+          bg = Image.new("RGBA", (1024, 1024), BG + (255,))
+          bg.save("assets/icon-background.png")
+          # الطبقة الأمامية: الشعار فقط في المنتصف
           fg = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
-          logo = src.resize((620, 620), Image.LANCZOS)
-          fg.paste(logo, ((1024 - 620) // 2, (1024 - 620) // 2), logo)
+          fg.paste(logo, ((1024 - logo.width) // 2, (1024 - logo.height) // 2))
           fg.save("assets/icon-foreground.png")
-          # الطبقة الخلفية: لون فاتح
-          Image.new("RGBA", (1024, 1024), (255, 255, 255, 255)).save("assets/icon-background.png")
           # أيقونة عامة للنسخ القديمة
-          base = Image.new("RGBA", (1024, 1024), (255, 255, 255, 255))
+          base = bg.copy()
           base.alpha_composite(fg)
           base.convert("RGB").save("assets/icon-only.png")
           PY
