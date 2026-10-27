@@ -1,5 +1,10 @@
 /* English dictionary: Arabic UI text -> English, applied at runtime by index.html when the language is English */
 window.I18N_EN = {
+"جارٍ تحميل حساب الدائن…": "Loading creditor account…",
+"الدائن غير مسجّل بعد، لذلك لا يظهر حسابه هنا. اطلب منه إضافة آيبانه.": "The creditor is not registered yet, so their account is not shown here. Ask them to add their IBAN.",
+"الدائن يستلم نقداً.": "The creditor receives cash.",
+"لم يُضف الدائن حساباً بعد.": "The creditor has not added an account yet.",
+"تعذر تحميل حساب الدائن.": "Could not load the creditor account.",
 "جديدة": "New",
 "المصاريف": "Expenses",
 "يطلب منك استلافاً": "is asking to borrow from you",
