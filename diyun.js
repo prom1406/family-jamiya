@@ -448,7 +448,8 @@ async function dbDecidePay(pid, ok) {
 async function dbCancelPay(pid) {
   const d = DB.d; if (!d) return;
   if (!confirm('إلغاء هذه الدفعة المعلّقة؟')) return;
-  try { await dbRef(d.id).collection('payments').doc(pid).delete(); toast('أُلغيت الدفعة', 'info'); }
+  const pCancel = DB.pays.find(x => x.id === pid);
+  try { await dbRef(d.id).collection('payments').doc(pid).delete(); toast('أُلغيت الدفعة', 'info'); const oc = dbOther(d); if (oc && pCancel) sendNotifs([oc], 'أُلغيت دفعة معلّقة', `${dispName(state.profile)} ألغى دفعة بقيمة ${fmtNum(dbN(pCancel.amount))} ريال`, dbJid(d.id), 'debt'); }
   catch (e) { toast('تعذر الإلغاء: ' + e.message, 'error'); }
 }
 
@@ -459,7 +460,7 @@ async function dbClaimLoan(did, myPh) {
   const b = db.batch();
   b.update(dbRef(did), { counterUid: state.user.uid, updatedAt: FV.serverTimestamp() });
   b.delete(loanReqRef(myPh, did));
-  try { await b.commit(); }
+  try { await b.commit(); const dd = DB.list.find(x => x.id === did); if (dd && dd.creatorUid) sendNotifs([dd.creatorUid], 'انضم المُقرض لطلب الاستلاف', `${dispName(state.profile)} سجّل نفسه كمُقرض لطلب ${fmtNum(dbN(dd.amount))} ريال`, dbJid(did), 'debt'); }
   catch (e) {
     // الطلب حُذف من المُستلف: نحذف الفهرس وحده
     if (e && e.code === 'not-found') await loanReqRef(myPh, did).delete().catch(() => {});
@@ -492,7 +493,7 @@ async function dbEditSave(f) {
   if (name.length < 2) return toast('اكتب اسم الطرف الآخر', 'error');
   if (!(amount > 0)) return toast('المبلغ غير صحيح', 'error');
   if (due && (!dbDateOk(due) || due < d.startDate)) return toast('موعد السداد يجب ألا يسبق تاريخ الدين', 'error');
-  try { await dbRef(d.id).update({ counterName: name, amount, reason: reason.slice(0, 200), dueDate: due, updatedAt: FV.serverTimestamp() }); closeModal(); toast('حُفظ التعديل'); }
+  try { await dbRef(d.id).update({ counterName: name, amount, reason: reason.slice(0, 200), dueDate: due, updatedAt: FV.serverTimestamp() }); closeModal(); toast('حُفظ التعديل'); const o = dbOther(d); if (o) sendNotifs([o], 'تم تعديل الدين', `${dispName(state.profile)} عدّل تفاصيل الدين — ${fmtNum(amount)} ريال`, dbJid(d.id), 'debt'); }
   catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
 }
 async function dbDelete() {
@@ -504,6 +505,8 @@ async function dbDelete() {
     const refs = [...pays.docs.map(x => x.ref), ref];
     if (d.type === 'loan' && !d.counterUid && d.counterPhone) refs.push(loanReqRef(normPhone(d.counterPhone), d.id));
     for (let i = 0; i < refs.length; i += 400) { const b = db.batch(); refs.slice(i, i + 400).forEach(r => b.delete(r)); await b.commit(); }
+    const oDel = dbOther(d);
+    if (oDel) sendNotifs([oDel], 'تم حذف الدين', `${dispName(state.profile)} حذف الدين — ${fmtNum(dbN(d.amount))} ريال`, dbJid(d.id), 'debt');
     dbLeave(); state.view = 'home'; render(); toast('حُذف الدين', 'info');
   } catch (e) { toast('تعذر الحذف: ' + e.message, 'error'); }
 }
