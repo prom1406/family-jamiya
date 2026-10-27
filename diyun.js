@@ -19,6 +19,23 @@ const DB_COL = 'debts';
 
 /* ---------- أدوات ---------- */
 const dbJid = id => 'db:' + id;
+// الطرف الآخر قد لا يكون معروفاً عند إنشاء الدين (لم يكن مسجّلاً)، فنبحث عنه برقم جواله ونحفظ معرّفه
+async function dbResolveOther(d) {
+  if (!d) return '';
+  const o = dbOther(d);
+  if (o) return o;
+  if (!d.counterPhone) return '';
+  try {
+    const ps = await db.collection('phones').doc(d.counterPhone).get();
+    const uid = ps.exists ? ps.data().uid : '';
+    if (uid && uid !== state.user.uid) {
+      d.counterUid = uid;
+      dbRef(d.id).update({ counterUid: uid, updatedAt: FV.serverTimestamp() }).catch(() => {});
+      return uid;
+    }
+  } catch (e) {}
+  return '';
+}
 const dbOther = d => d.creatorUid === state.user.uid ? d.counterUid : d.creatorUid; // الطرف الآخر (قد يكون غير مسجّل)
 const dbRef = id => db.collection(DB_COL).doc(id);
 const dbDay = () => isoDay(new Date());
@@ -404,12 +421,29 @@ function dbOpenPay() {
   const d = DB.d; if (!d) return;
   const left = dbLeft(d), lender = dbIsLender(d, state.user.uid);
   const note = !lender && d.counterUid ? 'ستُرسل للدائن ليؤكدها.' : '';
+  const acct = !lender ? '<div id="db-acct" class="text-xs text-slate-500">جارٍ تحميل حساب الدائن…</div>' : '';
   showModal(lender ? 'تسجيل مبلغ مستلم' : 'تسجيل مبلغ مسدَّد', `<form id="f-db-pay" class="space-y-3">
     <p class="text-xs text-slate-500">المتبقي ${fmtNum(left)} ريال. ${note}</p>
+    ${acct}
     <div><label class="text-xs font-semibold block mb-1">المبلغ (ريال)</label><input name="pamount" type="number" min="0.01" max="${left}" step="any" class="inp" required></div>
     <div><label class="text-xs font-semibold block mb-1">التاريخ</label><input name="pdate" type="date" class="inp" required value="${dbDay()}"></div>
     <div><label class="text-xs font-semibold block mb-1">ملاحظة (اختياري)</label><input name="pnote" class="inp" maxlength="120"></div>
     <button class="btn b-pri w-full py-3" type="submit">حفظ</button></form>`);
+  if (!lender) dbLoadLenderAcct(d);
+}
+// يعرض بيانات حساب الدائن (البنك والآيبان) مع زر نسخ ليحوّل المدين المبلغ منه مباشرة
+async function dbLoadLenderAcct(d) {
+  const box = () => document.getElementById('db-acct');
+  const uid = await dbResolveOther(d);
+  if (!box()) return;
+  if (!uid) { box().textContent = 'الدائن غير مسجّل بعد، لذلك لا يظهر حسابه هنا. اطلب منه إضافة آيبانه.'; return; }
+  try {
+    const s = await db.collection('users').doc(uid).get();
+    const p = s.exists ? s.data() : {};
+    const el = box(); if (!el) return;
+    if (p.iban) el.outerHTML = `<div class="rounded-2xl bg-slate-50 p-3 flex items-center justify-between gap-2"><div class="min-w-0 text-xs"><p class="text-slate-500">${esc(p.bank || '')}</p><p class="font-black break-all" dir="ltr">${esc(p.iban)}</p></div><button type="button" class="flex-none px-3 py-1.5 bg-white rounded-xl text-[11px] font-bold border" data-act="copy-iban" data-v="${esc(fixIban(p.iban))}"><i class="fa-regular fa-copy"></i> نسخ</button></div>`;
+    else el.textContent = String(p.bank || '').startsWith('كاش') ? 'الدائن يستلم نقداً.' : 'لم يُضف الدائن حساباً بعد.';
+  } catch (e) { if (box()) box().textContent = 'تعذر تحميل حساب الدائن.'; }
 }
 // يُضيف دفعة ويحدّث المسدّد. الدفعة المؤكدة تغلق الدين تلقائياً عند اكتمال المبلغ
 function dbApplyPaid(b, ref, d, delta) {
@@ -432,7 +466,7 @@ async function dbSavePay(f) {
     status: confirmed ? 'confirmed' : 'pending', createdAt: FV.serverTimestamp()
   });
   if (confirmed) dbApplyPaid(b, ref, d, amount);
-  try { await b.commit(); closeModal(); toast(confirmed ? 'سُجّل المبلغ' : 'أُرسلت الدفعة للدائن للتأكيد'); const o = dbOther(d); if (o) sendNotifs([o], confirmed ? 'سُجّلت دفعة على الدين' : 'دفعة جديدة بانتظار تأكيدك', `${dispName(state.profile)} — ${fmtNum(amount)} ريال`, dbJid(d.id), 'debt'); }
+  try { await b.commit(); closeModal(); toast(confirmed ? 'سُجّل المبلغ' : 'أُرسلت الدفعة للدائن للتأكيد'); const o = (await dbResolveOther(d)); if (o) sendNotifs([o], confirmed ? 'سُجّلت دفعة على الدين' : 'دفعة جديدة بانتظار تأكيدك', `${dispName(state.profile)} — ${fmtNum(amount)} ريال`, dbJid(d.id), 'debt'); }
   catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
 }
 async function dbDecidePay(pid, ok) {
@@ -449,7 +483,7 @@ async function dbCancelPay(pid) {
   const d = DB.d; if (!d) return;
   if (!confirm('إلغاء هذه الدفعة المعلّقة؟')) return;
   const pCancel = DB.pays.find(x => x.id === pid);
-  try { await dbRef(d.id).collection('payments').doc(pid).delete(); toast('أُلغيت الدفعة', 'info'); const oc = dbOther(d); if (oc && pCancel) sendNotifs([oc], 'أُلغيت دفعة معلّقة', `${dispName(state.profile)} ألغى دفعة بقيمة ${fmtNum(dbN(pCancel.amount))} ريال`, dbJid(d.id), 'debt'); }
+  try { await dbRef(d.id).collection('payments').doc(pid).delete(); toast('أُلغيت الدفعة', 'info'); const oc = (await dbResolveOther(d)); if (oc && pCancel) sendNotifs([oc], 'أُلغيت دفعة معلّقة', `${dispName(state.profile)} ألغى دفعة بقيمة ${fmtNum(dbN(pCancel.amount))} ريال`, dbJid(d.id), 'debt'); }
   catch (e) { toast('تعذر الإلغاء: ' + e.message, 'error'); }
 }
 
@@ -474,7 +508,7 @@ async function dbRespond(id, status) {
 async function dbSetClosed(closed) {
   const d = DB.d; if (!d || !dbIsLender(d, state.user.uid)) return;
   if (closed && !confirm('إغلاق الدين وإعفاء الطرف الآخر من المتبقي؟')) return;
-  try { await dbRef(d.id).update({ status: closed ? 'closed' : 'open', updatedAt: FV.serverTimestamp() }); toast(closed ? 'أُغلق الدين' : 'أُعيد فتح الدين', 'info'); const o = dbOther(d); if (o) sendNotifs([o], closed ? 'أُغلق الدين' : 'أُعيد فتح الدين', `${dispName(state.profile)} — ${fmtNum(dbN(d.amount))} ريال`, dbJid(d.id), 'debt'); }
+  try { await dbRef(d.id).update({ status: closed ? 'closed' : 'open', updatedAt: FV.serverTimestamp() }); toast(closed ? 'أُغلق الدين' : 'أُعيد فتح الدين', 'info'); const o = (await dbResolveOther(d)); if (o) sendNotifs([o], closed ? 'أُغلق الدين' : 'أُعيد فتح الدين', `${dispName(state.profile)} — ${fmtNum(dbN(d.amount))} ريال`, dbJid(d.id), 'debt'); }
   catch (e) { toast('تعذر التحديث: ' + e.message, 'error'); }
 }
 function dbOpenEdit() {
@@ -493,7 +527,7 @@ async function dbEditSave(f) {
   if (name.length < 2) return toast('اكتب اسم الطرف الآخر', 'error');
   if (!(amount > 0)) return toast('المبلغ غير صحيح', 'error');
   if (due && (!dbDateOk(due) || due < d.startDate)) return toast('موعد السداد يجب ألا يسبق تاريخ الدين', 'error');
-  try { await dbRef(d.id).update({ counterName: name, amount, reason: reason.slice(0, 200), dueDate: due, updatedAt: FV.serverTimestamp() }); closeModal(); toast('حُفظ التعديل'); const o = dbOther(d); if (o) sendNotifs([o], 'تم تعديل الدين', `${dispName(state.profile)} عدّل تفاصيل الدين — ${fmtNum(amount)} ريال`, dbJid(d.id), 'debt'); }
+  try { await dbRef(d.id).update({ counterName: name, amount, reason: reason.slice(0, 200), dueDate: due, updatedAt: FV.serverTimestamp() }); closeModal(); toast('حُفظ التعديل'); const o = (await dbResolveOther(d)); if (o) sendNotifs([o], 'تم تعديل الدين', `${dispName(state.profile)} عدّل تفاصيل الدين — ${fmtNum(amount)} ريال`, dbJid(d.id), 'debt'); }
   catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
 }
 async function dbDelete() {
@@ -505,7 +539,7 @@ async function dbDelete() {
     const refs = [...pays.docs.map(x => x.ref), ref];
     if (d.type === 'loan' && !d.counterUid && d.counterPhone) refs.push(loanReqRef(normPhone(d.counterPhone), d.id));
     for (let i = 0; i < refs.length; i += 400) { const b = db.batch(); refs.slice(i, i + 400).forEach(r => b.delete(r)); await b.commit(); }
-    const oDel = dbOther(d);
+    const oDel = (await dbResolveOther(d));
     if (oDel) sendNotifs([oDel], 'تم حذف الدين', `${dispName(state.profile)} حذف الدين — ${fmtNum(dbN(d.amount))} ريال`, dbJid(d.id), 'debt');
     dbLeave(); state.view = 'home'; render(); toast('حُذف الدين', 'info');
   } catch (e) { toast('تعذر الحذف: ' + e.message, 'error'); }
