@@ -83,4 +83,14 @@ if vt2 != vt:
     vars_gradle.write_text(vt2, encoding='utf8')
     print('minSdkVersion =', MIN_SDK)
     
+# 7) صلاحية الإشعارات (أندرويد 13+) والقناة الافتراضية لإشعارات FCM
+man = root / 'app' / 'src' / 'main' / 'AndroidManifest.xml'
+m = man.read_text(encoding='utf8')
+if 'POST_NOTIFICATIONS' not in m:
+    m = m.replace('</manifest>', '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n</manifest>', 1)
+if 'default_notification_channel_id' not in m:
+    m = m.replace('</application>', '    <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="default" />\n    </application>', 1)
+man.write_text(m, encoding='utf8')
+print('AndroidManifest: POST_NOTIFICATIONS + default channel')
+
 print('patch-android: OK')
