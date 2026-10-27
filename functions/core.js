@@ -54,6 +54,8 @@ async function deliver(ref, n, userCache) {
   // data للمتصفح (يعرضها الـ Service Worker) + apns لآيفون (إشعار ظاهر بصوت)
   const res = await messaging.sendEach(tokens.map(token => ({ token, data,
     webpush: { headers: { Urgency: 'high', TTL: '86400' } },
+    // أندرويد: بدون كتلة notification لا يعرض النظام الإشعار والتطبيق مغلق
+    android: { priority: 'high', ttl: 86400000, notification: { title, body, tag: data.tag, sound: 'default', channelId: 'default', defaultVibrateTimings: true } },
     apns: { headers: { 'apns-priority': '10' }, payload: { aps: { alert: { title, body }, sound: 'default' } } } })));
   let ok = 0; const dead = [];
   res.responses.forEach((r, i) => {
