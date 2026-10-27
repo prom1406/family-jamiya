@@ -838,7 +838,7 @@ const LOCD = () => LANG === 'en' ? 'en-GB' : 'ar-SA-u-ca-gregory-nu-latn', LOCN 
 let tr = s => s;
 if (LANG === 'en' && window.I18N_EN) (function () {
   const D = window.I18N_EN, AR = /[؀-ۿ]/, KEEP = new Set(['ريال', 'اليوم', 'غداً']);
-  const ks = Object.keys(D).filter(k => k.length >= 6 || /\s/.test(k) || KEEP.has(k)).sort((a, b) => b.length - a.length);
+  const ks = Object.keys(D).sort((a, b) => b.length - a.length);
   const re = ks.length ? new RegExp('(?<![\\u0600-\\u06FF])(?:' + ks.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')(?![\\u0600-\\u06FF])', 'g') : null;
   tr = s => {
     if (typeof s !== 'string' || !AR.test(s)) return s;
@@ -873,7 +873,7 @@ const themeLabel = () => ({ auto: 'تلقائي (حسب جهازك)', dark: 'د�
 const themeCycle = () => { const n = { auto: 'dark', dark: 'light', light: 'auto' }[themeMode()]; try { localStorage.setItem('jm_theme', n); } catch (e) {} if (window.__applyTheme) window.__applyTheme(n); render(); };
 const themeBtn = () => `<button class="btn b-sec" data-act="theme-cycle" aria-label="المظهر"><i class="fa-solid ${document.documentElement.classList.contains('dark') ? 'fa-sun' : 'fa-moon'}"></i></button>`;
 const setLang = l => { try { localStorage.setItem('jm_lang', l); } catch (e) {} location.reload(); };
-const langBtn = () => `<button class="btn b-sec" data-act="lang-toggle" aria-label="Language"><i class="fa-solid fa-language"></i> ${LANG === 'en' ? 'عربي' : 'EN'}</button>`;
+const langBtn = () => `<button class="btn b-sec" data-act="lang-toggle" aria-label="Language"><i class="fa-solid fa-language"></i> ${LANG === 'en' ? 'Arabic' : 'EN'}</button>`;
 /* ============ الإعدادات ============ */
 const firebaseConfig = {
   apiKey: "AIzaSyBD_a9TrhsCL5ognnIxhv2OuyiWJmdr33o",
