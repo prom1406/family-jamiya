@@ -1,5 +1,6 @@
 /* English dictionary: Arabic UI text -> English, applied at runtime by index.html when the language is English */
 window.I18N_EN = {
+"جديدة": "New",
 "المصاريف": "Expenses",
 "يطلب منك استلافاً": "is asking to borrow from you",
 "أكدت التحويل": "confirmed the transfer",
@@ -1156,7 +1157,6 @@ window.I18N_EN = {
 "قسط جمعية": "Installment of association",
 "المتبقي عليك": "You still owe",
 "متأخر، سدّد في أقرب وقت": "late, pay as soon as possible",
-"جمعية": "Association",
 "عضو لم يسدد": "member has not paid",
 "أعضاء لم يسددوا": "members have not paid",
 "بعد": "in",
