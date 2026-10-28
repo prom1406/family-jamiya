@@ -144,6 +144,35 @@ const WEB = 'w'.repeat(30) + 'WEBTOKEN', IOS = 'i'.repeat(30) + 'IOSTOKEN';
       assert.strictEqual(calls.length, 1); assert.strictEqual(calls[0][1].to, '966569090301');
     } finally { globalThis.fetch = f; }
   });
+  await t('autoBroadcast: يومي وأسبوعي لكل المستخدمين بتوقيت الرياض دون تكرار', async () => {
+    const { db, core } = mk(); const now = Date.UTC(2026, 9, 28, 5, 0); // الأربعاء 28 أكتوبر 08:00 بتوقيت الرياض (dow = 3)
+    ['u1', 'u2', 'u3'].forEach(u => db.seed('users/' + u, { name: u }));
+    db.seed('settings/autoNotifs', { items: [
+      { id: 'd1', title: 'يومي', body: 'نص', freq: 'daily', hour: 8, active: true },
+      { id: 'w1', title: 'أسبوعي', body: 'نص', freq: 'weekly', dow: 3, hour: 8, active: true },
+      { id: 'w2', title: 'يوم آخر', body: 'نص', freq: 'weekly', dow: 4, hour: 8, active: true },
+      { id: 'h9', title: 'ساعة أخرى', body: 'نص', freq: 'daily', hour: 9, active: true },
+      { id: 'off', title: 'موقوف', body: 'نص', freq: 'daily', hour: 8, active: false },
+      { id: 'empty', title: '', body: 'نص', freq: 'daily', hour: 8, active: true }] });
+    assert.strictEqual(await core.autoBroadcastJob(now), 6);
+    const n = db.all('notifs'); assert.strictEqual(n.length, 6);
+    assert.deepStrictEqual([...new Set(n.map(x => x.title))].sort(), ['أسبوعي', 'يومي']);
+    assert.deepStrictEqual([...new Set(n.map(x => x.toUid))].sort(), ['u1', 'u2', 'u3']); assert.ok(n.every(x => x.kind === 'custom' && x.pushed === false));
+    assert.strictEqual(await core.autoBroadcastJob(now + 600000), 0); // نفس الساعة مرة أخرى: لا تكرار
+    assert.strictEqual(db.all('notifs').length, 6);
+    assert.strictEqual(await core.autoBroadcastJob(now + 864e5), 6); // الخميس 08:00: اليومي مجدداً + الأسبوعي الخاص بالخميس (w2)
+    assert.deepStrictEqual([...new Set(db.all('notifs').map(x => x.title))].sort(), ['أسبوعي', 'يوم آخر', 'يومي']);
+  });
+  await t('autoBroadcast: بلا إعدادات لا يرسل شيئاً', async () => {
+    const { db, core } = mk(); db.seed('users/u1', {}); assert.strictEqual(await core.autoBroadcastJob(Date.UTC(2026, 9, 28, 5, 0)), 0); assert.strictEqual(db.all('notifs').length, 0);
+  });
+  await t('deliver: يمرّر kind في بيانات الدفع ليفتح إشعار الدردشة نافذتها', async () => {
+    const { db, core } = mk(); db.seed('users/u1', { fcmTokens: [WEB] });
+    db.seed('notifs/n1', { toUid: 'u1', title: 'دردشة', body: 'نص', jid: 'J1', kind: 'chatmsg', tag: 'chat_J1', pushed: false });
+    const ref = db.doc('notifs/n1'); await core.deliver(ref, (await ref.get()).data(), {});
+    assert.strictEqual(sent[0].data.kind, 'chatmsg'); assert.strictEqual(sent[0].data.jid, 'J1');
+    for (const v of Object.values(sent[0].data)) assert.strictEqual(typeof v, 'string');
+  });
   await t('lib: monthIdx/dayIn الشهرية والأسبوعية', async () => {
     assert.strictEqual(L.monthIdx({ startDate: '2026-10-01' }, { y: 2026, m: 11, d: 5 }), 2);
     assert.strictEqual(L.dayIn({ startDate: '2026-10-01', frequency: 'monthly' }, 0, 31), Date.UTC(2026, 9, 31));

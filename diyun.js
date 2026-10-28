@@ -19,13 +19,21 @@ const DB_COL = 'debts';
 
 /* ---------- أدوات ---------- */
 const dbJid = id => 'db:' + id;
-// يرسل الإشعار للطرفين معاً: نسخة للمنفّذ (تأكيد الحركة) ونسخة للطرف الآخر، بغض النظر عمّن أنشأ الدين
+// يرسل الإشعار للطرفين معاً: نسخة للمنفّذ (تأكيد الحركة) ونسخة للطرف الآخر، بغض النظر عمّن أنشأ الدين.
+// الطرف الآخر يُستخرج من وثيقة الدين نفسها (المنشئ أو الطرف المقابل، وإن لم يكن معرّفه محفوظاً نبحث عنه بجواله)،
+// فلا يضيع الإشعار إن كان المنفّذ هو المنشئ أو غير المنشئ. وكل إشعار يُكتب مستقلاً حتى لا يُسقط فشلُ أحدهما الآخر.
 async function dbNotifyBoth(did, otherUid, title, otherBody, selfBody) {
-  const me = state.user.uid, jid = dbJid(did), b = db.batch();
-  const rows = [[me, selfBody], [otherUid, otherBody]].filter(([u], i, a) => u && a.findIndex(([v]) => v === u) === i);
+  const me = state.user.uid, jid = dbJid(did);
+  let other = otherUid && otherUid !== me ? otherUid : '';
+  if (!other) {
+    const d = (DB.d && DB.d.id === did ? DB.d : null) || DB.list.find(x => x.id === did) || DB.arch.find(x => x.id === did);
+    if (d) other = await dbResolveOther(d);
+    if (other === me) other = '';
+  }
+  const rows = [[me, selfBody], [other, otherBody]].filter(([u], i, a) => u && a.findIndex(([v]) => v === u) === i);
   if (!rows.length) return;
-  rows.forEach(([to, body]) => b.set(db.collection('notifs').doc(), { toUid: to, fromUid: me, title: String(title).slice(0, 100), body: String(body).slice(0, 500), jid, kind: 'debt', tag: '', pushed: false, read: false, createdAt: FV.serverTimestamp() }));
-  try { await b.commit(); } catch (e) { console.warn('notif', e.code || e.message); }
+  const res = await Promise.allSettled(rows.map(([to, body]) => db.collection('notifs').add({ toUid: to, fromUid: me, title: String(title).slice(0, 100), body: String(body).slice(0, 500), jid, kind: 'debt', tag: '', pushed: false, read: false, createdAt: FV.serverTimestamp() })));
+  res.forEach((r, i) => { if (r.status === 'rejected') console.warn('notif', rows[i][0] === me ? 'self' : 'other', (r.reason && (r.reason.code || r.reason.message)) || r.reason); });
 }
 // الطرف الآخر قد لا يكون معروفاً عند إنشاء الدين (لم يكن مسجّلاً)، فنبحث عنه برقم جواله ونحفظ معرّفه
 async function dbResolveOther(d) {

@@ -50,7 +50,7 @@ async function deliver(ref, n, userCache) {
   const tokens = info.tokens.filter(t => !acked.includes(tail(t))).slice(-5); // أحدث 5 أجهزة
   if (!tokens.length) return ref.update({ pushed: true });
   const title = n.title || '', body = n.body || '';
-  const data = { title, body, jid: n.jid || '', tag: (n.tag || ('n_' + ref.id)) + '_' + String(to).slice(0, 8) };
+  const data = { title, body, jid: n.jid || '', kind: n.kind || '', tag: (n.tag || ('n_' + ref.id)) + '_' + String(to).slice(0, 8) }; // kind: ليفتح إشعار الدردشة نافذة الدردشة
   // data للمتصفح (يعرضها الـ Service Worker) + apns لآيفون (إشعار ظاهر بصوت)
   const res = await messaging.sendEach(tokens.map(token => ({ token, data,
     webpush: { headers: { Urgency: 'high', TTL: '86400' } },
@@ -188,5 +188,31 @@ async function reminderJob() {
   return fresh.length;
 }
 
-return { notifRef, notifData, claim, deliver, notifyNewUser, notifyInvite, reminderJob, chatNotify };
+/* ---------- إشعارات تلقائية يحدّدها المالك (يومية أو أسبوعية) لجميع المستخدمين ----------
+   settings/autoNotifs = { items: [{ id, title, body, freq: 'daily'|'weekly', dow: 0-6 (0 = الأحد), hour: 0-23 (توقيت الرياض), active }] }
+   تعمل كل ساعة؛ وعلامة في autoRem تمنع تكرار الإرسال لنفس الإشعار في نفس اليوم. */
+async function autoBroadcastJob(nowMs = Date.now()) {
+  const s = await db.doc('settings/autoNotifs').get(); if (!s.exists) return 0;
+  const items = Array.isArray(s.data().items) ? s.data().items : [];
+  const rt = new Date(nowMs + 3 * 3600000), hour = rt.getUTCHours(), dow = rt.getUTCDay(), day = rt.toISOString().slice(0, 10);
+  const due = items.filter(x => x && x.id && x.active !== false && String(x.title || '').trim() && String(x.body || '').trim() && Number(x.hour) === hour
+    && (x.freq === 'weekly' ? Number(x.dow) === dow : x.freq === 'daily'));
+  if (!due.length) return 0;
+  let ids = null, total = 0;
+  for (const x of due) {
+    const key = `ab_${String(x.id).slice(0, 40)}_${day}`;
+    try { await db.doc('autoRem/' + key).create({ at: FV.serverTimestamp() }); } catch (e) { continue; } // أُرسل اليوم مسبقاً
+    if (!ids) ids = (await db.collection('users').select().get()).docs.map(d => d.id);
+    for (let i = 0; i < ids.length; i += 200) {
+      const b = db.batch();
+      ids.slice(i, i + 200).forEach(u => b.set(notifRef(), notifData(u, String(x.title).trim().slice(0, 100), String(x.body).trim().slice(0, 500), 'custom', key, '')));
+      await b.commit();
+    }
+    total += ids.length;
+  }
+  logger.info('auto broadcast', due.length, total);
+  return total;
+}
+
+return { notifRef, notifData, claim, deliver, notifyNewUser, notifyInvite, reminderJob, chatNotify, autoBroadcastJob };
 };

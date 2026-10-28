@@ -5,7 +5,8 @@
    • onUserCreated / onInviteCreated: إشعار المالك بمشترك جديد، وإشعار المدعوّ بدعوة جديدة.
    • sweep: كل 5 دقائق يلتقط ما فاته (إشعارات لم تُرسل، مشتركون ودعوات).
    • onChatCreated: رسالة جديدة في دردشة الجمعية ← إشعار لبقية الأعضاء.
-   • reminders: الساعة 8 و12 بتوقيت الرياض ينشئ التذكيرات التلقائية وإشعارات بداية الدورات. */
+   • reminders: الساعة 8 و12 بتوقيت الرياض ينشئ التذكيرات التلقائية وإشعارات بداية الدورات.
+   • autoBroadcast: كل ساعة يرسل الإشعارات اليومية/الأسبوعية التي حدّدها المالك لجميع المستخدمين. */
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const logger = require('firebase-functions/logger');
@@ -44,3 +45,6 @@ exports.sweep = onSchedule({ schedule: 'every 5 minutes', region: SCHED_REGION, 
 });
 
 exports.reminders = onSchedule({ schedule: '0 8,12 * * *', timeZone: 'Asia/Riyadh', region: SCHED_REGION, timeoutSeconds: 300 }, async () => { await core.reminderJob(); });
+
+// إشعارات يحدّدها المالك من لوحة الإدارة (settings/autoNotifs): يومية أو أسبوعية لجميع المستخدمين، تُفحص كل ساعة بتوقيت الرياض
+exports.autoBroadcast = onSchedule({ schedule: '0 * * * *', timeZone: 'Asia/Riyadh', region: SCHED_REGION, timeoutSeconds: 300 }, async () => { await core.autoBroadcastJob(); });

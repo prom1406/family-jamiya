@@ -1,7 +1,7 @@
 /* الجمعية الصغيرة — Service Worker
    يجعل التطبيق قابلاً للتثبيت ويعمل واجهته دون اتصال. غيّر رقم الإصدار عند كل تحديث للملفات. */
-const VERSION = 'siwaa-v44';
-const SHELL = ['./', './index.html', './i18n-en.js', './privacy.html', './qattah.js?v=37', './diyun.js?v=37', './wizard.js?v=37', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png', './favicon-32.png', './logo-full.jpg'];
+const VERSION = 'siwaa-v45';
+const SHELL = ['./', './index.html', './i18n-en.js', './privacy.html', './qattah.js?v=39', './diyun.js?v=39', './wizard.js?v=39', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png', './favicon-32.png', './logo-full.jpg'];
 // مصادر ثابتة من CDN نخزنها للتشغيل السريع ودون اتصال
 const CDN_HOSTS = ['cdn.tailwindcss.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com', 'www.gstatic.com', 'cdn.jsdelivr.net', 'www.svgrepo.com'];
 
@@ -39,14 +39,15 @@ self.addEventListener('fetch', e => {
   // طلبات Firebase وغيرها تمر مباشرة للشبكة دون تخزين
 });
 
-// الضغط على إشعار النظام: يفتح التطبيق (وصفحة الجمعية إن وُجدت)
+// الضغط على إشعار النظام: يفتح التطبيق (وصفحة الجمعية إن وُجدت)، وإشعار الدردشة يفتح نافذة الدردشة نفسها
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  const jid = e.notification.data && e.notification.data.jid;
+  const d = e.notification.data || {}, jid = d.jid || '', kind = d.kind || '', chat = kind === 'chat' || kind === 'chatmsg';
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
     const c = list[0];
-    if (c) { c.focus(); if (jid) c.postMessage({ type: 'open-jamiya', jid }); return; }
-    return self.clients.openWindow('./');
+    if (c) { c.focus(); if (jid) c.postMessage({ type: 'open-jamiya', jid, kind }); return; }
+    // التطبيق مغلق: نمرّر الهدف في الرابط ليفتحه بعد تسجيل الدخول
+    return self.clients.openWindow(jid ? './?j=' + encodeURIComponent(jid) + (chat ? '&chat=1' : '') : './');
   }));
 });
 
@@ -54,5 +55,5 @@ self.addEventListener('notificationclick', e => {
 self.addEventListener('push', e => {
   let d = {}; try { d = e.data.json(); } catch (_) { d = { data: { body: e.data ? e.data.text() : '' } }; }
   const n = d.notification || {}, x = d.data || {};
-  e.waitUntil(self.registration.showNotification(n.title || x.title || 'سِواء', { body: n.body || x.body || '', icon: 'icon-192.png', badge: 'icon-192.png', lang: 'ar', dir: 'rtl', tag: x.tag || undefined, data: { jid: x.jid || '' } }));
+  e.waitUntil(self.registration.showNotification(n.title || x.title || 'سِواء', { body: n.body || x.body || '', icon: 'icon-192.png', badge: 'icon-192.png', lang: 'ar', dir: 'rtl', tag: x.tag || undefined, data: { jid: x.jid || '', kind: x.kind || '' } }));
 });
