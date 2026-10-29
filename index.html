@@ -3044,7 +3044,7 @@ document.addEventListener('visibilitychange', () => { if (state.user && ssGet('j
 /* ============ إشعارات النظام (تظهر خارج التطبيق على الجوال) ============ */
 /* داخل تطبيق iOS: إشعارات آبل (APNs عبر FCM) بإضافة FirebaseMessaging الأصلية؛ في المتصفح: Web Push كما كان. */
 const NP = () => window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.FirebaseMessaging;
-const nativePerm = () => state._nperm || 'prompt'; // granted | denied | prompt
+const nativePerm = () => state._nperm || 'unknown'; // granted | denied | prompt | unknown (لم تُقرأ حالة الإذن من iOS بعد: لا نعرض بانر التفعيل حتى لا يظهر خطأً عند كل فتح)
 const notifSupported = () => IS_NATIVE || 'Notification' in window;
 const notifOn = () => IS_NATIVE ? (nativePerm() === 'granted' && lsGet('jm_notif') !== '0') : (notifSupported() && Notification.permission === 'granted' && lsGet('jm_notif') !== '0');
 const notifCanAsk = () => IS_NATIVE ? nativePerm() === 'prompt' : (notifSupported() && Notification.permission === 'default' && (!isIOS() || isStandalone()));
@@ -3139,6 +3139,7 @@ async function nativePushRegister(force, ask) {
     let perm = (await p.checkPermissions()).receive;
     if (perm !== 'granted' && perm !== 'denied' && ask) perm = (await p.requestPermissions()).receive;
     state._nperm = perm === 'granted' ? 'granted' : perm === 'denied' ? 'denied' : 'prompt';
+    renderBanner(); // الحالة صارت معلومة: نُظهر البانر أو نخفيه
     if (state._nperm !== 'granted') { if (state.view === 'profile') render(); return { ok: false, err: 'permission-' + state._nperm }; }
     if (lsGet('jm_notif') === null || force) lsSet('jm_notif', '1');
     const tok = (await p.getToken()).token;

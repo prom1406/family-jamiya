@@ -213,6 +213,9 @@ jobs:
             /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" -c "Add :CFBundleURLTypes:0 dict" -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $RC" ios/App/App/Info.plist
           fi
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" -c "Add :UIBackgroundModes:0 string remote-notification" ios/App/App/Info.plist
+          # أذونات الكاميرا والصور: بدونها يُغلق iOS التطبيق فوراً عند اختيار «التقاط صورة» لإيصال السداد
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string يحتاج سِواء إلى الكاميرا لالتقاط صورة إيصال السداد" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string يحتاج سِواء إلى الصور لاختيار صورة إيصال السداد" ios/App/App/Info.plist
           ruby scripts/patch-ios.rb
 
       - name: مفتاح App Store Connect
