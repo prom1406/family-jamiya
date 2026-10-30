@@ -91,6 +91,10 @@ if 'POST_NOTIFICATIONS' not in m:
 if 'default_notification_channel_id' not in m:
     m = m.replace('</application>', '    <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="default" />\n    </application>', 1)
 man.write_text(m, encoding='utf8')
-print('AndroidManifest: POST_NOTIFICATIONS + default channel')
+# 8) الكاميرا: التقاط صورة الإيصال من حقل <input type=file capture> داخل WebView
+if 'android.permission.CAMERA' not in m:
+    m = m.replace('</manifest>', '    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />\n</manifest>', 1)
+man.write_text(m, encoding='utf8')
+print('AndroidManifest: POST_NOTIFICATIONS + default channel + CAMERA')
 
 print('patch-android: OK')

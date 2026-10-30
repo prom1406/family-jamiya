@@ -1469,7 +1469,7 @@ function nativeSendCode(phoneE164) {
     t = setTimeout(() => done(reject, Object.assign(new Error('timeout'), { code: 'auth/client-timeout' })), 60000);
     try {
       hs.push(await P.addListener('phoneCodeSent', ev => done(resolve, ev && ev.verificationId)));
-      hs.push(await P.addListener('phoneVerificationFailed', ev => done(reject, Object.assign(new Error((ev && ev.message) || 'native phone verification failed'), { code: 'auth/native-failed' }))));
+      hs.push(await P.addListener('phoneVerificationFailed', ev => done(reject, Object.assign(new Error((ev && ev.message) || 'native phone verification failed'), { code: /unusual activity|too many|blocked/i.test((ev && ev.message) || '') ? 'auth/too-many-requests' : 'auth/native-failed' }))));
       await P.signInWithPhoneNumber({ phoneNumber: phoneE164, timeout: 0 });
     } catch (e) { done(reject, e); }
   });
@@ -1479,7 +1479,7 @@ const phoneAuthErr = e => ({
   'auth/internal-error': 'تعذر إرسال الرمز الآن، أعد المحاولة بعد قليل [internal-error]',
   'auth/invalid-phone-number': 'رقم الجوال غير صحيح',
   'auth/missing-phone-number': 'اكتب رقم الجوال',
-  'auth/too-many-requests': 'محاولات كثيرة، انتظر قليلاً ثم أعد المحاولة',
+  'auth/too-many-requests': 'حظر Firebase هذا الجهاز مؤقتاً لكثرة محاولات إرسال الرمز. انتظر بضع ساعات ثم أعد المحاولة (لا تكرر الضغط)',
   'auth/invalid-verification-code': 'الرمز غير صحيح',
   'auth/code-expired': 'انتهت صلاحية الرمز، اطلب رمزاً جديداً',
   'auth/credential-already-in-use': 'هذا الجوال مرتبط بحساب آخر',
@@ -2997,9 +2997,19 @@ document.addEventListener('input', e => {
   if (t.matches('[data-wa-text]')) state.admin.waText = t.value;
   if (t.matches('[data-wa-q]')) { state.admin.waQ = t.value; paintWa(); }
 });
+// اختيار صورة الإيصال: من المعرض (الحقل الأصلي) أو بالتقاط مباشر بالكاميرا.
+// نافذة WebView في أندرويد لا تعرض الكاميرا إلا إذا وُجدت سمة capture، لذلك نضيف حقلاً مخفياً بها وننقل الصورة للحقل الأصلي.
+const receiptPicker = () => `<input name="file" type="file" accept="image/*" class="inp" required>
+      <button type="button" class="btn b-sec w-full mt-2" data-act="receipt-cam"><i class="fa-solid fa-camera"></i> التقاط الإيصال بالكاميرا</button>
+      <input type="file" accept="image/*" capture="environment" data-receipt-cam class="hide" tabindex="-1" aria-hidden="true">`;
 document.addEventListener('change', e => {
   const t = e.target;
   if (t && t.matches && t.matches('select[name=mode]') && t.form) { const f = t.form, o = f.querySelector('[data-fam-once]'), m = f.querySelector('[data-fam-monthly]'); if (o && m) { o.classList.toggle('hide', t.value !== 'once'); m.classList.toggle('hide', t.value !== 'monthly'); } return; }
+  if (t && t.matches && t.matches('[data-receipt-cam]')) { // صورة الكاميرا تُنقل إلى الحقل الأصلي ثم يُعاد استخدام معاينته
+    const pic = t.files && t.files[0], form = t.closest('form'), main = form && form.querySelector('[name=file]');
+    if (pic && main) { try { const dt = new DataTransfer(); dt.items.add(pic); main.files = dt.files; main.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) { toast('تعذر إرفاق الصورة، اخترها من المعرض', 'error'); } }
+    t.value = ''; return;
+  }
   if (t && t.matches && t.matches('#f-pay [name=file], #f-fampay [name=file]')) { const im = $('pay-prev'), f = t.files && t.files[0]; if (im && f) { im.src = URL.createObjectURL(f); im.classList.remove('hide'); } return; }
   if (!t.matches || !t.matches('[data-wa-optin]') || !state.user) return;
   const v = t.checked;
@@ -4061,7 +4071,7 @@ function openModal(kind) {
     <div class="p-2.5 bg-slate-50 rounded-xl text-[11px] text-slate-600">القسط ${fmtNum(c.j.amount)} ريال ${c.f.every} • المستحق عليك حتى الآن ${fmtNum(c.me?.owed || 0)} • المتبقي <b>${fmtNum(c.me?.remaining || 0)}</b> ريال</div>
     <div><label class="text-xs font-semibold block mb-1">المبلغ المحوّل (ريال) — يمكنك دفع جزء أو أكثر من قسط</label><input name="amount" type="number" step="0.01" min="1" class="inp" value="${c.me && c.me.remaining > 0 ? c.me.remaining : c.j.amount}" required>
       <div class="flex gap-2 flex-wrap mt-2">${c.me && c.me.remaining > 0 ? `<button type="button" class="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold" data-act="pay-fill" data-v="${c.me.remaining}">المتبقي كاملاً ${fmtNum(c.me.remaining)}</button>` : ''}${!(c.me && c.me.remaining === c.j.amount) ? `<button type="button" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold" data-act="pay-fill" data-v="${c.j.amount}">قسط واحد ${fmtNum(c.j.amount)}</button>` : ''}</div></div>
-    <div><label class="text-xs font-semibold block mb-1">صورة الإيصال (لقطة شاشة أو صورة)</label><input name="file" type="file" accept="image/*" class="inp" required><img id="pay-prev" class="hide mt-2 rounded-xl border max-h-44 mx-auto" alt="معاينة الإيصال"></div>
+    <div><label class="text-xs font-semibold block mb-1">صورة الإيصال (لقطة شاشة أو صورة)</label>${receiptPicker()}<img id="pay-prev" class="hide mt-2 rounded-xl border max-h-44 mx-auto" alt="معاينة الإيصال"></div>
     <div><label class="text-xs font-semibold block mb-1">رقم مرجع الحوالة (اختياري)</label><input name="ref" class="inp" dir="ltr"></div>
     <button class="btn b-pri w-full py-3" type="submit">إرسال الإيصال</button></form>`);
   if (kind === 'mod') showModal('اقتراح تعديل على الشروط', `<form id="f-mod" class="space-y-3"><textarea name="text" rows="3" class="inp" required placeholder="اكتب التعديل المقترح بوضوح..."></textarea>
@@ -5013,7 +5023,7 @@ function openFamilyPay() {
     <div><label class="text-xs font-semibold block mb-1">مبلغ هذا التحويل (ريال)</label><input name="amount" type="number" step="0.01" min="1" class="inp" required value="${left || (fs.monthly ? pl.amount : '')}" placeholder="المبلغ الذي حوّلته">
       <p class="text-[11px] text-slate-500 mt-1">${fs.monthly ? `قيمتك الشهرية ${fmtNum(pl.amount)} • المستحق حتى الآن ${fmtNum(owed)}` : `تعهدك ${fmtNum(pl.amount)}`} • المتبقي ${fmtNum(left)} ريال. يمكنك سداده دفعة واحدة أو على دفعات.</p></div>
     <div><label class="text-xs font-semibold block mb-1">رقم المرجع (اختياري)</label><input name="ref" class="inp" maxlength="40"></div>
-    <div><label class="text-xs font-semibold block mb-1">صورة الإيصال</label><input name="file" type="file" accept="image/*" class="inp" required><img id="pay-prev" class="hide mt-2 rounded-xl border max-h-44 mx-auto" alt="معاينة الإيصال"></div>
+    <div><label class="text-xs font-semibold block mb-1">صورة الإيصال</label>${receiptPicker()}<img id="pay-prev" class="hide mt-2 rounded-xl border max-h-44 mx-auto" alt="معاينة الإيصال"></div>
     <button class="btn b-pri w-full py-3" type="submit">إرسال الإيصال</button></form>`);
 }
 async function submitFamilyPay(f) {
@@ -5263,6 +5273,7 @@ const actions = {
   'log-open': openLog, 'stmt-me': () => openMemberStatement(), 'stmt': el => openMemberStatement(el.dataset.uid), 'stmt-print': el => printMemberStatement(el.dataset.uid),
   'lock-on': () => openLockForm('on'), 'lock-change': () => openLockForm('change'), 'lock-off': () => openLockForm('off'),
   'join-create': () => createJoinLink(false), 'join-regen': () => createJoinLink(true), 'join-toggle': toggleJoin, 'join-copy': copyJoinLink, 'join-do': joinFromLink,
+  'receipt-cam': el => { const i = el.closest('form') && el.closest('form').querySelector('[data-receipt-cam]'); if (i) i.click(); },
   'pay-fill': el => { const i = document.querySelector('#f-pay [name=amount], #f-fampay [name=amount]'); if (i) i.value = el.dataset.v; },
   'swap-modal': el => openSwapModal(+el.dataset.i), 'swap-yes': el => approveSwap(el.dataset.id), 'swap-no': el => rejectSwap(el.dataset.id, false), 'swap-cancel': el => rejectSwap(el.dataset.id, true)
 };
