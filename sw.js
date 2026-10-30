@@ -1,6 +1,6 @@
 /* الجمعية الصغيرة — Service Worker
    يجعل التطبيق قابلاً للتثبيت ويعمل واجهته دون اتصال. غيّر رقم الإصدار عند كل تحديث للملفات. */
-const VERSION = 'siwaa-v45';
+const VERSION = 'siwaa-v46';
 const SHELL = ['./', './index.html', './i18n-en.js', './privacy.html', './qattah.js?v=39', './diyun.js?v=39', './wizard.js?v=39', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png', './favicon-32.png', './logo-full.jpg'];
 // مصادر ثابتة من CDN نخزنها للتشغيل السريع ودون اتصال
 const CDN_HOSTS = ['cdn.tailwindcss.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com', 'www.gstatic.com', 'cdn.jsdelivr.net', 'www.svgrepo.com'];

@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<script>try{if(localStorage.getItem('jm_lang')==='en'){document.documentElement.lang='en';document.documentElement.dir='ltr';document.write('<script src="i18n-en.js?v=2"><\/script>');}}catch(e){}</script>
+<script>try{if(localStorage.getItem('jm_lang')==='en'){document.documentElement.lang='en';document.documentElement.dir='ltr';document.write('<script src="i18n-en.js?v=3"><\/script>');}}catch(e){}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1996,7 +1996,7 @@ function openExportModal() {
 function openJamiya(id) {
   cleanup(state.jUnsubs); state.jInviteSub = false; state.gotM = state.gotP = false;
   if (state.afterOpen && state.afterOpen.id !== id) state.afterOpen = null;
-  state.activeId = id; state.j = null; state.members = {}; state.payments = []; state.jInvites = []; state.wishes = {}; state.wishMode = null; state.shareReqs = {}; state.shareMode = null; state.swapReqs = []; state.pledges = {}; state.guests = {}; state.famTab = 'overview'; state.jamTab = 'overview';
+  state.activeId = id; state.j = null; state.members = {}; state.payments = []; state.jInvites = []; state.wishes = {}; state.wishMode = null; state.wishAllDenied = false; state.shareReqs = {}; state.shareMode = null; state.swapReqs = []; state.pledges = {}; state.guests = {}; state.famTab = 'overview'; state.jamTab = 'overview';
   state.view = 'jamiya'; render();
   const ref = db.collection('jamiyat').doc(id);
   state.jUnsubs.push(stopChat, () => { if (state.wishUnsub) { state.wishUnsub(); state.wishUnsub = null; } if (state.shareUnsub) { state.shareUnsub(); state.shareUnsub = null; } if (state.pledgeUnsub) { state.pledgeUnsub(); state.pledgeUnsub = null; } if (state.guestUnsub) { state.guestUnsub(); state.guestUnsub = null; } });
@@ -4102,27 +4102,30 @@ const isStaffJ = j => !!j && !!state.user && (j.creatorUid === state.user.uid ||
 const openPill = o => `<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold ${o ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}"><i class="fa-solid ${o ? 'fa-lock-open' : 'fa-lock'}"></i> ${o ? 'مفتوحة' : 'مغلقة'}</span>`;
 const jref = () => db.collection('jamiyat').doc(state.j.id);
 
-// المشرف ونائبه يريان كل الرغبات، والعضو يرى رغبته فقط
+// كل أعضاء الجمعية يرون كل الرغبات وأسبابها. إن لم تسمح قواعد Firestore بذلك بعد، يرى العضو رغبته فقط (wishAllDenied)
 function syncWishes() {
   const j = state.j; if (!j || !state.user || j.type === 'family') return;
-  const mode = isStaffJ(j) ? 'all' : 'mine';
+  const mode = (isStaffJ(j) || !state.wishAllDenied) ? 'all' : 'mine';
   if (state.wishMode === mode) return;
   if (state.wishUnsub) { state.wishUnsub(); state.wishUnsub = null; }
   state.wishMode = mode; state.wishes = {};
   const col = jref().collection('wishes'), uid = state.user.uid, redraw = () => { if (state.view === 'jamiya') render(); };
-  const onErr = e => { if (e.code !== 'permission-denied') toast('خطأ في تحميل الرغبات: ' + e.message, 'error'); };
+  const onErr = e => {
+    if (e.code === 'permission-denied' && mode === 'all' && !isStaffJ(j)) { state.wishAllDenied = true; return syncWishes(); } // القواعد لا تسمح بعد: نرجع لرغبة العضو وحدها
+    if (e.code !== 'permission-denied') toast('خطأ في تحميل الرغبات: ' + e.message, 'error');
+  };
   state.wishUnsub = mode === 'all'
     ? col.onSnapshot(s => { state.wishes = {}; s.docs.forEach(d => state.wishes[d.id] = d.data()); redraw(); }, onErr)
     : col.doc(uid).onSnapshot(s => { state.wishes = s.exists ? { [uid]: s.data() } : {}; redraw(); }, onErr);
 }
-const wishLine = (j, w) => `${w.pos ? 'الدور ' + w.pos + ' — ' + periodLabel(j, w.pos - 1) : 'بلا دور محدد'}${w.text ? ' • ' + esc(w.text) : ''}`;
+const wishLine = (j, w) => `${w.pos ? 'الدور ' + w.pos + ' — ' + periodLabel(j, w.pos - 1) : 'بلا دور محدد'}${w.text ? `<span class="block mt-0.5"><b class="text-rose-600">السبب:</b> ${esc(w.text)}</span>` : ''}`;
 function wishCard(c) {
   const j = c.j, open = !!j.wishOpen, uid = state.user.uid; if (!j.memberUids.includes(uid)) return '';
   const mine = state.wishes[uid];
   const myBox = mine ? `<div class="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-xs"><p class="text-[10px] text-emerald-700 font-bold mb-0.5">رغبتك</p>${wishLine(j, mine)}</div>`
     : `<p class="text-xs text-slate-400">${open ? 'لم تكتب رغبتك بعد.' : 'لم تكتب رغبة في هذه الجمعية.'}</p>`;
   let all = '';
-  if (c.canManage) {
+  { // قائمة رغبات الأعضاء: ظاهرة لجميع أعضاء الجمعية
     const list = c.uniq.filter(u => state.wishes[u]), missing = c.uniq.filter(u => !state.wishes[u]);
     all = `<div class="pt-3 mt-3 border-t border-slate-100 space-y-1.5"><p class="text-[11px] font-bold text-slate-600">رغبات الأعضاء (${list.length}/${c.uniq.length})</p>
       ${list.map(u => `<div class="p-2 bg-slate-50 rounded-xl text-[11px]"><b>${esc(dispName(state.members[u]))}</b> <span class="text-slate-400">(ترتيبه الحالي ${c.turns.map((x, k) => x === u ? k + 1 : 0).filter(Boolean).join('، ')})</span><div class="text-slate-600">${wishLine(j, state.wishes[u])}</div></div>`).join('') || '<p class="text-[11px] text-slate-400">لا توجد رغبات بعد.</p>'}
@@ -4140,8 +4143,8 @@ function openWishModal() {
   for (let i = lockedCount(c); i < c.j.count; i++) opts.push(`<option value="${i + 1}" ${w.pos === i + 1 ? 'selected' : ''}>الدور ${i + 1} — ${periodLabel(c.j, i)}</option>`);
   showModal('رغبتي في الاستلام', `<form id="f-wish" class="space-y-3">
     <div><label class="text-xs font-semibold block mb-1">الدور الذي تفضّله</label><select name="pos" class="inp">${opts.join('')}</select></div>
-    <div><label class="text-xs font-semibold block mb-1">ملاحظة للمشرف (اختياري)</label><textarea name="text" rows="3" maxlength="200" class="inp" placeholder="مثال: أحتاج المبلغ قبل بداية الدراسة">${esc(w.text || '')}</textarea></div>
-    <p class="text-[11px] text-slate-500 leading-relaxed">رغبتك تظهر للمشرف ونائبه فقط، والقرار النهائي في ترتيب القبض للمشرف.</p>
+    <div><label class="text-xs font-semibold block mb-1">السبب (اختياري)</label><textarea name="text" rows="3" maxlength="200" class="inp" placeholder="مثال: أحتاج المبلغ قبل بداية الدراسة">${esc(w.text || '')}</textarea></div>
+    <p class="text-[11px] text-slate-500 leading-relaxed">رغبتك وسببها تظهران لجميع أعضاء الجمعية، والقرار النهائي في ترتيب القبض للمشرف.</p>
     <button class="btn b-pri w-full py-3" type="submit">حفظ رغبتي</button>${w.uid ? '<button type="button" class="btn b-red w-full" data-act="wish-del">حذف رغبتي</button>' : ''}</form>`);
 }
 async function submitWish(f) {
