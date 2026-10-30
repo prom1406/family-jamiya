@@ -551,12 +551,13 @@ async function dbDelete() {
   if (dbLocked(d)) return toast('الدين مؤكد من الطرف الآخر ولا يمكن حذفه', 'error');
   if (!confirm('حذف هذا الدين نهائياً؟')) return;
   try {
+    // نُرسل الإشعار قبل الحذف: بعده لا تجد قواعد Firestore وثيقة الدين لتتحقق أن المرسل والمستلم طرفان فيها
+    const oDel = (await dbResolveOther(d));
+    await dbNotifyBoth(d.id, oDel, 'تم حذف الدين', `${dispName(state.profile)} حذف الدين — ${fmtNum(dbN(d.amount))} ريال`, `حذفت الدين بمبلغ ${fmtNum(dbN(d.amount))} ريال`);
     const ref = dbRef(d.id), pays = await ref.collection('payments').get();
     const refs = [...pays.docs.map(x => x.ref), ref];
     if (d.type === 'loan' && !d.counterUid && d.counterPhone) refs.push(loanReqRef(normPhone(d.counterPhone), d.id));
     for (let i = 0; i < refs.length; i += 400) { const b = db.batch(); refs.slice(i, i + 400).forEach(r => b.delete(r)); await b.commit(); }
-    const oDel = (await dbResolveOther(d));
-    await dbNotifyBoth(d.id, oDel, 'تم حذف الدين', `${dispName(state.profile)} حذف الدين — ${fmtNum(dbN(d.amount))} ريال`, `حذفت الدين بمبلغ ${fmtNum(dbN(d.amount))} ريال`);
     dbLeave(); state.view = 'home'; render(); toast('حُذف الدين', 'info');
   } catch (e) { toast('تعذر الحذف: ' + e.message, 'error'); }
 }

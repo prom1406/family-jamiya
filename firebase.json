@@ -3,7 +3,15 @@
     {
       "source": "functions",
       "codebase": "default",
-      "ignore": ["node_modules", "test", ".git", "*.log"]
+      "ignore": [
+        "node_modules",
+        "test",
+        ".git",
+        "*.log"
+      ]
     }
-  ]
+  ],
+  "firestore": {
+    "rules": "firestore.rules"
+  }
 }

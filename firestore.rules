@@ -1,0 +1,755 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    // موثّق = بريد مفعّل، أو جوال سعودي مُتحقَّق منه بالرمز (phone_number في رمز المصادقة)
+    function phoneOf() {
+      return request.auth.token.get('phone_number', '').matches('[+]9665[0-9]{8}')
+        ? '0' + request.auth.token.phone_number.replace('[+]966', '') : '';
+    }
+    function verified() { return signedIn() && (request.auth.token.get('email_verified', false) == true || phoneOf() != ''); }
+    // البريد والجوال من رمز المصادقة فقط؛ الحقل الفارغ لا يطابق شيئاً (منع مطابقة الدعوات بقيمة فارغة)
+    // البريد يُعتمد في مطابقة الدعوات فقط بعد تفعيله، وإلا أمكن لأي مستخدم انتحال بريد غيره
+    function myEmail() { return request.auth.token.get('email_verified', false) == true ? request.auth.token.get('email', '').lower() : ''; }
+    function emailIs(e) { return e is string && e != '' && e == myEmail(); }
+    function myPhone() { return phoneOf(); }
+    function phoneIs(p) { return p is string && p != '' && p == myPhone(); }
+    function isOwner() {
+      return signedIn() && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() == 'mamydady87@gmail.com';
+    }
+    function isAdmin() { return isOwner() || (signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))); }
+    function jam(jid) { return get(/databases/$(database)/documents/jamiyat/$(jid)).data; }
+    function isMember(jid) { return signedIn() && request.auth.uid in jam(jid).memberUids; }
+    function jamA(jid) { return getAfter(/databases/$(database)/documents/jamiyat/$(jid)).data; }
+    function isDeputy(jid) { return signedIn() && jam(jid).get('deputyUid', '') == request.auth.uid; }
+    // تبديل دورين بين عضوين: يوافق عليه الطرف الآخر، ويُتحقق أن الناتج هو نفس الترتيب بعد تبديل الموضعين فقط
+    // الموضع i لم يتغير إلا إذا كان أحد موضعي التبديل (أقصى عدد أدوار 30، فنفحص كل موضع صراحةً دون عمليات قوائم معقدة)
+    function keep(i, t, n, q) { return t.size() <= i || q.lo == i || q.hi == i || n[i] == t[i]; }
+    function swapOk(jid) {
+      let rid = request.resource.data.get('lastSwap', '');
+      let sp = /databases/$(database)/documents/jamiyat/$(jid)/swapReqs/$(rid);
+      let t = resource.data.turns;
+      let n = request.resource.data.turns;
+      let q = get(sp).data;
+      return rid is string && rid != '' && exists(sp)
+        && q.status == 'pending'
+        && q.toUid == request.auth.uid
+        && t[q.fromIdx] == q.fromUid
+        && t[q.toIdx] == request.auth.uid
+        && n.size() == t.size()
+        && n[q.lo] == t[q.hi]
+        && n[q.hi] == t[q.lo]
+        && keep(0, t, n, q) 
+        && keep(1, t, n, q) 
+        && keep(2, t, n, q) 
+        && keep(3, t, n, q) 
+        && keep(4, t, n, q) 
+        && keep(5, t, n, q) 
+        && keep(6, t, n, q) 
+        && keep(7, t, n, q) 
+        && keep(8, t, n, q) 
+        && keep(9, t, n, q) 
+        && keep(10, t, n, q) 
+        && keep(11, t, n, q) 
+        && keep(12, t, n, q) 
+        && keep(13, t, n, q) 
+        && keep(14, t, n, q) 
+        && keep(15, t, n, q) 
+        && keep(16, t, n, q) 
+        && keep(17, t, n, q) 
+        && keep(18, t, n, q) 
+        && keep(19, t, n, q) 
+        && keep(20, t, n, q) 
+        && keep(21, t, n, q) 
+        && keep(22, t, n, q) 
+        && keep(23, t, n, q) 
+        && keep(24, t, n, q) 
+        && keep(25, t, n, q) 
+        && keep(26, t, n, q) 
+        && keep(27, t, n, q) 
+        && keep(28, t, n, q) 
+        && keep(29, t, n, q);
+    }
+    function isCreator(jid) { return signedIn() && jam(jid).creatorUid == request.auth.uid; }
+    // عضو أو مشرف (المشرف قد لا يكون عضواً في جمعيته)
+    function isStaffOrMember(jid) { return signedIn() && (request.auth.uid in jam(jid).memberUids || jam(jid).creatorUid == request.auth.uid); }
+
+    // مشارك سجّله مشرف التعاون العائلي (لم يدخل التطبيق)
+    function isGuest(jid, gid) { return gid is string && exists(/databases/$(database)/documents/jamiyat/$(jid)/guests/$(gid)); }
+
+    // ===== القطة: صندوق مشترك لفعالية أو رحلة =====
+    function qtDoc(qid) { return get(/databases/$(database)/documents/qattahs/$(qid)).data; }
+    function qtAdmin(qid) { return signedIn() && qtDoc(qid).adminUid == request.auth.uid; }
+    function qtStaff(qid) { return signedIn() && (qtDoc(qid).adminUid == request.auth.uid || qtDoc(qid).get('deputyUid', '') == request.auth.uid); }
+    function qtMember(qid) { return signedIn() && request.auth.uid in qtDoc(qid).memberUids; }
+    // المشرف يكتب مشاركيه في نفس الدفعة التي تنشئ القطة أو تضيف عضواً (getAfter يقرأ الحالة بعد الدفعة)
+    function qtAdminAfter(qid) { return signedIn() && getAfter(/databases/$(database)/documents/qattahs/$(qid)).data.adminUid == request.auth.uid; }
+    // دعوة معلّقة موجّهة لي بجوالي (إن كان موثّقاً وله جوال) أو ببريدي الموثّق
+    function qtInviteForMe(qid) {
+      return verified() && (
+        (myPhone() != '' && exists(/databases/$(database)/documents/qattahInvites/$(qid + '__p' + myPhone()))
+          && get(/databases/$(database)/documents/qattahInvites/$(qid + '__p' + myPhone())).data.status == 'pending')
+        || (exists(/databases/$(database)/documents/qattahInvites/$(qid + '__' + myEmail()))
+          && get(/databases/$(database)/documents/qattahInvites/$(qid + '__' + myEmail())).data.status == 'pending'));
+    }
+    // التحقق من صحة الوثيقة الكاملة بعد الكتابة (يُستخدم عند الإنشاء والتعديل)
+    function qtValid(d) {
+      return d.name is string && d.name.size() >= 1 && d.name.size() <= 60
+        && d.reason is string && d.reason.size() <= 400
+        && d.target is number && d.target > 0 && d.target <= 100000000
+        && d.participants is int && d.participants >= 2 && d.participants <= 100
+        && d.collectStart is string && d.collectStart.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && d.collectEnd is string && d.collectEnd.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && d.eventStart is string && d.eventStart.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && d.eventEnd is string && d.eventEnd.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && d.collectEnd >= d.collectStart && d.eventStart >= d.collectStart && d.eventEnd >= d.eventStart
+        && d.adminName is string && d.memberUids.size() <= d.participants;
+    }
+
+    // جوال المستخدم من ملفه (يُستخدم لمطابقة دعوات الجوال، ويشترط بريداً موثّقاً)
+    function pendingInviteForMe(jid) {
+      return verified() && (
+        (exists(/databases/$(database)/documents/invites/$(jid + '__' + myEmail()))
+          && get(/databases/$(database)/documents/invites/$(jid + '__' + myEmail())).data.status == 'pending')
+        || (exists(/databases/$(database)/documents/invites/$(jid + '__p' + myPhone()))
+          && get(/databases/$(database)/documents/invites/$(jid + '__p' + myPhone())).data.status == 'pending'));
+    }
+
+    // ===== القطة =====
+    match /qattahs/{qid} {
+      // أرشفة القطة المنتهية وإعادتها: مشرفها فقط، وفي حقول الأرشفة وحدها
+      allow update: if signedIn() && resource.data.adminUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['archivedAt','archivedBy','archiveAuto','archiveSkip']);
+
+      // يقرأ القطة من هو عضو فيها، ومشرفها، والمشرف العام
+      allow read: if signedIn() && (request.auth.uid in resource.data.memberUids || resource.data.adminUid == request.auth.uid || isAdmin());
+
+      allow create: if verified()
+        && request.resource.data.adminUid == request.auth.uid
+        && request.resource.data.memberUids == [request.auth.uid]
+        && request.resource.data.deputyUid == ''
+        && request.resource.data.collected == 0
+        && request.resource.data.get('expOpen', false) == false
+        && request.resource.data.keys().hasOnly(['name','reason','target','participants','collectStart','collectEnd','eventStart','eventEnd','adminUid','adminName','deputyUid','deputyName','memberUids','collected','expOpen','createdAt','adminBank','adminIban','adminPhone'])
+        && qtValid(request.resource.data)
+        && request.resource.data.get('adminBank', '') is string && request.resource.data.get('adminBank', '').size() <= 60
+        && request.resource.data.get('adminIban', '') is string && request.resource.data.get('adminIban', '').size() <= 34
+        && request.resource.data.get('adminPhone', '') is string && request.resource.data.get('adminPhone', '').size() <= 15;
+
+      // المشرف: يعدّل البيانات والمشاركين والنائب والمبلغ المحصّل، ولا يغيّر مشرفها
+      allow update: if signedIn() && resource.data.adminUid == request.auth.uid
+        && request.resource.data.adminUid == resource.data.adminUid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','reason','target','participants','collectStart','collectEnd','eventStart','eventEnd','memberUids','deputyUid','deputyName','collected','expOpen','adminBank','adminIban','adminPhone'])
+        && qtValid(request.resource.data)
+        && request.resource.data.get('adminBank', '') is string && request.resource.data.get('adminBank', '').size() <= 60
+        && request.resource.data.get('adminIban', '') is string && request.resource.data.get('adminIban', '').size() <= 34
+        && request.resource.data.get('adminPhone', '') is string && request.resource.data.get('adminPhone', '').size() <= 15
+        && request.auth.uid in request.resource.data.memberUids
+        && request.resource.data.collected is number && request.resource.data.collected >= 0
+        && request.resource.data.get('expOpen', false) is bool
+        && (request.resource.data.deputyUid == '' || (request.resource.data.deputyUid in request.resource.data.memberUids && request.resource.data.deputyUid != request.resource.data.adminUid));
+
+      // قبول دعوة: المدعو يضيف نفسه إلى memberUids فقط، بشرط وجود دعوة معلّقة موجّهة له
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids'])
+        && !(request.auth.uid in resource.data.memberUids)
+        && request.auth.uid in request.resource.data.memberUids
+        && request.resource.data.memberUids.size() == resource.data.memberUids.size() + 1
+        && request.resource.data.memberUids.size() <= resource.data.participants
+        && qtInviteForMe(qid);
+
+      allow delete: if signedIn() && (resource.data.adminUid == request.auth.uid || isOwner());
+
+      // المشاركون: يضيفهم المشرف مباشرة، أو يضيف المدعو نفسه بعد قبول الدعوة
+      match /members/{uid} {
+        allow read: if qtMember(qid) || qtAdmin(qid) || isAdmin();
+        allow create: if (qtAdminAfter(qid) || (request.auth.uid == uid && qtInviteForMe(qid)))
+          && request.resource.data.uid == uid
+          && request.resource.data.keys().hasOnly(['uid','name','phone','paid','direct','addedBy','joinedAt'])
+          && request.resource.data.name is string && request.resource.data.name.size() >= 1 && request.resource.data.name.size() <= 60
+          && request.resource.data.paid == 0;
+        // تسجيل السداد: المشرف فقط، والحقل المسموح تعديله هو paid
+        allow update: if qtAdmin(qid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paid','credit'])
+          && request.resource.data.get('paid', 0) is number && request.resource.data.get('paid', 0) >= 0 && request.resource.data.get('paid', 0) <= 10000000
+          && request.resource.data.get('credit', 0) is number && request.resource.data.get('credit', 0) >= 0 && request.resource.data.get('credit', 0) <= 10000000;
+        allow delete: if qtAdmin(qid);
+      }
+
+      // تأكيد السداد: يرسله العضو لنفسه، ويعتمده المشرف فيُحتسب في مدفوعات العضو
+      match /claims/{pid} {
+        allow read: if qtAdmin(qid) || isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+        allow create: if qtMember(qid) && request.resource.data.uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['uid','name','amount','ref','status','createdAt'])
+          && request.resource.data.status == 'pending'
+          && request.resource.data.name is string && request.resource.data.name.size() <= 60
+          && request.resource.data.amount is number && request.resource.data.amount > 0 && request.resource.data.amount <= 10000000
+          && request.resource.data.ref is string && request.resource.data.ref.size() <= 60;
+        allow update: if qtAdmin(qid) && resource.data.status == 'pending'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','decidedAt'])
+          && request.resource.data.status in ['confirmed', 'rejected'];
+        allow delete: if qtAdmin(qid) || (signedIn() && resource.data.uid == request.auth.uid && resource.data.status == 'pending');
+      }
+
+      // طلب إضافة مصروف: يرسله العضو، ويعتمده المشرف فيُسجَّل مصروفاً ويُحتسب مقدّماً من العضو
+      match /expReqs/{rid} {
+        allow read: if qtAdmin(qid) || isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+        allow create: if qtMember(qid) && request.resource.data.uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['uid','name','title','details','amount','date','status','createdAt'])
+          && request.resource.data.status == 'pending'
+          && request.resource.data.name is string && request.resource.data.name.size() <= 60
+          && request.resource.data.title is string && request.resource.data.title.size() >= 1 && request.resource.data.title.size() <= 80
+          && request.resource.data.details is string && request.resource.data.details.size() <= 300
+          && request.resource.data.amount is number && request.resource.data.amount > 0 && request.resource.data.amount <= 10000000
+          && request.resource.data.date is string && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+        allow update: if qtAdmin(qid) && resource.data.status == 'pending'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','decidedAt'])
+          && request.resource.data.status in ['approved', 'rejected'];
+        allow delete: if qtAdmin(qid) || (signedIn() && resource.data.uid == request.auth.uid && resource.data.status == 'pending');
+      }
+
+      // المصروفات: يسجّلها المشرف أو نائبه، ويقرؤها الأعضاء
+      match /expenses/{eid} {
+        allow read: if qtMember(qid) || qtAdmin(qid) || isAdmin();
+        allow create: if qtStaff(qid)
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['name','amount','date','uid','byName','createdAt','forUid','byMember','details'])
+          && request.resource.data.get('forUid', '') is string
+          && request.resource.data.get('byMember', '') is string && request.resource.data.get('byMember', '').size() <= 60
+          && request.resource.data.get('details', '') is string && request.resource.data.get('details', '').size() <= 300
+          && request.resource.data.name is string && request.resource.data.name.size() >= 1 && request.resource.data.name.size() <= 80
+          && request.resource.data.amount is number && request.resource.data.amount > 0 && request.resource.data.amount <= 10000000
+          && request.resource.data.date is string && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+        allow delete: if qtAdmin(qid) || (qtStaff(qid) && resource.data.get('forUid', '') == '');
+      }
+    }
+
+    // الدعوات: المعرّف = qid__p{جوال}  أو  qid__{بريد}. يكتبها مشرف القطة، ويقبلها أو يرفضها المدعو
+    match /qattahInvites/{iid} {
+      allow read: if isOwner() || (signedIn() && (
+        resource.data.invitedBy == request.auth.uid
+        || resource.data.adminUid == request.auth.uid
+        || (verified() && ((myPhone() != '' && phoneIs(resource.data.phone)) || emailIs(resource.data.email)))));
+
+      allow create: if signedIn()
+        && request.resource.data.invitedBy == request.auth.uid
+        && request.resource.data.adminUid == request.auth.uid
+        && qtAdmin(request.resource.data.qid)
+        && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasOnly(['qid','qName','qTarget','qEnd','adminUid','adminName','invitedName','phone','email','invitedBy','status','createdAt'])
+        && request.resource.data.qName is string && request.resource.data.qName.size() <= 60
+        && request.resource.data.invitedName is string && request.resource.data.invitedName.size() <= 60
+        && request.resource.data.phone is string && request.resource.data.email is string
+        && ((request.resource.data.phone.matches('05[0-9]{8}') && request.resource.data.email == '' && iid == request.resource.data.qid + '__p' + request.resource.data.phone)
+            || (request.resource.data.email != '' && request.resource.data.phone == '' && iid == request.resource.data.qid + '__' + request.resource.data.email));
+
+      // المشرف يعيد إرسال دعوة رُفضت سابقاً، والمدعو يقبل أو يرفض (الحقل status فقط)
+      allow update: if signedIn() && (
+        (resource.data.adminUid == request.auth.uid && request.resource.data.adminUid == request.auth.uid
+          && request.resource.data.qid == resource.data.qid && request.resource.data.status == 'pending')
+        || (verified() && ((myPhone() != '' && phoneIs(resource.data.phone)) || emailIs(resource.data.email))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && request.resource.data.status in ['accepted', 'declined']));
+
+      allow delete: if isOwner() || (signedIn() && resource.data.adminUid == request.auth.uid);
+    }
+
+    // ===== فهرس طلبات الاستلاف حسب جوال المُقرض (لمن لم يسجّل بعد) =====
+    match /loanReqs/{ph}/items/{iid} {
+      allow read: if verified() && myPhone() == ph;
+      allow create: if signedIn() && request.resource.data.creatorUid == request.auth.uid
+        && request.resource.data.debtId == iid
+        && request.resource.data.keys().hasOnly(['debtId','creatorUid','creatorName','amount','reason','createdAt']);
+      allow delete: if (verified() && myPhone() == ph) || (signedIn() && resource.data.creatorUid == request.auth.uid);
+    }
+
+    // ===== الديون =====
+    function dbDoc(did) { return get(/databases/$(database)/documents/debts/$(did)).data; }
+    function dbIsLenderOf(d) { return (d.kind == 'lent' && d.creatorUid == request.auth.uid) || (d.kind == 'borrowed' && d.counterUid == request.auth.uid); }
+    function dbIsBorrowerOf(d) { return (d.kind == 'borrowed' && d.creatorUid == request.auth.uid) || (d.kind == 'lent' && d.counterUid == request.auth.uid); }
+    function dbParty(did) { return signedIn() && (dbDoc(did).creatorUid == request.auth.uid || dbDoc(did).counterUid == request.auth.uid); }
+    function dbDateStr(v) { return v is string && v.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'); }
+
+    // ===== الديون =====
+    match /debts/{did} {
+      // أرشفة الدين المنتهي وإعادته: منشئه فقط، وفي حقول الأرشفة وحدها
+      allow update: if signedIn() && resource.data.creatorUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['archivedAt','archivedBy','archiveAuto','archiveSkip']);
+
+      allow read: if signedIn() && (resource.data.creatorUid == request.auth.uid || resource.data.counterUid == request.auth.uid || isAdmin());
+
+      // إنشاء: المنشئ فقط. إن كان للطرف الآخر حساب يبدأ الدين "بانتظار القبول"
+      allow create: if verified() && request.resource.data.creatorUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['creatorUid','creatorName','kind','counterName','counterPhone','counterUid','amount','reason','startDate','dueDate','status','paid','createdAt','updatedAt','type'])
+        && request.resource.data.creatorName is string && request.resource.data.creatorName.size() <= 60
+        && request.resource.data.kind in ['lent', 'borrowed']
+        && request.resource.data.counterName is string && request.resource.data.counterName.size() >= 1 && request.resource.data.counterName.size() <= 40
+        && request.resource.data.counterPhone is string && request.resource.data.counterPhone.size() <= 15
+        && request.resource.data.counterUid is string && request.resource.data.counterUid != request.auth.uid
+        && request.resource.data.amount is number && request.resource.data.amount > 0 && request.resource.data.amount <= 100000000
+        && request.resource.data.reason is string && request.resource.data.reason.size() <= 200
+        && dbDateStr(request.resource.data.startDate)
+        && request.resource.data.dueDate is string && (request.resource.data.dueDate == '' || dbDateStr(request.resource.data.dueDate))
+        && request.resource.data.paid == 0
+        && ((request.resource.data.counterUid == '' && request.resource.data.status == 'open' && request.resource.data.get('type', '') != 'loan')
+            || (request.resource.data.counterUid != '' && request.resource.data.status == 'proposed' && request.resource.data.get('type', '') != 'loan')
+            // استلاف: المدين يطلب قرضاً من دائن مسجّل، ولا يثبت إلا بعد تأكيد الدائن للتحويل
+            || (request.resource.data.get('type', '') == 'loan' && request.resource.data.kind == 'borrowed'
+                && request.resource.data.status == 'requested'
+                && ((request.resource.data.counterUid != '') || (request.resource.data.counterUid == '' && request.resource.data.counterPhone != ''))));
+
+      // تعديل المنشئ للبيانات الأساسية، ما دام لا توجد دفعات
+      allow update: if signedIn() && resource.data.creatorUid == request.auth.uid && resource.data.paid == 0
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['counterName','amount','reason','dueDate','updatedAt'])
+        && request.resource.data.amount is number && request.resource.data.amount > 0 && request.resource.data.amount <= 100000000
+        && request.resource.data.counterName is string && request.resource.data.counterName.size() >= 1 && request.resource.data.counterName.size() <= 40
+        && request.resource.data.reason is string && request.resource.data.reason.size() <= 200
+        && (request.resource.data.dueDate == '' || dbDateStr(request.resource.data.dueDate))
+        // قبول الطرف الآخر أو رفضه
+        || (signedIn() && resource.data.counterUid == request.auth.uid && resource.data.status == 'proposed'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt'])
+            && request.resource.data.status in ['open', 'declined'])
+        // استلاف أُرسل لجوال غير مسجّل: من يسجّل بهذا الجوال (بريد موثّق) يربط الطلب بحسابه
+        || (verified() && resource.data.get('type', '') == 'loan' && resource.data.status == 'requested'
+            && resource.data.counterUid == '' && resource.data.phoneIs(resource.data.counterPhone)
+            && request.resource.data.counterUid == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['counterUid','updatedAt']))
+        // استلاف: الدائن يؤكد تحويل المبلغ (بالمبلغ والتاريخ الفعليين) فيثبت القرض، أو يرفض الطلب
+        || (signedIn() && resource.data.get('type', '') == 'loan' && resource.data.counterUid == request.auth.uid && resource.data.status == 'requested'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','amount','startDate','paid','updatedAt'])
+            && request.resource.data.status in ['open', 'declined']
+            && request.resource.data.paid == 0
+            && request.resource.data.amount is number && request.resource.data.amount > 0 && request.resource.data.amount <= 100000000
+            && dbDateStr(request.resource.data.startDate))
+        // الدائن: تأكيد الدفعات وإغلاق الدين وإعادة فتحه
+        || (signedIn() && dbIsLenderOf(resource.data) && resource.data.status in ['open', 'closed']
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paid','status','updatedAt'])
+            && request.resource.data.status in ['open', 'closed']
+            && request.resource.data.paid is number && request.resource.data.paid >= 0 && request.resource.data.paid <= resource.data.amount)
+        // المدين مع دائن غير مسجّل: يسجّل السداد مباشرة
+        || (signedIn() && resource.data.kind == 'borrowed' && resource.data.creatorUid == request.auth.uid && resource.data.counterUid == ''
+            && resource.data.status in ['open', 'closed']
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paid','status','updatedAt'])
+            && request.resource.data.status in ['open', 'closed']
+            && request.resource.data.paid is number && request.resource.data.paid >= 0 && request.resource.data.paid <= resource.data.amount);
+
+      // الحذف: المنشئ فقط، ما دام لا توجد دفعات، وما دام الدين غير مؤكد من الطرف الآخر
+      allow delete: if signedIn() && resource.data.creatorUid == request.auth.uid && resource.data.paid == 0
+        && !(resource.data.status in ['open', 'closed'] && resource.data.counterUid != '');
+
+      // الدفعات: المدين مع دائن مسجّل يُرسلها معلّقة، والدائن يؤكدها
+      match /payments/{pid} {
+        allow read: if dbParty(did);
+        allow create: if dbParty(did) && request.resource.data.byUid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['amount','date','note','byUid','byName','status','createdAt'])
+          && request.resource.data.amount is number && request.resource.data.amount > 0 && request.resource.data.amount <= 100000000
+          && dbDateStr(request.resource.data.date)
+          && request.resource.data.note is string && request.resource.data.note.size() <= 120
+          && request.resource.data.byName is string && request.resource.data.byName.size() <= 60
+          && ((request.resource.data.status == 'pending' && dbIsBorrowerOf(dbDoc(did)) && dbDoc(did).counterUid != '' && dbDoc(did).status == 'open')
+              || (request.resource.data.status == 'confirmed' && dbDoc(did).status == 'open'
+                  && (dbIsLenderOf(dbDoc(did)) || (dbIsBorrowerOf(dbDoc(did)) && dbDoc(did).counterUid == ''))));
+        allow update: if dbIsLenderOf(dbDoc(did)) && resource.data.status == 'pending'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','decidedAt'])
+          && request.resource.data.status in ['confirmed', 'rejected'];
+        // المُقرض يحذف الدفعات المعلّقة أو المرفوضة فقط، والمؤكدة لا تُحذف
+        allow delete: if (dbIsLenderOf(dbDoc(did)) && resource.data.status != 'confirmed')
+          || (resource.data.byUid == request.auth.uid && resource.data.status == 'pending');
+      }
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      // الجوال في الملف يُقبل إن طابق رقم الحساب المُتحقَّق منه، أو بقي كما هو دون تغيير
+      allow create: if signedIn() && request.auth.uid == uid
+        && (request.resource.data.get('phone', '') == '' || phoneIs(request.resource.data.phone));
+      allow update: if signedIn() && request.auth.uid == uid
+        && (request.resource.data.get('phone', '') == resource.data.get('phone', '') || phoneIs(request.resource.data.phone));
+      // المالك يصحّح البريد والجوال فقط
+      allow update: if isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email', 'phone']);
+    }
+
+    // سجل الالتزام العام للعضو: يُقرأ بالمعرّف فقط (get) عند دعوته، ويكتبه صاحبه فقط
+    match /reliability/{uid} {
+      allow get: if signedIn();
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['pct', 'on', 'due', 'n', 'sup', 'mem', 'show', 'at'])
+        && request.resource.data.show is bool
+        && request.resource.data.get('pct', 0) is int && request.resource.data.get('on', 0) is int && request.resource.data.get('due', 0) is int
+        && request.resource.data.get('n', 0) is int && request.resource.data.get('sup', 0) is int && request.resource.data.get('mem', 0) is int;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /admins/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isOwner();
+    }
+
+    // منع تكرار رقم الجوال
+    match /phones/{phone} {
+      allow get: if signedIn();
+      allow create: if signedIn()
+        && phone.matches('05[0-9]{8}')
+        && request.resource.data.keys().hasOnly(['uid'])
+        && (request.resource.data.uid == request.auth.uid || isOwner());
+      allow update: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && (resource.data.uid == request.auth.uid || isOwner());
+    }
+
+    match /jamiyat/{jid} {
+      // أرشفة الجمعية/التعاون المنتهي وإعادته: منشئه فقط، وفي حقول الأرشفة وحدها
+      allow update: if signedIn() && resource.data.creatorUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['archivedAt','archivedBy','archiveAuto','archiveSkip']);
+
+      allow read: if signedIn() && (request.auth.uid in resource.data.memberUids || resource.data.creatorUid == request.auth.uid || isAdmin());
+
+      allow create: if verified()
+        && request.resource.data.creatorUid == request.auth.uid
+        && (request.resource.data.memberUids == [request.auth.uid] || request.resource.data.memberUids == [])
+        && request.resource.data.count >= 2 && request.resource.data.count <= 30
+        && request.resource.data.get('frequency', 'monthly') in ['monthly', 'tenday', 'biweekly', 'weekly']
+        && request.resource.data.get('type', 'jamiya') in ['jamiya', 'family']
+        // التعاون العائلي: هدف، ونهاية محددة، وآيبان المستفيد بصيغة صحيحة
+        && (request.resource.data.get('type', 'jamiya') != 'family' || (
+              request.resource.data.goal is string && request.resource.data.goal.size() > 0 && request.resource.data.goal.size() <= 120
+              && request.resource.data.get('reasons', '') is string && request.resource.data.get('reasons', '').size() <= 600
+              && request.resource.data.get('mode', 'once') in ['once', 'monthly']
+              && (request.resource.data.get('mode', 'once') == 'monthly'
+                  ? (request.resource.data.monthlyDay is int && request.resource.data.monthlyDay >= 1 && request.resource.data.monthlyDay <= 28
+                     && request.resource.data.targetAmount is number && request.resource.data.targetAmount > 0
+                     && request.resource.data.famStart is string)
+                  : request.resource.data.endAt is timestamp)
+              && request.resource.data.benIban is string && request.resource.data.benIban.matches('^SA[0-9]{22}$')));
+
+      allow update: if signedIn() && (
+        (resource.data.creatorUid == request.auth.uid
+          && request.resource.data.creatorUid == resource.data.creatorUid
+          && request.resource.data.count >= request.resource.data.memberUids.size()
+          && request.resource.data.get('turns', []).size() <= request.resource.data.count
+          && request.resource.data.count <= 30
+          && request.resource.data.get('type', 'jamiya') == resource.data.get('type', 'jamiya')
+          && request.resource.data.get('mode', 'once') == resource.data.get('mode', 'once')
+          && (request.resource.data.get('type', 'jamiya') != 'family' || (
+                request.resource.data.goal is string && request.resource.data.goal.size() > 0 && request.resource.data.goal.size() <= 120
+                && request.resource.data.get('reasons', '') is string && request.resource.data.get('reasons', '').size() <= 600
+                && request.resource.data.benIban is string && request.resource.data.benIban.matches('^SA[0-9]{22}$')))
+          && (resource.data.get('hasConfirmed', false) != true || request.resource.data.get('hasConfirmed', false) == true)
+          && (request.resource.data.get('deputyUid', '') == ''
+              || (request.resource.data.deputyUid in request.resource.data.memberUids
+                  && request.resource.data.deputyUid != request.resource.data.creatorUid)))
+        || (request.auth.uid in resource.data.memberUids
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['modRequest']))
+        || (request.auth.uid in resource.data.memberUids
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['turns', 'lastSwap'])
+          && swapOk(jid))
+        // علامة «سداد مقبول»: أي عضو (المستلم عادةً) يرفعها لتصبح true ولا تُخفض أبداً
+        || (request.auth.uid in resource.data.memberUids
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hasConfirmed'])
+          && request.resource.data.hasConfirmed == true)
+        // الانضمام برابط: يثبت العضو الرمز عبر مستند joins يُنشأ في نفس العملية
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids', 'turns'])
+          && verified()
+          && resource.data.get('joinOpen', false) == true
+          && existsAfter(/databases/$(database)/documents/joins/$(jid + '__' + request.auth.uid + '__' + resource.data.get('joinCode', '')))
+          && !(request.auth.uid in resource.data.memberUids)
+          && request.auth.uid in request.resource.data.memberUids
+          && request.resource.data.memberUids.size() == resource.data.memberUids.size() + 1
+          && request.resource.data.memberUids.size() <= resource.data.count
+          && request.resource.data.get('turns', []).size() <= resource.data.count)
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids', 'turns'])
+          && pendingInviteForMe(jid)
+          && request.auth.uid in request.resource.data.memberUids
+          && request.resource.data.memberUids.size() == resource.data.memberUids.size() + 1
+          && request.resource.data.memberUids.size() <= resource.data.count
+          && request.resource.data.get('turns', []).size() <= resource.data.count)
+      );
+
+      // المشرف لا يحذف الجمعية بعد أول سداد مقبول، والمالك يحذف دائماً
+      allow delete: if signedIn() && (isOwner() || (resource.data.creatorUid == request.auth.uid && resource.data.get('hasConfirmed', false) != true));
+
+      match /members/{uid} {
+        allow read: if isStaffOrMember(jid) || isAdmin();
+        allow delete: if signedIn() && (isOwner() || isCreator(jid));
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && request.auth.uid in getAfter(/databases/$(database)/documents/jamiyat/$(jid)).data.memberUids;
+        allow update: if isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email', 'phone']);
+      }
+
+      match /proofs/{pid} {
+        allow read: if isStaffOrMember(jid) || isAdmin();
+        allow delete: if signedIn() && (isOwner() || isCreator(jid));
+        allow create, update: if isMember(jid)
+          && request.resource.data.uid == request.auth.uid
+          && pid.matches('^[0-9]+_' + request.auth.uid + '(_[0-9]+)?$')
+          && request.resource.data.data is string
+          && request.resource.data.data.size() < 700000;
+      }
+
+      // رغبة الاستلام: يكتبها العضو لنفسه فقط حين يفتح المشرف الباب (wishOpen)، ويقرؤها كل أعضاء الجمعية ومشرفها (مع السبب)
+      match /wishes/{uid} {
+        allow read: if signedIn() && (request.auth.uid == uid || isStaffOrMember(jid) || isAdmin());
+        allow create, update: if isMember(jid) && request.auth.uid == uid
+          && jam(jid).get('wishOpen', false) == true
+          && request.resource.data.keys().hasOnly(['uid', 'text', 'pos', 'updatedAt'])
+          && request.resource.data.uid == uid
+          && request.resource.data.text is string && request.resource.data.text.size() <= 200
+          && request.resource.data.pos is int && request.resource.data.pos >= 0 && request.resource.data.pos <= 30;
+        allow delete: if signedIn() && (
+          (request.auth.uid == uid && jam(jid).get('wishOpen', false) == true)
+          || isCreator(jid) || isOwner());
+      }
+
+      // المشاركون الذين يسجّلهم مشرف التعاون العائلي: يقرؤهم الأعضاء، ويكتبهم المشرف فقط
+      match /guests/{gid} {
+        allow read: if isStaffOrMember(jid) || isAdmin();
+        allow create, update: if isCreator(jid) && jam(jid).get('type', 'jamiya') == 'family'
+          && request.resource.data.keys().hasOnly(['name', 'inviteId', 'linked', 'createdAt'])
+          && request.resource.data.name is string && request.resource.data.name.size() >= 1 && request.resource.data.name.size() <= 60
+          && request.resource.data.get('inviteId', '') is string && request.resource.data.get('linked', '') is string;
+        allow delete: if isCreator(jid) || isOwner();
+      }
+
+      // تعهدات التعاون العائلي: العضو (والمشرف) يحدد مبلغه بنفسه ما دام التعاون مفتوحاً، ويراها أعضاء التعاون
+      match /pledges/{uid} {
+        allow read: if isMember(jid) || isAdmin();
+        allow create, update: if isMember(jid) && request.auth.uid == uid
+          && jam(jid).get('type', 'jamiya') == 'family'
+          && jam(jid).get('closed', false) != true
+          && request.time <= jam(jid).get('endAt', request.time)
+          && request.resource.data.keys().hasOnly(['uid', 'amount', 'from', 'updatedAt', 'hist', 'chk'])
+          && request.resource.data.get('chk', 0) is int && request.resource.data.get('hist', []) is list && request.resource.data.get('hist', []).size() <= 120
+          && request.resource.data.uid == uid
+          && request.resource.data.amount is number && request.resource.data.amount >= 1 && request.resource.data.amount <= 10000000
+          // الاشتراك الشهري الثابت إن حدده المشرف
+          && request.resource.data.amount == jam(jid).get('monthlyAmount', request.resource.data.amount)
+          && request.resource.data.get('from', 0) is int && request.resource.data.get('from', 0) >= 0 && request.resource.data.get('from', 0) <= 1200
+          && (resource == null || request.resource.data.get('from', 0) == resource.data.get('from', 0));
+        // المشرف يسجّل تعهد مشارك لم يدخل التطبيق
+        allow create, update: if isCreator(jid) && isGuest(jid, uid)
+          && jam(jid).get('type', 'jamiya') == 'family'
+          && jam(jid).get('closed', false) != true
+          && request.resource.data.keys().hasOnly(['uid', 'amount', 'from', 'updatedAt', 'hist', 'chk'])
+          && request.resource.data.get('chk', 0) is int && request.resource.data.get('hist', []) is list && request.resource.data.get('hist', []).size() <= 120
+          && request.resource.data.uid == uid
+          && request.resource.data.amount is number && request.resource.data.amount >= 1 && request.resource.data.amount <= 10000000
+          && request.resource.data.amount == jam(jid).get('monthlyAmount', request.resource.data.amount)
+          && request.resource.data.get('from', 0) is int && request.resource.data.get('from', 0) >= 0 && request.resource.data.get('from', 0) <= 1200;
+        allow delete: if signedIn() && (
+          (request.auth.uid == uid && jam(jid).get('closed', false) != true)
+          || (isCreator(jid) && isGuest(jid, uid) && jam(jid).get('closed', false) != true)
+          || isOwner() || (isCreator(jid) && jam(jid).get('hasConfirmed', false) != true));
+      }
+
+      // سجل النشاط: يضيف الأعضاء أحداثهم فقط، ولا تعديل عليه، ولا يحذفه المشرف بعد أول سداد مقبول
+      match /log/{lid} {
+        allow read: if isStaffOrMember(jid) || isAdmin();
+        allow create: if isStaffOrMember(jid)
+          && request.resource.data.keys().hasOnly(['uid', 'type', 'text', 'createdAt'])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.type is string && request.resource.data.type.size() <= 12
+          && request.resource.data.text is string && request.resource.data.text.size() <= 200
+          && request.resource.data.createdAt == request.time;
+        allow delete: if signedIn() && (isOwner() || (isCreator(jid) && jam(jid).get('hasConfirmed', false) != true));
+      }
+
+      // دردشة الجمعية: يكتب الأعضاء فقط حين يفتحها المشرف (chatOpen)، والمشرف يحذف الرسائل
+      match /chat/{mid} {
+        allow read: if isStaffOrMember(jid) || isAdmin();
+        allow create: if isMember(jid)
+          && jam(jid).get('chatOpen', false) == true
+          && request.resource.data.keys().hasOnly(['uid', 'text', 'createdAt'])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500
+          && request.resource.data.createdAt == request.time;
+        allow delete: if signedIn() && (isCreator(jid) || isOwner());
+      }
+
+      // طلب سهم إضافي: العضو يطلب لنفسه، والمشرف يوافق (يعدّل turns) ويحذف الطلب
+      match /shareReqs/{uid} {
+        allow read: if signedIn() && (request.auth.uid == uid || isCreator(jid) || isAdmin());
+        allow create, update: if isMember(jid) && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['uid', 'extra', 'createdAt'])
+          && request.resource.data.uid == uid
+          && request.resource.data.extra is int && request.resource.data.extra >= 1 && request.resource.data.extra <= 10;
+        allow delete: if signedIn() && (request.auth.uid == uid || isCreator(jid) || isOwner());
+      }
+
+      // طلب تبديل دور بين عضوين
+      match /swapReqs/{rid} {
+        allow read: if signedIn() && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid || isCreator(jid) || isAdmin());
+        allow create: if isMember(jid)
+          && request.resource.data.keys().hasOnly(['fromUid', 'toUid', 'fromIdx', 'toIdx', 'lo', 'hi', 'status', 'createdAt'])
+          && request.resource.data.fromUid == request.auth.uid
+          && request.resource.data.toUid != request.auth.uid
+          && request.resource.data.toUid in jam(jid).memberUids
+          && request.resource.data.status == 'pending'
+          && request.resource.data.fromIdx is int && request.resource.data.toIdx is int
+          && request.resource.data.lo is int && request.resource.data.hi is int
+          && request.resource.data.lo >= 0 && request.resource.data.lo < request.resource.data.hi
+          && ((request.resource.data.fromIdx == request.resource.data.lo && request.resource.data.toIdx == request.resource.data.hi)
+              || (request.resource.data.fromIdx == request.resource.data.hi && request.resource.data.toIdx == request.resource.data.lo))
+          && jam(jid).turns[request.resource.data.fromIdx] == request.auth.uid
+          && jam(jid).turns[request.resource.data.toIdx] == request.resource.data.toUid;
+        allow delete: if signedIn() && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid || isCreator(jid) || isOwner());
+      }
+
+      match /payments/{pid} {
+        allow read: if isStaffOrMember(jid) || isAdmin();
+        allow delete: if signedIn() && (isOwner() || isCreator(jid));
+        allow create: if (
+            (isMember(jid)
+              && request.resource.data.uid == request.auth.uid
+              && pid.matches('^[0-9]+_' + request.auth.uid + '(_[0-9]+)?$'))
+            || (isCreator(jid) && isGuest(jid, request.resource.data.uid)
+              && pid.matches('^[0-9]+_' + request.resource.data.uid + '(_[0-9]+)?$'))
+          )
+          && request.resource.data.status == 'pending'
+          && request.resource.data.amount is number && request.resource.data.amount > 0
+          // لا مساهمات بعد إغلاق التعاون أو انتهاء مدته
+          && jam(jid).get('closed', false) != true
+          && request.time <= jam(jid).get('endAt', request.time);
+        allow update: if signedIn() && (
+          ((resource.data.recipientUid == request.auth.uid || isCreator(jid))
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
+          || (resource.data.uid == request.auth.uid && resource.data.status == 'pending'
+            && request.resource.data.status == 'pending')
+        );
+      }
+    }
+
+    // إثبات الانضمام برابط: المعرّف jid__uid__code ويُنشأ فقط بالرمز الحالي والرابط مفعّل
+    match /joins/{jid_uid_code} {
+      allow create, update: if verified()
+        && request.resource.data.keys().hasOnly(['jid', 'uid', 'code', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.code is string && request.resource.data.code.size() >= 8
+        && jid_uid_code == request.resource.data.jid + '__' + request.auth.uid + '__' + request.resource.data.code
+        && jam(request.resource.data.jid).get('joinOpen', false) == true
+        && jam(request.resource.data.jid).get('joinCode', '') == request.resource.data.code;
+      allow delete: if signedIn() && (resource.data.uid == request.auth.uid || isOwner());
+    }
+
+    // معاينة رابط الانضمام: يقرأها من يعرف الرمز (get فقط، بلا قائمة)، ويكتبها مشرف الجمعية
+    match /joinLinks/{code} {
+      allow get: if true; // رمز غير قابل للتخمين، والبيانات اسم الجمعية وقسطها فقط
+      allow create: if signedIn() && code.size() >= 8
+        && request.resource.data.keys().hasOnly(['jid', 'creatorUid', 'creatorName', 'name', 'amount', 'count', 'frequency', 'type', 'goal', 'endDate', 'open', 'updatedAt'])
+        && request.resource.data.creatorUid == request.auth.uid
+        && jamA(request.resource.data.jid).creatorUid == request.auth.uid
+        && jamA(request.resource.data.jid).get('joinCode', '') == code;
+      allow update: if signedIn() && resource.data.creatorUid == request.auth.uid
+        && request.resource.data.creatorUid == resource.data.creatorUid
+        && request.resource.data.jid == resource.data.jid
+        && request.resource.data.keys().hasOnly(['jid', 'creatorUid', 'creatorName', 'name', 'amount', 'count', 'frequency', 'type', 'goal', 'endDate', 'open', 'updatedAt']);
+      allow delete: if signedIn() && (resource.data.creatorUid == request.auth.uid || isOwner());
+    }
+
+    // الدعوات: المعرّف = jid__p{جوال}  أو  jid__{بريد}
+    match /invites/{iid} {
+      allow read: if isOwner() || signedIn() && (
+        resource.data.creatorUid == request.auth.uid
+        || resource.data.invitedBy == request.auth.uid
+        || (verified() && (emailIs(resource.data.email) || phoneIs(resource.data.phone))));
+
+      allow create: if signedIn()
+        && request.resource.data.invitedBy == request.auth.uid
+        && request.resource.data.creatorUid == jam(request.resource.data.jamiyaId).creatorUid
+        && (isCreator(request.resource.data.jamiyaId) || isDeputy(request.resource.data.jamiyaId))
+        && request.resource.data.status == 'pending'
+        && (
+          (request.resource.data.phone is string
+            && request.resource.data.phone.matches('05[0-9]{8}')
+            && iid == request.resource.data.jamiyaId + '__p' + request.resource.data.phone)
+          || (request.resource.data.email is string && request.resource.data.email != ''
+            && iid == request.resource.data.jamiyaId + '__' + request.resource.data.email)
+        );
+
+      allow update: if signedIn() && (
+        resource.data.creatorUid == request.auth.uid
+        || (resource.data.invitedBy == request.auth.uid && isDeputy(resource.data.jamiyaId)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
+        || (verified()
+            && (emailIs(resource.data.email) || phoneIs(resource.data.phone))
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])));
+
+      allow delete: if isOwner() || (signedIn() && (resource.data.creatorUid == request.auth.uid
+        || (resource.data.invitedBy == request.auth.uid && isDeputy(resource.data.jamiyaId))));
+    }
+
+    // إشعار دين (jid = db:{id}): المرسل والمستلم كلاهما طرف في الدين
+    function dbNotifOk(did) {
+      return exists(/databases/$(database)/documents/debts/$(did))
+        && (get(/databases/$(database)/documents/debts/$(did)).data.creatorUid == request.auth.uid
+            || get(/databases/$(database)/documents/debts/$(did)).data.counterUid == request.auth.uid)
+        && (request.resource.data.toUid == get(/databases/$(database)/documents/debts/$(did)).data.creatorUid
+            || request.resource.data.toUid == get(/databases/$(database)/documents/debts/$(did)).data.counterUid);
+    }
+    // إشعار قطة (jid = qt:{id}): المرسل والمستلم كلاهما عضو في القطة أو مشرفها
+    function qtNotifOk(qid) {
+      return exists(/databases/$(database)/documents/qattahs/$(qid))
+        && (request.auth.uid in get(/databases/$(database)/documents/qattahs/$(qid)).data.memberUids
+            || get(/databases/$(database)/documents/qattahs/$(qid)).data.adminUid == request.auth.uid)
+        && (request.resource.data.toUid in get(/databases/$(database)/documents/qattahs/$(qid)).data.memberUids
+            || request.resource.data.toUid == get(/databases/$(database)/documents/qattahs/$(qid)).data.adminUid);
+    }
+
+    // ===== الإشعارات: مستند لكل مستلم، يقرأه ويحذفه صاحبه فقط =====
+    match /notifs/{id} {
+      allow read, delete: if signedIn() && resource.data.toUid == request.auth.uid;
+      allow update: if signedIn() && resource.data.toUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read','pushed','delivered','ack']);
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['toUid','fromUid','title','body','jid','kind','tag','createdAt','pushed','read'])
+        && request.resource.data.get('pushed', false) == false && request.resource.data.get('read', false) == false
+        && request.resource.data.keys().hasAll(['toUid','fromUid','title','body','kind'])
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.toUid is string && request.resource.data.title is string && request.resource.data.body is string
+        && request.resource.data.title.size() <= 100 && request.resource.data.body.size() <= 500
+        && (isAdmin()
+          || (request.resource.data.jid is string && request.resource.data.jid != ''
+              && !request.resource.data.jid.matches('^(db|qt):.*')
+              && (request.auth.uid in jamA(request.resource.data.jid).memberUids || request.auth.uid == jamA(request.resource.data.jid).creatorUid)
+              && (request.resource.data.toUid in jamA(request.resource.data.jid).memberUids || request.resource.data.toUid == jamA(request.resource.data.jid).creatorUid)
+              && (request.resource.data.kind != 'custom' || jamA(request.resource.data.jid).creatorUid == request.auth.uid))
+          // الديون: الإشعار بين طرفي الدين فقط
+          || (request.resource.data.jid is string && request.resource.data.jid.matches('^db:.+')
+              && request.resource.data.kind != 'custom'
+              && dbNotifOk(request.resource.data.jid.split(':')[1]))
+          // القطة: الإشعار بين أعضاء القطة ومشرفها فقط
+          || (request.resource.data.jid is string && request.resource.data.jid.matches('^qt:.+')
+              && request.resource.data.kind != 'custom'
+              && qtNotifOk(request.resource.data.jid.split(':')[1])));
+    }
+
+    // ===== لوحة المالك: التتبع والإدارة =====
+    match /activity/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow write: if signedIn() && request.auth.uid == uid;
+    }
+    match /events/{id} {
+      allow read: if isAdmin();
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+    }
+    match /stats/{day} {
+      allow read: if isAdmin();
+      allow create: if request.resource.data.keys().hasOnly(['day','visits','pv','logins','dau','regs','pwa','dev','os','br','src','hours','views']);
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['day','visits','pv','logins','dau','regs','pwa','dev','os','br','src','hours','views']);
+    }
+    match /blocked/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow write: if isAdmin();
+    }
+    match /admin_notes/{id} {
+      allow read, write: if isAdmin();
+    }
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}
