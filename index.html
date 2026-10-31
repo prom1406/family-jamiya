@@ -933,7 +933,7 @@ const BANKS = ["مصرف الراجحي","البنك الأهلي السعودي
 
 /* ============ الحالة ============ */
 const state = {
-  user: null, profile: null, isAdmin: false, view: 'loading', authMode: (function () { try { return (IS_NATIVE || localStorage.getItem('jm_email')) ? 'login' : 'phone'; } catch (e) { return 'login'; } })(), phoneStep: (function () { try { return localStorage.getItem('jm_phone_pw') ? 'pw' : 'phone'; } catch (e) { return 'phone'; } })(), _phoneName: '', _phoneLabel: '',
+  user: null, profile: null, isAdmin: false, view: 'loading', authMode: (function () { try { return (IS_NATIVE || localStorage.getItem('jm_email')) ? 'login' : 'phone'; } catch (e) { return 'login'; } })(), phoneStep: (function () { try { return localStorage.getItem('jm_phone_pw') ? 'pw' : 'reg'; } catch (e) { return 'reg'; } })(), _phoneName: '', _phoneLabel: '',
   jamiyat: [], invites: [], activeId: null, j: null, members: {}, payments: [], jInvites: [],
   admin: { jamiyat: [], users: [], qattahs: [] }, unsubs: [], jUnsubs: [], pays: {}, payLs: {}, afterOpen: null
 };
@@ -978,9 +978,18 @@ const normPhone = s => {
   return d;
 };
 const validPhone = s => /^05\d{8}$/.test(String(s || '').trim());
-// الجوال «المُتحقَّق منه» هو رقم حساب Firebase نفسه (رمز SMS)، لا الرقم المكتوب في الملف الشخصي
-const phone05FromUser = u => { const d = String((u && u.phoneNumber) || '').replace(/\D/g, ''); return /^9665\d{8}$/.test(d) ? '0' + d.slice(3) : ''; };
-// الحساب موثَّق إن فعّل بريده، أو وثّق جواله السعودي بالرمز
+// الجوال «المعتمد»: يُعتمد تلقائياً بمجرد إدخاله في الملف الشخصي دون أي رسالة SMS (الرسائل مكلفة).
+// يمنع تكراره حجزُه في phones/{الرقم}، وتتحقق القواعد من أن الحجز لصاحب الحساب نفسه.
+// ويبقى مقبولاً رقم الحسابات القديمة التي وثّقته برمز SMS (phoneNumber في حساب Firebase).
+const tokenPhone05 = u => { const d = String((u && u.phoneNumber) || '').replace(/\D/g, ''); return /^9665\d{8}$/.test(d) ? '0' + d.slice(3) : ''; };
+// رقم الجوال الذي سُجّل به الحساب (البريد الداخلي رقم@phone.siwaa.app)، يُستخدم لتعبئة الملف الشخصي عند الإنشاء فقط
+const mailPhone05 = u => { const e = lc(u && u.email), d = e.endsWith('@phone.siwaa.app') ? e.slice(0, -'@phone.siwaa.app'.length) : ''; return /^05\d{8}$/.test(d) ? d : ''; };
+const accountPhone05 = u => tokenPhone05(u) || mailPhone05(u);
+const phone05FromUser = u => {
+  const p = (u && state.user && state.profile && u.uid === state.user.uid && !state._phoneTaken) ? normPhone(state.profile.phone) : '';
+  return validPhone(p) ? p : tokenPhone05(u);
+};
+// الحساب معتمد إن فعّل بريده، أو أدخل جوالاً سعودياً (يُعتمد تلقائياً)
 const isVerified = u => !!u && (!!u.emailVerified || !!phone05FromUser(u));
 // Firebase يسجّل الدخول بكلمة المرور عبر البريد فقط: لحساب الجوال بريد داخلي ثابت لا يظهر ولا يُرسل إليه شيء
 const PHONE_MAIL = '@phone.siwaa.app';
@@ -1167,7 +1176,7 @@ const needsPay = (c, u) => (u !== c.recUid || sharesOf(c.turns, u) > 1) && c.acc
 auth.onAuthStateChanged(async user => { if (state._registering) return; await bootUser(user); });
 async function bootUserFull(user) {
   cleanup(state.unsubs); cleanup(state.jUnsubs); stopPayListeners(); state.pays = {}; stopBlockWatch(); stopHeartbeat(); state._tv = null; stopQattah(); stopDebts();
-  state.user = user; state.profile = null; state.isAdmin = false; state._restoreTried = false;
+  state.user = user; state.profile = null; state.isAdmin = false; state._restoreTried = false; state._phoneTaken = false;
   state.jamiyat = []; state.jamiyatArch = []; state.invites = [];
   if (!user) { unlock(); state.view = 'auth'; return render(); }
 
@@ -1188,7 +1197,7 @@ async function bootUserFull(user) {
   if (!state.profile && user.displayName) { if (!(await autoProfile(user, user.displayName))) return; }
   if (!state.profile) { state.view = 'complete'; return render(); }
   maybeLock(true); watchBlocked(); trackSession(); renderBanner();
-  claimPhone(user.uid, state.profile.phone);
+  state._phoneTaken = !(await claimPhone(user.uid, normPhone(state.profile.phone))); // قبل المستمعين: القواعد تعتمد الجوال المحجوز لصاحبه
   startListeners();
   startQattahListeners();
   startDebtListeners();
@@ -1208,8 +1217,15 @@ async function saveProfileWithPhone(uid, data, mode, oldPhone) {
     if (mode === 'update') t.update(userRef, data); else t.set(userRef, data);
   });
 }
-async function claimPhone(uid, phone) { // للحسابات القديمة: يحجز رقمها بصمت إن لم يكن محجوزاً
-  try { if (!validPhone(phone)) return; const r = db.collection('phones').doc(phone); const x = await r.get(); if (!x.exists) await r.set({ uid }); } catch (e) {}
+// يحجز رقم الحساب بصمت إن لم يكن محجوزاً (للحسابات القديمة). يُرجع false فقط إن كان محجوزاً لحساب آخر،
+// وحينها لا يُعتمد الرقم لهذا الحساب ويُطلب منه رقم آخر
+async function claimPhone(uid, phone) {
+  try {
+    if (!validPhone(phone)) return true;
+    const r = db.collection('phones').doc(phone), x = await r.get();
+    if (!x.exists) { await r.set({ uid }); return true; }
+    return x.data().uid === uid;
+  } catch (e) { return true; }
 }
 const PHONE_TAKEN_MSG = 'رقم الجوال هذا مسجّل مسبقاً بحساب آخر';
 const phoneSaveErr = e => e && e.message === 'PHONE_TAKEN' ? PHONE_TAKEN_MSG : (e && e.code === 'permission-denied' ? 'تعذر حجز رقم الجوال: انشر قواعد Firestore الجديدة (مجموعة phones) ثم أعد المحاولة' : (e && e.message) || 'خطأ غير معروف');
@@ -1259,12 +1275,12 @@ function startListeners() {
 // إنشاء الملف الشخصي تلقائياً بالحد الأدنى (الاسم والبريد)، وباقي البيانات تُطلب عند الحاجة فقط
 // حساب جوال لا يحق له الدخول (رقم محجوز لحساب آخر): نحذفه حتى لا يبقى يتيماً
 async function discardPhoneAccount() {
-  try { if (auth.currentUser && !auth.currentUser.email) await auth.currentUser.delete(); } catch (e) {}
+  try { if (auth.currentUser && (!auth.currentUser.email || mailPhone05(auth.currentUser))) await auth.currentUser.delete(); } catch (e) {}
   await auth.signOut().catch(() => {});
 }
 async function autoProfile(u, name) {
   if (state.settings.regClosed && !state.isAdmin) { toast(state.settings.regMsg || 'التسجيل الجديد متوقف مؤقتاً', 'error'); await auth.signOut().catch(() => {}); return false; }
-  const ph = phone05FromUser(u);
+  const ph = accountPhone05(u); // رقم تسجيل الجوال (يُعتمد تلقائياً ويُحجز أدناه)، وفارغ لمن دخل بالبريد أو جوجل فيُطلب منه لاحقاً
   const profile = { name, email: realEmail(u), phone: ph, bank: '', iban: '', waOptIn: false, nick: '', showAs: 'name', showPhone: false, showEmail: false, avatar: u.photoURL || '', ownerNotified: false, createdAt: FV.serverTimestamp() };
   let existing = null;
   try {
@@ -1275,7 +1291,7 @@ async function autoProfile(u, name) {
       t.set(ref, profile);
     });
   } catch (e) {
-    if (e.message === 'PHONE_TAKEN') { toast(PHONE_TAKEN_MSG + '. ادخل بحسابك بالبريد وأضف جوالك من الملف الشخصي', 'error'); await discardPhoneAccount(); return false; }
+    if (e.message === 'PHONE_TAKEN') { toast(PHONE_TAKEN_MSG + '. إن كان رقمك فادخل بحسابك السابق (بالجوال وكلمة المرور أو بالبريد)', 'error'); await discardPhoneAccount(); return false; }
     toast('تعذر إنشاء الحساب: ' + e.message, 'error'); return false;
   }
   if (existing) { state.profile = existing; return true; }
@@ -1299,6 +1315,27 @@ async function doRegister(f) {
     await bootUser(auth.currentUser); // ندخل مباشرة دون شاشة تحقق ولا إعادة تسجيل دخول
     toast('أهلاً بك! أرسلنا رابط تفعيل إلى بريدك', 'success');
   } catch (e) { state._registering = false; btn.disabled = false; toast(authErr(e), 'error'); }
+}
+// تسجيل حساب جديد برقم الجوال وكلمة مرور: بلا رسالة SMS. الرقم يُعتمد تلقائياً، ويمنع تكراره حجزُه في phones
+// (وتمنعه Firebase أيضاً عبر البريد الداخلي رقم@phone.siwaa.app)
+async function doPhoneRegister(f) {
+  if (state.settings.regClosed) return toast(state.settings.regMsg || 'التسجيل الجديد متوقف مؤقتاً', 'error');
+  const name = f.name.value.trim(), p = normPhone(f.phone.value), pass = f.password.value;
+  if (name.length < 3) return toast('اكتب اسمك (3 أحرف على الأقل)', 'error');
+  if (!validPhone(p)) return toast('رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
+  if (pass.length < 6) return toast('كلمة المرور 6 أحرف على الأقل', 'error');
+  const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+  state._registering = true;
+  try {
+    const cred = await auth.createUserWithEmailAndPassword(phoneLoginEmail(p), pass);
+    await cred.user.updateProfile({ displayName: name }).catch(() => {});
+    lsSet('jm_phone_pw', '1');
+    state._registering = false;
+    await bootUser(auth.currentUser); // ينشئ الملف الشخصي ويحجز الرقم (فإن كان محجوزاً لحساب آخر يُلغى الحساب الجديد)
+  } catch (e) {
+    state._registering = false; btn.disabled = false;
+    toast(e.code === 'auth/email-already-in-use' ? PHONE_TAKEN_MSG + '. إن كان رقمك فادخل بكلمة المرور (الرابط أسفل النموذج)' : authErr(e), 'error');
+  }
 }
 async function doLogin(f) {
   const email = lc(f.email.value);
@@ -1440,7 +1477,7 @@ function needVerified(next) {
   state._afterVerify = next;
   showModal('فعّل بريدك أولاً', `<div class="space-y-3 text-center"><div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl"><i class="fa-solid fa-envelope-circle-check"></i></div>
     <p class="text-xs text-slate-600 leading-relaxed">لحماية حسابك وأموال الأعضاء نفعّل بريدك مرة واحدة فقط. أرسلنا الرابط إلى <b dir="ltr">${esc(state.user.email)}</b>، افتحه ثم عد واضغط «تم التفعيل».</p>
-    <button class="btn b-pri w-full py-3" data-act="verify-check">تم التفعيل، تابع</button><button class="btn b-sec w-full" data-act="verify-resend">إعادة إرسال الرابط</button><button class="btn b-sec w-full" data-act="phone-verify"><i class="fa-solid fa-mobile-screen"></i> أو وثّق جوالك بدلاً من البريد</button></div>`);
+    <button class="btn b-pri w-full py-3" data-act="verify-check">تم التفعيل، تابع</button><button class="btn b-sec w-full" data-act="verify-resend">إعادة إرسال الرابط</button><button class="btn b-sec w-full" data-act="phone-verify"><i class="fa-solid fa-mobile-screen"></i> أو أدخل جوالك (يُعتمد مباشرة)</button></div>`);
 }
 async function verifyCheckAction() {
   await softVerifyCheck(true);
@@ -1450,11 +1487,11 @@ function verifyBanner() {
   if (!state.user || isVerified(state.user)) return '';
   return `<div class="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs space-y-2"><p class="font-black text-amber-900"><i class="fa-solid fa-envelope-circle-check"></i> فعّل بريدك لتنضم أو تنشئ جمعية</p>
     <p class="text-amber-800 leading-relaxed">أرسلنا رابط التفعيل إلى <b dir="ltr">${esc(state.user.email)}</b>. افتحه ثم ارجع هنا وسيُحدَّث تلقائياً.</p>
-    <div class="flex gap-2"><button class="btn b-pri flex-1" data-act="verify-check">تم التفعيل</button><button class="btn b-sec flex-1" data-act="verify-resend">إعادة الإرسال</button></div><button class="btn b-sec w-full" data-act="phone-verify"><i class="fa-solid fa-mobile-screen"></i> وثّق جوالك بدلاً من البريد</button></div>`;
+    <div class="flex gap-2"><button class="btn b-pri flex-1" data-act="verify-check">تم التفعيل</button><button class="btn b-sec flex-1" data-act="verify-resend">إعادة الإرسال</button></div><button class="btn b-sec w-full" data-act="phone-verify"><i class="fa-solid fa-mobile-screen"></i> أدخل جوالك بدلاً من البريد (يُعتمد مباشرة)</button></div>`;
 }
 
-/* ---- توثيق الجوال بديلاً عن البريد: رمز SMS يُربط بحساب الدخول الحالي فيُعدّ الحساب موثّقاً ---- */
-let phoneVerifier = null;
+/* ---- اعتماد الجوال: يُدخل الرقم فيُعتمد مباشرة دون رسالة SMS (يمنع التكرارَ حجزُه في phones) ---- */
+// مساعدات الإرسال التالية (المهلة، الجوال الأصلي، رسائل الأخطاء) لا يستخدمها إلا مسار الدخول القديم برمز SMS للحسابات القديمة
 // مهلة لعمليات الجوال: إن علق reCAPTCHA أو الشبكة يظهر سبب واضح بدل انتظار بلا نهاية
 const withTimeout = (p, ms = 25000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error('timeout'), { code: 'auth/client-timeout' })), ms))]);
 // داخل تطبيق iOS لا يعمل reCAPTCHA الويب (النطاق capacitor://localhost)، فيُرسَل الرمز عبر Firebase الأصلي
@@ -1491,75 +1528,32 @@ const phoneAuthErr = e => ({
 }[e && e.code]) || (e && e.message === 'PHONE_TAKEN' ? PHONE_TAKEN_MSG : authErr(e) + (e && e.code ? ' [' + e.code + ']' : ''));
 function openPhoneVerify() {
   if (!state.user) return;
-  showModal('وثّق جوالك', `<div class="space-y-3">
-    <p class="text-xs text-slate-600 leading-relaxed">أرسل رمز تحقق إلى جوالك. بعد التوثيق لا تحتاج تفعيل البريد.</p>
-    <form id="f-phone-send" class="space-y-3">
-      <input name="phone" class="inp" dir="ltr" type="tel" inputmode="numeric" autocomplete="tel" placeholder="05xxxxxxxx" value="${esc(normPhone(state.profile && state.profile.phone))}" required>
-      <div id="pv-recaptcha"></div>
-      <button class="btn b-pri w-full py-3" type="submit">أرسل الرمز</button>
-    </form>
-    <form id="f-phone-code" class="space-y-3 hide">
-      <input name="code" class="inp" dir="ltr" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="رمز التحقق" required>
-      <button class="btn b-pri w-full py-3" type="submit">تأكيد</button>
-    </form></div>`);
+  showModal('رقم جوالك', `<form id="f-phone-set" class="space-y-3">
+    <p class="text-xs text-slate-600 leading-relaxed">اكتب رقم جوالك وسيُعتمد مباشرة دون رسالة تحقق. تصلك به دعوات الجمعيات المرسلة إلى رقمك، ولا يمكن لحسابين استخدام الرقم نفسه.</p>
+    <input name="phone" class="inp" dir="ltr" type="tel" inputmode="numeric" autocomplete="tel" placeholder="05xxxxxxxx" value="${esc(normPhone(state.profile && state.profile.phone))}" required>
+    <button class="btn b-pri w-full py-3" type="submit">حفظ واعتماد الرقم</button></form>`);
 }
-async function sendPhoneCode(f) {
+async function savePhoneNumber(f) {
   const p = normPhone(f.phone.value), btn = f.querySelector('button[type=submit]');
   if (!validPhone(p)) return toast('رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام', 'error');
+  if (!state.user || !state.profile) return;
+  const old = normPhone(state.profile.phone);
+  if (old === p && !state._phoneTaken) { toast('هذا هو رقمك المعتمد حالياً', 'info'); return; }
   btn.disabled = true;
   try {
-    if (phone05FromUser(auth.currentUser) === p) { toast('هذا هو رقمك الموثّق الحالي', 'info'); btn.disabled = false; return; }
-    const e164 = '+966' + p.slice(1), changing = !!phone05FromUser(auth.currentUser);
-    if (useNativePhone()) {
-      const vid = await nativeSendCode(e164);
-      const cred = code => firebase.auth.PhoneAuthProvider.credential(vid, code);
-      state._phoneConf = { confirm: code => changing ? auth.currentUser.updatePhoneNumber(cred(code)) : auth.currentUser.linkWithCredential(cred(code)) };
-    } else {
-    phoneVerifier = freshRecaptcha(phoneVerifier, 'pv-recaptcha');
-    if (phone05FromUser(auth.currentUser)) { // تغيير رقم موثّق
-      const vid = await withTimeout(new firebase.auth.PhoneAuthProvider().verifyPhoneNumber('+966' + p.slice(1), phoneVerifier));
-      state._phoneConf = { confirm: code => auth.currentUser.updatePhoneNumber(firebase.auth.PhoneAuthProvider.credential(vid, code)) };
-    } else state._phoneConf = await withTimeout(auth.currentUser.linkWithPhoneNumber('+966' + p.slice(1), phoneVerifier));
-    }
-    state._phoneP = p;
-    f.classList.add('hide'); $('f-phone-code').classList.remove('hide');
-    toast('أرسلنا رمز التحقق إلى جوالك', 'success');
-  } catch (e) {
-    toast(phoneAuthErr(e), 'error');
-    if (phoneVerifier) { try { phoneVerifier.clear(); } catch (_) {} phoneVerifier = null; }
-  } finally { btn.disabled = false; }
-}
-async function confirmPhoneCode(f) {
-  const btn = f.querySelector('button[type=submit]');
-  if (!state._phoneConf) return toast('أرسل الرمز أولاً', 'error');
-  btn.disabled = true;
-  try {
-    await state._phoneConf.confirm(f.code.value.trim());
-    await auth.currentUser.getIdToken(true); // ليحمل الرمز مطالبة رقم الجوال قبل كتابة الملف الشخصي
-    state.user = auth.currentUser; state._phoneConf = null;
-    const p = state._phoneP, old = state.profile && state.profile.phone;
-    if (state.profile && normPhone(old) !== p) {
-      await saveProfileWithPhone(state.user.uid, { phone: p }, 'update', validPhone(old) ? old : null);
-      state.profile = { ...state.profile, phone: p };
-    }
-    cleanup(state.unsubs); if (state.profile) startListeners();
-    closeModal(); toast('تم توثيق جوالك ✓', 'success');
+    await saveProfileWithPhone(state.user.uid, { phone: p }, 'update', validPhone(old) ? old : null);
+    state.profile = { ...state.profile, phone: p }; state._phoneTaken = false;
+    // نسخة الجوال داخل ملف عضويتك في جمعياتك تتبع الرقم الجديد
+    await Promise.all((state.jamiyat || []).map(j => db.collection('jamiyat').doc(j.id).collection('members').doc(state.user.uid).update({ phone: p }).catch(() => {})));
+    cleanup(state.unsubs); startListeners();
+    closeModal(); toast('تم اعتماد جوالك ✓', 'success');
     const n = state._afterVerify; state._afterVerify = null;
     if (n) n(); else render();
-  } catch (e) {
-    // الجوال مسجّل مسبقاً بحساب آخر: نعرض الدخول بذلك الحساب بدل رسالة خطأ تقنية
-    const cred = e && (e.credential || (firebase.auth.PhoneAuthProvider.credentialFromError && firebase.auth.PhoneAuthProvider.credentialFromError(e)));
-    if (e && ['auth/credential-already-in-use', 'auth/account-exists-with-different-credential'].includes(e.code) && cred) {
-      if (confirm('هذا الجوال مسجّل بحساب سِواء آخر. هل تريد الدخول بذلك الحساب بدلاً من الحساب الحالي؟')) {
-        try { state._phoneConf = null; await auth.signInWithCredential(cred); closeModal(); }
-        catch (e2) { toast(phoneAuthErr(e2), 'error'); }
-      }
-    } else toast(phoneAuthErr(e), 'error');
-  }
+  } catch (e) { toast(phoneSaveErr(e), 'error'); }
   finally { btn.disabled = false; }
 }
 
-/* ---- الدخول/التسجيل برقم الجوال من شاشة الدخول: رمز SMS يكفي، والبريد اختياري ---- */
+/* ---- الدخول القديم برمز SMS: للحسابات القديمة بلا كلمة مرور فقط (التسجيل الجديد بالجوال وكلمة المرور دون رسائل) ---- */
 let authVerifier = null;
 // reCAPTCHA لا يُرسم مرتين في العنصر نفسه: نُزيل القديم ونستبدله بعنصر جديد لكل محاولة
 function freshRecaptcha(oldVerifier, wrapperId) {
@@ -1611,7 +1605,7 @@ async function submitPwLogin(f) {
   try { await auth.signInWithEmailAndPassword(phoneLoginEmail(p), f.password.value); lsSet('jm_phone_pw', '1'); }
   catch (e) {
     const wrong = ['auth/invalid-credential', 'auth/invalid-login-credentials', 'auth/wrong-password', 'auth/user-not-found'].includes(e.code);
-    toast(wrong ? 'الجوال أو كلمة المرور غير صحيحة. إن لم تنشئ كلمة مرور بعد فادخل برمز SMS' : authErr(e), 'error');
+    toast(wrong ? 'الجوال أو كلمة المرور غير صحيحة. إن كان حسابك قديماً بلا كلمة مرور فاختر «لديّ حساب قديم بدون كلمة مرور»' : authErr(e), 'error');
   } finally { btn.disabled = false; }
 }
 // إنشاء كلمة المرور بعد أول دخول برمز SMS (يُربط بالحساب نفسه دون حساب جديد)
@@ -1718,8 +1712,8 @@ async function handleInvite(f) {
   } catch (e) { toast('تعذر إنشاء الدعوة: ' + e.message, 'error'); }
 }
 function inviteText(i, forEmail = false) {
-  const who = i.phone ? `رقم جوالك (${i.phone}) بعد توثيقه` : `هذا البريد (${i.email})`;
-  const verifyNote = i.phone ? '\n\n⚠️ مهم: لا تظهر هذه الدعوة إلا بعد توثيق رقم جوالك برمز SMS. بعد تسجيل الدخول اضغط: حسابي ← بياناتي ← وثّق جوالك، وأدخل الرقم نفسه.' : '';
+  const who = i.phone ? `رقم جوالك (${i.phone})` : `هذا البريد (${i.email})`;
+  const verifyNote = i.phone ? '\n\n⚠️ مهم: سجّل برقم الجوال نفسه ليظهر لك طلب الانضمام تلقائياً.' : '';
   return `السلام عليكم ${i.name}،\nدعاك ${i.inviterName} ${i.family ? 'للمشاركة في تعاون عائلي "' + i.jamiyaName + '".' : 'للانضمام إلى جمعية "' + i.jamiyaName + '" بقيمة اشتراك ' + i.amount + ' ريال ' + (i.every || 'شهرياً') + '.'}\n\nبالتطبيق تعرف دورك ومتى تقبض ومتى تسدد، وتصلك تذكيرات تلقائية، دون تنزيل ودون رسوم.\nلقبول الدعوة افتح الرابط أدناه، وأنشئ حساباً أو سجّل الدخول بنفس ${who}:${verifyNote}${forEmail ? mailLink() : '\n' + shareUrl() + (i.jamiyaId ? '?j=' + encodeURIComponent(i.jamiyaId) : '')}`;
 }
 // نافذة إرسال الدعوة: واتساب أولاً، ثم البريد (إن وُجد) أو النسخ
@@ -1727,7 +1721,7 @@ function showInviteShare(i, fresh) {
   state.lastInvite = i;
   if (fresh) logEvent('growth_invite_created', { jid: i.jamiyaId || '' });
   showModal(fresh ? 'تم إنشاء الدعوة' : 'إرسال الدعوة', `<div class="space-y-3 text-xs">
-    <p class="text-slate-600 leading-relaxed">${fresh ? 'الدعوة محفوظة. ' : ''}${i.phone ? `ستظهر لـ <b>${esc(i.name)}</b> بعد تسجيل الدخول <b>وتوثيق</b> رقم جواله <b dir="ltr">${esc(i.phone)}</b> برمز SMS. <b class="text-amber-700">الرقم يجب أن يكون موثّقاً لظهور الدعوة</b>، وإن دخل بالبريد فعليه توثيق جواله من «بياناتي».` : `ستظهر لـ <b>${esc(i.name)}</b> تلقائياً عند التسجيل أو الدخول بالبريد <b dir="ltr">${esc(i.email || '')}</b>.`} أرسل له الرابط الآن:</p>
+    <p class="text-slate-600 leading-relaxed">${fresh ? 'الدعوة محفوظة. ' : ''}${i.phone ? `ستظهر لـ <b>${esc(i.name)}</b> تلقائياً عند تسجيله برقم جواله <b dir="ltr">${esc(i.phone)}</b>. <b class="text-amber-700">يجب أن يكون الرقم هو نفسه رقم جواله في التطبيق</b>، وإن دخل بالبريد فعليه إدخال هذا الرقم في «بياناتي».` : `ستظهر لـ <b>${esc(i.name)}</b> تلقائياً عند التسجيل أو الدخول بالبريد <b dir="ltr">${esc(i.email || '')}</b>.`} أرسل له الرابط الآن:</p>
     <div class="p-3 bg-slate-50 rounded-xl text-slate-600 whitespace-pre-line leading-relaxed">${esc(inviteText(i))}</div>
     <div class="flex flex-wrap gap-2">
       ${i.phone ? `<a class="btn b-pri flex-1" target="_blank" rel="noopener" href="${waLink(i.phone, inviteText(i))}"><i class="fa-brands fa-whatsapp"></i> إرسال عبر واتساب</a>` : ''}
@@ -3361,23 +3355,32 @@ function trustStrip() {
 }
 function vPhoneForm() {
   const lb = 'text-xs font-semibold block mb-1';
+  // مسار قديم: رمز SMS لمن لديه حساب قديم بلا كلمة مرور فقط (لا يُستخدم في التسجيل الجديد)
   if (state.phoneStep === 'code') return `<form id="f-auth-code" class="space-y-3">
     <p class="text-xs text-slate-600 leading-relaxed">أرسلنا رمزاً من 6 أرقام إلى <b dir="ltr">${esc(state._phoneLabel)}</b></p>
     <div><label class="${lb}">رمز التحقق</label><input name="code" class="inp" dir="ltr" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required></div>
     <button class="btn b-pri w-full py-3 text-sm" type="submit">تأكيد ودخول</button>
     <button type="button" class="w-full text-xs text-slate-500" data-act="auth-phone-back">تغيير الرقم</button></form>`;
   if (state.phoneStep === 'phone') return `<form id="f-auth-phone" class="space-y-3">
-    <div><label class="${lb}">اسمك <span class="text-slate-400 font-normal">(للحساب الجديد)</span></label><input name="name" class="inp" autocomplete="name" placeholder="الاسم الأول والأخير" value="${esc(state._phoneName)}"></div>
+    <p class="text-xs text-amber-900 leading-relaxed bg-amber-50 border border-amber-200 rounded-xl p-2.5">هذا الخيار للحسابات القديمة التي لم تنشئ كلمة مرور بعد: سنرسل رمزاً مرة واحدة ثم تنشئ كلمة مرور. لحساب جديد استخدم «حساب جديد» وهو بلا رسائل.</p>
     <div><label class="${lb}">رقم الجوال</label><input name="phone" class="inp" dir="ltr" type="tel" inputmode="numeric" autocomplete="tel" placeholder="05xxxxxxxx" required></div>
+    <input type="hidden" name="name" value="${esc(state._phoneName)}">
     <div id="auth-recaptcha"></div>
     <button class="btn b-pri w-full py-3 text-sm" type="submit">أرسل رمز التحقق</button>
-    <button type="button" class="w-full text-xs text-slate-500" data-act="auth-pw">عندي كلمة مرور، ادخل بها</button></form>`;
-  return `<form id="f-auth-pw" class="space-y-3">
+    <div class="flex justify-between gap-2 text-xs"><button type="button" class="text-emerald-700 font-semibold" data-act="auth-pw">عندي كلمة مرور</button><button type="button" class="text-slate-500" data-act="auth-reg">حساب جديد</button></div></form>`;
+  if (state.phoneStep === 'pw') return `<form id="f-auth-pw" class="space-y-3">
     <div><label class="${lb}">رقم الجوال</label><input name="phone" class="inp" dir="ltr" type="tel" inputmode="numeric" autocomplete="tel username" placeholder="05xxxxxxxx" required></div>
     <div><label class="${lb}">كلمة المرور</label><input name="password" type="password" class="inp" required autocomplete="current-password"></div>
     <button class="btn b-pri w-full py-3 text-sm" type="submit">دخول</button>
-    <div class="flex justify-between gap-2 text-xs"><button type="button" class="text-emerald-700 font-semibold" data-act="auth-sms">دخول برمز SMS</button><button type="button" class="text-slate-500" data-act="auth-sms">نسيت كلمة المرور؟</button></div>
-    <p class="text-[11px] text-slate-500 leading-relaxed text-center">حساب جديد؟ اختر «دخول برمز SMS» وأكمل التسجيل بالرمز.</p></form>`;
+    <div class="flex justify-between gap-2 text-xs"><button type="button" class="text-emerald-700 font-semibold" data-act="auth-reg">حساب جديد؟ سجّل برقم جوالك</button><button type="button" class="text-slate-500" data-act="auth-forgot">نسيت كلمة المرور؟</button></div>
+    <button type="button" class="w-full text-[11px] text-slate-400" data-act="auth-sms">لديّ حساب قديم بدون كلمة مرور</button></form>`;
+  return `<form id="f-auth-reg" class="space-y-3">
+    <div><label class="${lb}">اسمك</label><input name="name" class="inp" autocomplete="name" required placeholder="الاسم الأول والأخير" value="${esc(state._phoneName)}"></div>
+    <div><label class="${lb}">رقم الجوال</label><input name="phone" class="inp" dir="ltr" type="tel" inputmode="numeric" autocomplete="tel" placeholder="05xxxxxxxx" required></div>
+    <div><label class="${lb}">كلمة المرور</label><input name="password" type="password" class="inp" required minlength="6" autocomplete="new-password" placeholder="6 أحرف على الأقل"></div>
+    <button class="btn b-pri w-full py-3 text-sm" type="submit">ابدأ مجاناً الآن</button>
+    <p class="text-[11px] text-slate-500 leading-relaxed text-center">بلا رسائل نصية: يُعتمد رقمك مباشرة، ولا يمكن لحسابين استخدام الرقم نفسه.</p>
+    <button type="button" class="w-full text-xs text-slate-500" data-act="auth-pw">عندي حساب، ادخل بكلمة المرور</button></form>`;
 }
 function vAuth() {
   const m = state.authMode, jp = state.joinPreview, reg = m === 'register', ph = m === 'phone', lb = 'text-xs font-semibold block mb-1';
@@ -3742,7 +3745,7 @@ async function bootUser(user) {
   if (!user) clearCache();
   if (user && c && c.uid === user.uid && c.profile) {
     cleanup(state.unsubs); cleanup(state.jUnsubs); stopPayListeners(); state.pays = {}; stopBlockWatch(); stopHeartbeat(); state._tv = null; stopQattah(); stopDebts();
-    state.user = user; state.profile = c.profile; state.isAdmin = !!c.isAdmin; state._restoreTried = false;
+    state.user = user; state.profile = c.profile; state.isAdmin = !!c.isAdmin; state._restoreTried = false; state._phoneTaken = false;
     state.jamiyat = c.jamiyat || []; state.jamiyatArch = c.jamiyatArch || []; state.invites = [];
     QT.list = c.qattahs || []; QT.arch = c.qattahsArch || []; DB.list = c.debts || []; DB.arch = c.debtsArch || [];
     maybeLock(true); watchBlocked(); trackSession(); renderBanner();
@@ -3841,25 +3844,20 @@ const apSwitch = (name, checked, title, sub) => `<label class="ap-row ap-sw">
   <span class="ap-tx"><b>${title}</b>${sub ? `<small>${sub}</small>` : ''}</span>
   <span class="ap-switch"><input type="checkbox" name="${name}" ${checked ? 'checked' : ''}><i></i></span></label>`;
 
-// بوابة توثيق الجوال: كل من لديه ملف شخصي ولا يملك جوالاً موثّقاً يرى هذه الشاشة فقط
+// بوابة الجوال: كل من لديه ملف شخصي ولا يملك جوالاً معتمداً يرى هذه الشاشة فقط (يُعتمد الرقم المُدخل مباشرة دون رسالة)
 function phoneGated() { return !!(state.user && state.profile && !phone05FromUser(state.user)); }
 function vPhoneGate() {
   const pre = esc(normPhone((state.profile || {}).phone));
   return `<div class="ap fade">
     <section class="ap-hero">
       <div class="ap-top"><div class="ap-avw"><div class="ap-av"><i class="fa-solid fa-mobile-screen-button"></i></div></div>
-        <div class="min-w-0 flex-1"><div class="ap-name">خطوة واحدة قبل المتابعة</div><div class="ap-sub">وثّق رقم جوالك لتفعيل خدمات سِواء</div></div></div>
+        <div class="min-w-0 flex-1"><div class="ap-name">خطوة واحدة قبل المتابعة</div><div class="ap-sub">أدخل رقم جوالك لتفعيل خدمات سِواء</div></div></div>
     </section>
     <div class="ap-card">
-      <p class="ap-note">توثيق الجوال برمز SMS يُفعّل الجمعيات والقطات والديون والدعوات، ولن يُطلب منك مرة أخرى بعده. الدعوات المرسلة بالجوال تظهر لك فقط بعد توثيقه.</p>
-      <form id="f-phone-send" class="ap-form">
-        <div class="ap-f"><label>رقم الجوال</label><input name="phone" type="tel" dir="ltr" inputmode="numeric" autocomplete="tel" placeholder="05xxxxxxxx" value="${pre}" required></div>
-        <div id="pv-recaptcha"></div>
-        <button class="btn b-pri w-full py-3" type="submit">أرسل رمز التحقق</button>
-      </form>
-      <form id="f-phone-code" class="ap-form hide">
-        <div class="ap-f"><label>رمز التحقق (6 أرقام)</label><input name="code" dir="ltr" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="------" required></div>
-        <button class="btn b-pri w-full py-3" type="submit">تأكيد وفتح التطبيق</button>
+      <p class="ap-note">${state._phoneTaken ? 'رقمك المسجّل في ملفك محجوز لحساب آخر، أدخل رقماً آخر. ' : ''}يُعتمد رقمك مباشرة دون رسالة تحقق، ويُفعّل الجمعيات والقطات والديون والدعوات. الدعوات المرسلة إلى رقمك تظهر لك به، ولا يمكن لحسابين استخدام الرقم نفسه.</p>
+      <form id="f-phone-set" class="ap-form">
+        <div class="ap-f"><label>رقم الجوال</label><input name="phone" type="tel" dir="ltr" inputmode="numeric" autocomplete="tel" placeholder="05xxxxxxxx" value="${state._phoneTaken ? '' : pre}" required></div>
+        <button class="btn b-pri w-full py-3" type="submit">حفظ وفتح التطبيق</button>
       </form>
     </div>
     <button type="button" class="ap-btn-warn" data-act="ap-confirm" data-target="logout"><i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج</button>
@@ -3919,13 +3917,13 @@ function vProfile() {
 
   const tabs = `<nav class="ap-tabs" role="tablist">${AP_TABS.map(t => `<button type="button" role="tab" class="ap-tab ${t.id === tab ? 'on' : ''}" data-act="ap-tab" data-tab="${t.id}"><i class="fa-solid ${t.ic}"></i><span>${t.t}</span></button>`).join('')}</nav>`;
 
-  const dataPanel = `${phoneVerified ? '' : `<div class="ap-card list">${apRow('fa-mobile-screen', 'warn', 'وثّق جوالك', 'لتصلك دعوات الجمعيات المرسلة إلى رقمك', 'phone-verify')}</div>`}
+  const dataPanel = `${phoneVerified ? '' : `<div class="ap-card list">${apRow('fa-mobile-screen', 'warn', 'أدخل جوالك', 'لتصلك دعوات الجمعيات المرسلة إلى رقمك', 'phone-verify')}</div>`}
   <div class="ap-card">
     <div class="ap-f"><label>الاسم الكامل</label><input name="name" maxlength="60" value="${esc(p.name)}" autocomplete="name"></div>
-    <div class="ap-f ap-lock"><label>رقم الجوال الموثّق</label>
-      <div class="ap-ro"><span dir="ltr">${esc(phone05FromUser(u) || p.phone || '')}</span>${phone05FromUser(u) ? '<span class="ap-badge"><i class="fa-solid fa-circle-check"></i> موثّق</span>' : ''}</div>
+    <div class="ap-f ap-lock"><label>رقم الجوال</label>
+      <div class="ap-ro"><span dir="ltr">${esc(phone05FromUser(u) || p.phone || '')}</span>${phone05FromUser(u) ? '<span class="ap-badge"><i class="fa-solid fa-circle-check"></i> معتمد</span>' : ''}</div>
       <input type="hidden" name="phone" value="${esc(phone05FromUser(u) || p.phone || '')}">
-      <button type="button" class="ap-link" data-act="phone-change"><i class="fa-solid fa-arrow-rotate-right"></i> تغيير الرقم عبر توثيق جديد</button></div>
+      <button type="button" class="ap-link" data-act="phone-change"><i class="fa-solid fa-arrow-rotate-right"></i> تغيير الرقم</button></div>
     <div class="ap-f"><label>البنك أو المحفظة</label><select name="bank">${bankOpts(sel)}</select></div>
     <div class="ap-f ${sel === OTHER_BANK ? '' : 'hide'}" data-other><label>اسم البنك أو المحفظة</label><input name="bankOther" placeholder="اكتب الاسم" value="${esc(BANKS.includes(p.bank) ? '' : p.bank)}"></div>
     <div class="ap-f ap-iban" data-ok="${ibanOk(p.iban) ? '1' : ''}"><label>الآيبان <small>(اتركه فارغاً للكاش)</small></label>
@@ -5224,7 +5222,7 @@ const actions = {
   'reg-push': async () => { const r = await registerPush(true); toast(r.ok ? 'سُجّل هذا الجهاز لإشعارات حسابك ✓' : 'تعذر تسجيل الجهاز: ' + r.err, r.ok ? 'success' : 'error'); },
   'google': doGoogle, 'apple': doApple, 'del-account': deleteMyAccount,
   'toggle-pass': el => { const i = el.parentElement.querySelector('input'); if (i) { const show = i.type === 'password'; i.type = show ? 'text' : 'password'; el.innerHTML = show ? '<i class="fa-regular fa-eye-slash"></i>' : '<i class="fa-regular fa-eye"></i>'; } },
-  'email-link': doEmailLink, 'verify-check': verifyCheckAction, 'auth-phone': () => { state.authMode = 'phone'; state.phoneStep = lsGet('jm_phone_pw') ? 'pw' : 'phone'; state._phoneConf = null; render(); }, 'auth-sms': () => { state.phoneStep = 'phone'; state._phoneConf = null; render(); }, 'auth-pw': () => { state.phoneStep = 'pw'; state._phoneConf = null; render(); }, 'set-pass': () => openSetPassword(), 'auth-phone-back': () => { state.phoneStep = 'phone'; state._phoneConf = null; render(); }, 'phone-verify': () => openPhoneVerify(), 'verify-resend': () => auth.currentUser.sendEmailVerification({ url: appUrl() }).then(() => toast('أُعيد إرسال رابط التفعيل')).catch(e => toast(authErr(e), 'error')),
+  'email-link': doEmailLink, 'verify-check': verifyCheckAction, 'auth-phone': () => { state.authMode = 'phone'; state.phoneStep = lsGet('jm_phone_pw') ? 'pw' : 'reg'; state._phoneConf = null; render(); }, 'auth-sms': () => { state.phoneStep = 'phone'; state._phoneConf = null; render(); }, 'auth-reg': () => { state.phoneStep = 'reg'; state._phoneConf = null; render(); }, 'auth-forgot': () => showModal('نسيت كلمة المرور؟', `<div class="space-y-3 text-xs text-slate-600 leading-relaxed"><p>حسابات الجوال لا ترسل رسائل نصية، لذلك تُستعاد كلمة المرور عبر بريد مضاف للحساب.</p><p><b>إن أضفت بريداً لحسابك سابقاً:</b> ادخل من تبويب «دخول بالبريد» واختر «نسيت كلمة المرور؟».</p><p><b>إن لم تضف بريداً:</b> تواصل مع إدارة سِواء ليُعاد ضبط حسابك.</p><button class="btn b-pri w-full py-3" data-act="close">حسناً</button></div>`), 'auth-pw': () => { state.phoneStep = 'pw'; state._phoneConf = null; render(); }, 'set-pass': () => openSetPassword(), 'auth-phone-back': () => { state.phoneStep = 'phone'; state._phoneConf = null; render(); }, 'phone-verify': () => openPhoneVerify(), 'verify-resend': () => auth.currentUser.sendEmailVerification({ url: appUrl() }).then(() => toast('أُعيد إرسال رابط التفعيل')).catch(e => toast(authErr(e), 'error')),
   'open-details': () => needDetails(() => render()), 'dismiss-nudge': () => { lsSet('jm_nudge_x', '1'); render(); },
   'auth-register': () => { state.authMode = 'register'; render(); },
   'auth-login': () => { state.authMode = 'login'; render(); },
@@ -5305,7 +5303,7 @@ document.addEventListener('input', e => {
   if (fm.querySelector('[data-identity]')) updPreview(fm);
   if (e.target.name === 'icon') fm.querySelectorAll('.emo').forEach(b => b.classList.toggle('on', b.dataset.v === e.target.value.trim()));
 });
-const forms = { 'f-auth-pw': submitPwLogin, 'f-setpw': submitSetPassword, 'f-changepass': submitChangePass, 'f-addemail': submitAddEmail, 'f-auth-phone': sendAuthCode, 'f-auth-code': confirmAuthCode, 'f-phone-send': sendPhoneCode, 'f-phone-code': confirmPhoneCode, 'f-register': doRegister, 'f-login': doLogin, 'f-reset': doReset, 'f-complete': doCompleteProfile, 'f-need': doNeedDetails, 'f-create': handleCreate,
+const forms = { 'f-auth-pw': submitPwLogin, 'f-setpw': submitSetPassword, 'f-changepass': submitChangePass, 'f-addemail': submitAddEmail, 'f-auth-phone': sendAuthCode, 'f-auth-code': confirmAuthCode, 'f-phone-set': savePhoneNumber, 'f-auth-reg': doPhoneRegister, 'f-register': doRegister, 'f-login': doLogin, 'f-reset': doReset, 'f-complete': doCompleteProfile, 'f-need': doNeedDetails, 'f-create': handleCreate,
   'f-invite': handleInvite, 'f-pay': submitPayment, 'f-mod': submitMod, 'f-notif': submitNotif, 'f-deputy': f => setDeputy(f.uid.value), 'f-edit': submitEdit, 'f-profile': saveProfile, 'f-delete': submitDelete, 'f-wish': submitWish, 'f-chat': sendChat, 'f-create-family': handleCreateFamily, 'f-fampay': submitFamilyPay, 'f-famself': submitSelfContrib, 'f-addguest': submitAddGuest, 'f-famguest': submitGuestPay, 'f-pledge': submitPledge, 'f-famedit': submitFamilyEdit, 'f-share': submitShare, 'f-swap': submitSwap, 'f-lock': submitLock, 'f-lockoff': submitLockOff };
 Object.assign(forms, ADMIN_FORMS);
 Object.assign(forms, QT_FORMS);

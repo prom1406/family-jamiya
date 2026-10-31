@@ -3,10 +3,29 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     function signedIn() { return request.auth != null; }
-    // موثّق = بريد مفعّل، أو جوال سعودي مُتحقَّق منه بالرمز (phone_number في رمز المصادقة)
-    function phoneOf() {
+    // موثّق = بريد مفعّل، أو جوال سعودي مُعتمد.
+    // الجوال يُعتمد تلقائياً بمجرد إدخاله في الملف الشخصي (دون رسالة SMS)، بشرط أن يكون محجوزاً لصاحب الحساب
+    // في phones/{الرقم}: فلا يمكن لحسابين اعتماد الرقم نفسه. ويبقى رقم الحسابات القديمة الموثّقة برمز SMS مقبولاً.
+    function tokenPhone() {
       return request.auth.token.get('phone_number', '').matches('[+]9665[0-9]{8}')
         ? '0' + request.auth.token.phone_number.replace('[+]966', '') : '';
+    }
+    function profilePhone() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('phone', '') : '';
+    }
+    function claimedPhone() {
+      let p = profilePhone();
+      return p is string && p.matches('05[0-9]{8}')
+        && exists(/databases/$(database)/documents/phones/$(p))
+        && get(/databases/$(database)/documents/phones/$(p)).data.uid == request.auth.uid ? p : '';
+    }
+    function phoneOf() { return claimedPhone() != '' ? claimedPhone() : tokenPhone(); }
+    // الجوال المكتوب في الملف الشخصي مقبول إن حُجز لصاحب الحساب في نفس العملية (الحجز والملف يُكتبان معاً)
+    function phoneClaimedAfter(p) {
+      return p is string && p.matches('05[0-9]{8}')
+        && existsAfter(/databases/$(database)/documents/phones/$(p))
+        && getAfter(/databases/$(database)/documents/phones/$(p)).data.uid == request.auth.uid;
     }
     function verified() { return signedIn() && (request.auth.token.get('email_verified', false) == true || phoneOf() != ''); }
     // البريد والجوال من رمز المصادقة فقط؛ الحقل الفارغ لا يطابق شيئاً (منع مطابقة الدعوات بقيمة فارغة)
@@ -362,11 +381,11 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
-      // الجوال في الملف يُقبل إن طابق رقم الحساب المُتحقَّق منه، أو بقي كما هو دون تغيير
+      // الجوال في الملف يُقبل إن حُجز لصاحب الحساب (يُعتمد تلقائياً دون رسالة)، أو طابق رقم حساب قديم موثّق، أو بقي كما هو دون تغيير
       allow create: if signedIn() && request.auth.uid == uid
-        && (request.resource.data.get('phone', '') == '' || phoneIs(request.resource.data.phone));
+        && (request.resource.data.get('phone', '') == '' || phoneIs(request.resource.data.phone) || phoneClaimedAfter(request.resource.data.phone));
       allow update: if signedIn() && request.auth.uid == uid
-        && (request.resource.data.get('phone', '') == resource.data.get('phone', '') || phoneIs(request.resource.data.phone));
+        && (request.resource.data.get('phone', '') == resource.data.get('phone', '') || phoneIs(request.resource.data.phone) || phoneClaimedAfter(request.resource.data.phone));
       // المالك يصحّح البريد والجوال فقط
       allow update: if isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email', 'phone']);
     }
