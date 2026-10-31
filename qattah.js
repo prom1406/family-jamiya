@@ -181,7 +181,7 @@ function qtInvitesHtml() {
 function qtHomeBlock() {
   const cards = QT.list.map(qtCard).join('');
   const coll = QT.list.reduce((s, q) => s + qtNum(q.collected), 0), tg = QT.list.reduce((s, q) => s + qtNum(q.target), 0);
-  const sum = QT.list.length ? `<div class="card p-4 flex items-center justify-between gap-3 flex-wrap"><div class="min-w-0"><p class="text-[11px] text-slate-500 flex items-center gap-1.5"><i class="fa-solid fa-sack-dollar text-teal-600"></i>إجمالي المبلغ المجتمع</p><b class="text-xl font-black text-teal-700">${fmtNum(coll)} <span class="text-xs">ريال</span></b></div><div class="text-left"><p class="text-[11px] text-slate-500">من أصل الأهداف</p><b class="text-sm">${fmtNum(tg)} ريال</b></div></div>` : '';
+  const sum = QT.list.length ? `<div class="card p-4 flex items-center justify-between gap-3 flex-wrap"><div class="min-w-0"><p class="text-[11px] text-slate-500 flex items-center gap-1.5"><i class="fa-solid fa-sack-dollar text-teal-600"></i>إجمالي المبلغ المجتمع</p><b class="text-xl font-black text-teal-700">${fmtNum(coll)} <span class="text-xs">ريال</span></b></div><div class="text-left"><p class="text-[11px] text-slate-500">من أصل الأهداف</p><b class="text-sm">${fmtNum(tg)} ريال</b></div><div class="w-full h-1.5 rounded-full bg-teal-50 overflow-hidden"><div class="h-full rounded-full bg-teal-600" style="width:${tg > 0 ? Math.min(100, Math.round(coll / tg * 100)) : 0}%"></div></div></div>` : '';
   return `<div class="space-y-2.5"><div class="sw-sec"><h3>القطة</h3>
       <button type="button" class="sw-add" data-act="qt-new"><i class="fa-solid fa-plus"></i> قطة جديدة</button></div>
     ${sum}${cards || '<div class="card p-6 text-center text-xs text-slate-500">لا توجد قطة بعد. أنشئ صندوقاً مشتركاً لفعالية أو رحلة.</div>'}</div>`;
@@ -231,7 +231,7 @@ function qtView() {
 
   const hero = `<div class="rounded-3xl p-5 text-white shadow-lg space-y-4" style="background:linear-gradient(135deg,#0f4c3a,#1e5a46 55%,#0fb16b)">
     <div class="flex justify-between items-start gap-3"><div class="min-w-0"><p class="text-[11px] text-emerald-100 font-bold">القطة</p>
-      <h3 class="text-xl font-black leading-snug">${esc(q.name)}</h3>${q.reason ? `<p class="text-xs text-emerald-50/90 mt-1 leading-relaxed">${esc(q.reason)}</p>` : ''}</div>
+      <h3 class="text-xl font-black leading-snug text-white">${esc(q.name)}</h3>${q.reason ? `<p class="text-xs text-emerald-50/90 mt-1 leading-relaxed">${esc(q.reason)}</p>` : ''}</div>
       <span class="flex-none px-2.5 py-1 rounded-full text-[10px] font-black bg-white/25"><i class="fa-solid ${st.i}"></i> ${st.l}</span></div>
     <div><div class="flex justify-between text-[11px] text-emerald-100 mb-1"><span>المحصّل ${fmtNum(coll)} ريال</span><span>من ${fmtNum(tg)} • ${pct}%</span></div>
       <div class="h-2.5 rounded-full bg-white/25 overflow-hidden"><div class="h-full rounded-full bg-white" style="width:${pct}%"></div></div></div>
