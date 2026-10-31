@@ -35,7 +35,7 @@
 <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-messaging-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-app-check-compat.js"></script>
 <style>
-:root{--brand:#1e5a46;--brand-2:#1e5a46;--ink:#0f172a;--bg:#f5f7f5;--tab-h:64px;--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px)}
+:root{--brand:#1e5a46;--brand-2:#1e5a46;--ink:#14211c;--bg:#f4f6f5;--tab-h:80px;--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);--accent:#6366f1;--loss:#B42F34;--petrol:#0f4c3a;--petrol-2:#0f4c3a;--muted:#6b7c75;--surface:#FFFFFF;--line:#e6ece9;--line-2:#d5dfda;--gold:#e65a2c;--gold-soft:#fbebe4;--ok:#2E7D5B;--r-card:22px;--r-ctl:16px;--shadow:0 1px 2px rgba(10,58,44,.05),0 10px 24px -12px rgba(10,58,44,.18);--brand-dark:#0f4c3a;--brand-soft:#e6f4ed;--brand-line:#c5ddd0;--g900:#0a3a2c;--g800:#0f4c3a;--g700:#1e5a46;--g500:#0fb16b;--g100:#e6f4ed;--g50:#f2f8f5}
 *{-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;background:#f5f7f5;overscroll-behavior-y:none}
 body{font-family:'Cairo',system-ui,-apple-system,sans-serif;color:var(--ink);min-height:100vh;min-height:100dvh;overscroll-behavior-y:none;
@@ -128,7 +128,7 @@ body.has-ibar{padding-bottom:calc(var(--tab-h) + var(--sab) + 104px)}
 @media print{body>*:not(#print-root){display:none!important}#print-root{display:block!important}@page{margin:12mm}}
 
 /* ===== ثيم عصري: ألوان هادئة وأزرار وبطاقات أنعم ===== */
-:root{--brand:#1e5a46;--brand-2:#0fb16b;--accent:#6366f1;--tab-h:80px;--bg:#f5f7f5}
+
 body{background:radial-gradient(700px 360px at 100% -6%,rgba(15,177,107,.38) 0,transparent 62%),radial-gradient(640px 340px at -8% 4%,rgba(165,180,252,.30) 0,transparent 58%),var(--bg);background-attachment:fixed}
 .app-header{background:rgba(255,255,255,.72);border-bottom:1px solid rgba(255,255,255,.6);box-shadow:0 8px 28px -20px rgba(15,23,42,.35)}
 .app-header .logo{border-radius:14px;box-shadow:0 6px 16px -6px rgba(30,90,70,.55)}
@@ -172,7 +172,7 @@ body{background:radial-gradient(700px 360px at 100% -6%,rgba(15,177,107,.38) 0,t
 .dot-on{display:inline-block;width:9px;height:9px;border-radius:50%;background:#0fb16b;box-shadow:0 0 0 3px rgba(15,177,107,.25)}
 
 /* ===== الهوية المالية: زجاجية زمردية (Advanced Glassmorphism) ===== */
-:root{--brand:#0f4c3a;--brand-2:#1e5a46;--ink:#0f172a;--bg:#f8fafc;--loss:#e11d48}
+
 body{font-family:'Cairo',system-ui,sans-serif;color:var(--ink);
   background:radial-gradient(900px 420px at 100% -8%,rgba(15,177,107,.35) 0,transparent 60%),radial-gradient(800px 380px at -10% 0,rgba(15,177,107,.28) 0,transparent 55%),linear-gradient(160deg,#f8fafc 0%,#e2e8f0 100%);background-attachment:fixed}
 .app-header{background:rgba(255,255,255,.28);-webkit-backdrop-filter:blur(16px) saturate(160%);backdrop-filter:blur(16px) saturate(160%);border-bottom:1px solid rgba(255,255,255,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 12px 28px -18px rgba(15,23,42,.25)}
@@ -196,7 +196,7 @@ body{font-family:'Cairo',system-ui,sans-serif;color:var(--ink);
 .toast.success{background:linear-gradient(135deg,#1e5a46,#0f4c3a)}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /* ===== تصميم v7 — «دفتر الثقة»: بترولي هادئ، ذهبي للمال، بلا زجاج ولا تدرجات زخرفية ===== */
-:root{--petrol:#0f4c3a;--petrol-2:#1e5a46;--brand:#1e5a46;--brand-2:#0fb16b;--ink:#212c26;--muted:#5B6E71;--bg:#f5f7f5;--surface:#fff;--line:#DCE4E1;--line-2:#C7D4CF;--gold:#e65a2c;--gold-soft:#fbebe4;--ok:#2E7D5B;--loss:#B42F34;--r-card:18px;--r-ctl:12px;--shadow:0 1px 2px rgba(11,46,51,.05),0 8px 20px -14px rgba(11,46,51,.22)}
+
 body{font-family:'Cairo',system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg);line-height:1.7}
 h1,h2,h3,.font-display{font-family:'Cairo',system-ui,sans-serif;letter-spacing:0;color:var(--petrol)}
 :focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:6px}
@@ -258,10 +258,7 @@ h1,h2,h3,.font-display{font-family:'Cairo',system-ui,sans-serif;letter-spacing:0
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 /* ===== v8 — Modern Light UI: فاتح وهادئ (طبقة أنماط فقط، بلا تغيير في HTML أو JavaScript) ===== */
-:root{--bg:#f5f7f5;--surface:#FFFFFF;--brand:#1e5a46;--brand-dark:#0f4c3a;--brand-soft:#eaf0eb;--brand-line:#c5ddd0;--ink:#212c26;--muted:#647A8B;--line:#E4EBF1;--line-2:#D3DEE7;
-  /* إعادة توجيه متغيرات الإصدارات السابقة إلى لوحة الألوان الجديدة */
-  --petrol:#0f4c3a;--petrol-2:#0f4c3a;--brand-2:#1e5a46;--gold:#e65a2c;--gold-soft:#fbebe4;--r-card:20px;--r-ctl:14px;
-  --shadow:0 1px 2px rgba(23,50,77,.04),0 8px 22px -14px rgba(23,50,77,.14)}
+
 body{background:var(--bg);background-image:none;color:var(--ink)}
 h1,h2,h3,.font-display{color:var(--ink)}
 :focus-visible{outline:2px solid var(--brand);outline-offset:2px}
@@ -358,10 +355,7 @@ body{overflow-x:hidden}
 main img,.sheet img,main table,.sheet table{max-width:100%}
 
 /* ===== v9 — Modern Banking UI: أخضر عميق، بطاقات ناعمة، أزرار واضحة (طبقة أنماط فقط، بلا تغيير في HTML أو JavaScript) ===== */
-:root{--g900:#0a3a2c;--g800:#0f4c3a;--g700:#1e5a46;--g500:#0fb16b;--g100:#e6f4ed;--g50:#f2f8f5;
-  --bg:#f4f6f5;--ink:#14211c;--muted:#6b7c75;--line:#e6ece9;--line-2:#d5dfda;--brand-soft:#e6f4ed;--brand-line:#c5ddd0;
-  --r-card:22px;--r-ctl:16px;
-  --shadow:0 1px 2px rgba(10,58,44,.05),0 10px 24px -12px rgba(10,58,44,.18)}
+
 body{background:var(--bg);color:var(--ink)}
 h1,h2,h3,.font-display{color:var(--ink);font-weight:800}
 
@@ -455,10 +449,10 @@ body .sw-card{display:flex;flex-wrap:wrap;align-items:center;gap:12px;background
 .sw-card .sw-t b{display:block;font-size:14.5px;font-weight:700;color:#14211c;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sw-card .sw-t small{display:block;font-size:12px;color:#6b7c75}
 .sw-amt{text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:3px}
-.sw-amt b{font-size:15px;font-weight:800;color:#14211c}
+.sw-amt b{font-size:15px;font-weight:800;color:#14211c;font-variant-numeric:tabular-nums}
 .sw-bdg{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px}
 .sw-bdg.or{background:#fdeee8;color:#e65a2c}.sw-bdg.g{background:#e6f4ed;color:#0f4c3a}.sw-bdg.gr{background:#eef1f0;color:#6b7c75}
-.sw-prog{flex-basis:100%;height:6px;border-radius:99px;background:#e6f4ed;overflow:hidden}
+.sw-prog{flex-basis:100%;height:8px;border-radius:99px;background:#e6f4ed;overflow:hidden}
 .sw-prog i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#0fb16b,#1e5a46)}
 
 /* شريط التنقل: كبسولة خضراء خلف أيقونة الصفحة الحالية */
@@ -3586,10 +3580,10 @@ function vJamiya() {
       cycleRow = `<div class="rounded-2xl bg-white/15 py-2 px-3 flex justify-between items-center gap-2"><span class="text-right"><span class="text-[10px] text-emerald-100 block">تبدأ الدورة الأولى</span><b class="text-xs">${fmtDate(st0)}</b></span><span class="px-3 py-1 rounded-full bg-white/25 text-xs font-black">${left === 0 ? 'تبدأ اليوم' : 'بعد ' + daysAr(left)}</span></div>`;
     }
   }
-  const recBox = c.finished ? `<div class="rounded-3xl p-6 text-white shadow-lg" style="background:linear-gradient(135deg,#1e293b,#334155)"><h3 class="text-lg font-black">اكتملت الجمعية 🎉</h3><p class="text-xs text-slate-300 mt-1">استلم جميع الأعضاء أدوارهم.</p></div>`
+  const recBox = c.finished ? `<div class="rounded-3xl p-6 text-white shadow-lg" style="background:linear-gradient(135deg,#1e293b,#334155)"><h3 class="text-lg font-black text-white">اكتملت الجمعية 🎉</h3><p class="text-xs text-slate-300 mt-1">استلم جميع الأعضاء أدوارهم.</p></div>`
     : `<div class="rounded-3xl p-5 text-white shadow-lg space-y-4" style="background:linear-gradient(135deg,#0f4c3a,#1e5a46 55%,#0fb16b)">
       <div class="flex justify-between items-start gap-3"><div class="min-w-0"><p class="text-[11px] text-emerald-100 font-bold">${c.started ? 'مستلم دفعة ' + periodLabel(j, c.cur) : 'أول مستلم (لم تبدأ الجمعية بعد)'}</p>
-        <h3 class="text-xl font-black leading-snug">${c.rec ? esc(dispName(c.rec)) : 'لم يكتمل ترتيب الأعضاء'}</h3></div>
+        <h3 class="text-xl font-black leading-snug text-white">${c.rec ? esc(dispName(c.rec)) : 'لم يكتمل ترتيب الأعضاء'}</h3></div>
         <span class="flex-none px-2.5 py-1 rounded-full text-[10px] font-black bg-white/25">${c.started ? 'الدورة ' + (c.cur + 1) + ' من ' + j.count : 'لم تبدأ'}</span></div>
       ${c.rec && c.rec.iban ? `<div class="rounded-2xl bg-white/15 p-3 flex items-center justify-between gap-2"><div class="min-w-0 text-xs"><p class="text-emerald-100">${esc(c.rec.bank || '')}</p><p class="font-black break-all" dir="ltr">${esc(c.rec.iban)}</p></div><button class="flex-none px-3 py-1.5 bg-white/25 rounded-xl text-[11px] font-bold" data-act="copy-iban" data-v="${esc(fixIban(c.rec.iban))}"><i class="fa-regular fa-copy"></i> نسخ</button></div>` : ''}
       <div class="grid grid-cols-2 gap-2 text-center"><div class="rounded-2xl bg-white/15 py-2"><span class="text-[10px] text-emerald-100 block">آخر موعد للسداد</span><b class="text-xs">${fmtDate(due)}</b></div><div class="rounded-2xl bg-white/15 py-2"><span class="text-[10px] text-emerald-100 block">موعد الاستلام</span><b class="text-xs">${fmtDate(payout)}</b></div></div>
@@ -4799,7 +4793,7 @@ function vFamily(c) {
 
   // الرئيسية
   const hero = `<div class="rounded-3xl p-5 text-white shadow-lg" style="background:linear-gradient(135deg,#6d28d9,#7c3aed 55%,#a78bfa)">
-    <div class="flex justify-between items-start gap-3"><div class="min-w-0"><p class="text-[11px] text-violet-100 font-bold">الهدف</p><h3 class="text-lg font-black leading-snug">${esc(j.goal)}</h3></div>
+    <div class="flex justify-between items-start gap-3"><div class="min-w-0"><p class="text-[11px] text-violet-100 font-bold">الهدف</p><h3 class="text-lg font-black leading-snug text-white">${esc(j.goal)}</h3></div>
       <span class="flex-none px-2.5 py-1 rounded-full text-[10px] font-black ${fs.open ? 'bg-white/25' : 'bg-black/25'}">${fs.monthly ? (fs.open ? '🔄 مستمر شهرياً' : (fs.reached ? '🎉 اكتمل الهدف' : '🔒 مغلق')) : fs.open ? '🟢 مفتوح • ' + fs.left + ' يوم' : (j.closed ? '🔒 مغلق' : '⏹ انتهت المدة')}</span></div>
     <div class="mt-4"><p class="text-[11px] text-violet-100">المبلغ المحصّل (المؤكد)</p><p class="text-3xl font-black">${fmtNum(st.confirmed)} <span class="text-sm font-bold text-violet-100">ريال</span></p>
       ${target ? `<div class="h-2.5 rounded-full bg-white/25 overflow-hidden mt-2"><div class="h-full rounded-full bg-white" style="width:${pct}%"></div></div><p class="text-[11px] text-violet-100 mt-1">${pct}% من ${fmtNum(target)} ريال${st.confirmed >= target ? ' 🎉' : ''}</p>` : '<p class="text-[11px] text-violet-100 mt-1">بلا مبلغ مستهدف، والمساهمة بقدر الاستطاعة</p>'}</div>
