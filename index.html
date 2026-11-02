@@ -1398,7 +1398,8 @@ async function deleteMyAccount() {
   const u = auth.currentUser; if (!u) return;
   if (!confirm('سيُحذف حسابك وبياناتك الشخصية نهائياً ولا يمكن التراجع عن ذلك. هل أنت متأكد؟')) return;
   const typed = prompt('للتأكيد اكتب كلمة: حذف');
-  if (typed === null || typed.trim() !== 'حذف') return toast('لم يتم حذف الحساب', 'info');
+  const tw = typed === null ? '' : typed.trim().toLowerCase();
+  if (tw !== 'حذف' && tw !== 'delete') return toast('لم يتم حذف الحساب', 'info');
   try {
     // إعادة التحقق من الهوية (يطلبها Firebase قبل الحذف)
     const ids = (u.providerData || []).map(p => p && p.providerId);
