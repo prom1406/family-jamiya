@@ -1,10 +1,28 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" data-lang="ar">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>سياسة الخصوصية وشروط الخدمة وحذف البيانات — سِواء</title>
 <meta name="description" content="سياسة الخصوصية وشروط الاستخدام وتعليمات حذف البيانات لتطبيق سِواء وفق نظام حماية البيانات الشخصية في المملكة العربية السعودية.">
+<script>
+/* اللغة: ?lang=en|ar ثم اختيار الصفحة المحفوظ ثم لغة التطبيق ثم لغة المتصفح | Language: ?lang, saved choice, app language, browser language */
+(function(){
+  var d=document.documentElement,T={
+    ar:['سياسة الخصوصية وشروط الخدمة وحذف البيانات — سِواء','سياسة الخصوصية وشروط الاستخدام وتعليمات حذف البيانات لتطبيق سِواء وفق نظام حماية البيانات الشخصية في المملكة العربية السعودية.'],
+    en:['Privacy Policy, Terms of Service & Data Deletion — Siwaa','Privacy policy, terms of use and data deletion instructions for the Siwaa app, in line with the Personal Data Protection Law of the Kingdom of Saudi Arabia.']};
+  window.__applyLang=function(l){
+    d.setAttribute('data-lang',l);d.lang=l;d.dir=l==='ar'?'rtl':'ltr';
+    document.title=T[l][0];var m=document.querySelector('meta[name="description"]');if(m)m.setAttribute('content',T[l][1]);
+  };
+  var l;
+  try{var q=location.search.match(/[?&]lang=(ar|en)/);l=q&&q[1];
+    if(!l){var s=localStorage.getItem('jm_privacy_lang');if(s==='ar'||s==='en')l=s}
+    if(!l&&localStorage.getItem('jm_lang')==='en')l='en';}catch(e){}
+  if(!l)l=/^ar/i.test(navigator.language||'')?'ar':'en';
+  window.__applyLang(l);
+})();
+</script>
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -38,26 +56,40 @@ th{background:rgba(15,118,110,.09);font-weight:800}
 a{color:var(--brand2)}
 .btn{display:inline-block;background:var(--brand);color:#fff!important;text-decoration:none;padding:10px 20px;border-radius:12px;font-weight:800}
 footer{text-align:center;color:var(--mut);font-size:.82rem;padding:0 16px 30px}
+html[data-lang="ar"] .en,html[data-lang="en"] .ar{display:none!important}
+.en th,.en td{text-align:left}
+.en h2,.en h3,.en p,.en li{line-height:1.7}
+header{position:relative}
+.lang{position:absolute;top:14px;inset-inline-end:14px;background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.55);border-radius:999px;padding:6px 16px;font:inherit;font-weight:700;font-size:.9rem;cursor:pointer}
+.lang:hover{background:rgba(255,255,255,.28)}
 </style>
 </head>
 <body>
 
 <header>
-  <img class="logo" src="logo-full.jpg" alt="شعار سِواء" width="150" height="150" onerror="this.onerror=null;this.src='icon-192.png';this.width=96;this.height=96">
-  <h1>سِواء</h1>
-  <p>سياسة الخصوصية • شروط الخدمة • حذف البيانات</p>
+  <button type="button" class="lang" id="langBtn" aria-label="Switch language / تبديل اللغة"><span class="ar">English</span><span class="en">العربية</span></button>
+  <img class="logo" src="logo-full.jpg" alt="شعار سِواء — Siwaa logo" width="150" height="150" onerror="this.onerror=null;this.src='icon-192.png';this.width=96;this.height=96">
+  <h1><span class="ar">سِواء</span><span class="en">Siwaa</span></h1>
+  <p class="ar">سياسة الخصوصية • شروط الخدمة • حذف البيانات</p>
+  <p class="en">Privacy Policy • Terms of Service • Data Deletion</p>
 </header>
 
-<nav>
+<nav class="ar">
   <a href="#privacy">سياسة الخصوصية</a>
   <a href="#terms">شروط الخدمة</a>
   <a href="#data-deletion">تعليمات حذف البيانات</a>
 </nav>
 
+<nav class="en" lang="en" dir="ltr">
+  <a href="#privacy-en">Privacy Policy</a>
+  <a href="#terms-en">Terms of Service</a>
+  <a href="#data-deletion-en">Data Deletion</a>
+</nav>
+
 <main>
 
 <!-- ======================= سياسة الخصوصية ======================= -->
-<section class="doc" id="privacy">
+<section class="doc ar" id="privacy">
   <h2>سياسة الخصوصية</h2>
   <p class="meta">آخر تحديث: 31 أكتوبر 2026</p>
 
@@ -142,7 +174,7 @@ footer{text-align:center;color:var(--mut);font-size:.82rem;padding:0 16px 30px}
 </section>
 
 <!-- ======================= شروط الخدمة ======================= -->
-<section class="doc" id="terms">
+<section class="doc ar" id="terms">
   <h2>شروط الخدمة</h2>
   <p class="meta">آخر تحديث: 14 أكتوبر 2026</p>
 
@@ -189,7 +221,7 @@ footer{text-align:center;color:var(--mut);font-size:.82rem;padding:0 16px 30px}
 </section>
 
 <!-- ======================= حذف البيانات ======================= -->
-<section class="doc" id="data-deletion">
+<section class="doc ar" id="data-deletion">
   <h2>تعليمات حذف البيانات</h2>
   <p class="meta">آخر تحديث: 31 أكتوبر 2026</p>
 
@@ -243,8 +275,220 @@ footer{text-align:center;color:var(--mut);font-size:.82rem;padding:0 16px 30px}
   <p>التطبيق يفتح محادثات واتساب بنص جاهز ولا يخزّن سجلات محادثات واتساب لديه. وإن كانت لك محادثات لدى واتساب أو بيانات لدى Meta فتُدار حسب سياسة Meta، ولا يتحكم التطبيق بها.</p>
 </section>
 
+<!-- ======================= ENGLISH VERSION ======================= -->
+
+<!-- ======================= Privacy Policy ======================= -->
+<section class="doc en" id="privacy-en" lang="en" dir="ltr">
+  <h2>Privacy Policy</h2>
+  <p class="meta">Last updated: October 31, 2026</p>
+
+  <p>Siwaa (سِواء) (the “App”, “we” or “us”) is committed to protecting your personal data in accordance with the <b>Personal Data Protection Law (PDPL)</b> of the Kingdom of Saudi Arabia and its Implementing Regulations, overseen by the <b>Saudi Data &amp; Artificial Intelligence Authority (SDAIA)</b>, and in line with the data-governance controls and policies issued by the <b>National Data Management Office (NDMO)</b>. This policy explains what data we collect, why we collect it, how we store and use it, and what your rights are.</p>
+
+  <h3>1. Who controls your data</h3>
+  <p>The App is a platform for organizing rotating savings associations (periodic pay-out circles, known in Arabic as “jamiyas”) among friends, relatives and colleagues. It is operated by an individual (the App owner). For any privacy-related matter, contact: <a href="mailto:ibrahimtumbakti@gmail.com">ibrahimtumbakti@gmail.com</a>.</p>
+
+  <h3>2. Data we collect</h3>
+  <div class="tw"><table>
+    <tr><th>Category</th><th>Details</th><th>Purpose</th></tr>
+    <tr><td>Account data</td><td>Name, email address (or a private relay address from Apple if you choose to hide your email), your profile picture if you sign in with Google, and the display nickname you choose. Firebase Authentication stores your sign-in credentials (email and password, phone number and password, Google, Apple, or a sign-in link sent to your email); the App never sees your password.</td><td>Creating your account, signing you in, and identifying you to the members of your association</td></tr>
+    <tr><td>Contact data</td><td>Mobile phone number</td><td>Identifying you within an association, preventing duplicate accounts, and making it easier to contact you via WhatsApp</td></tr>
+    <tr><td>Invitee and participant data</td><td>The name and phone number or email address entered by an association’s supervisor or a member when inviting someone, and only the name when recording a participant who has not yet joined the App</td><td>Sending the invitation and linking it to the invitee’s account when they register</td></tr>
+    <tr><td>Payment and transfer data</td><td>Bank name and IBAN that you enter in order to receive payouts, and the history of payments and amounts</td><td>Allowing members to transfer money to you when it is your turn, and documenting payments</td></tr>
+    <tr><td>Payment receipts</td><td>Receipt images or screenshots that you upload as proof of payment, stored in compressed form in the App’s database</td><td>Proving payment to the association’s supervisor and members</td></tr>
+    <tr><td>Association data</td><td>Association name, amount, duration and turn order; short text chat messages inside the association if the supervisor enables them; and the event log</td><td>Running the association and keeping its records transparent</td></tr>
+    <tr><td>Device notifications</td><td>Your device notification identifier (FCM token), if you allow notifications</td><td>Sending payment alerts, reminders and new-member notices</td></tr>
+    <tr><td>Payment-commitment indicator</td><td>The share of your payments made on time, the number of on-time payments out of those due, and the number of associations you have joined or supervised. These are calculated from your payment history and updated when you open the App. When the “commitment record” feature is turned on, it may be shown to someone who invites you to an association by entering your phone number.</td><td>Helping supervisors gauge reliability before adding members</td></tr>
+    <tr><td>Usage and device activity</td><td>Number of sign-ins, date of last sign-in and last seen, device type, operating system, browser, device language, screen size and sign-in method; a usage event log linked to your account that includes your name and email and is visible only to the App’s administrators; aggregated visit statistics; and local storage in your browser to remember settings and run the App offline</td><td>Improving performance, detecting errors and monitoring App usage</td></tr>
+  </table></div>
+  <p><b>What we do not collect:</b> We do not collect your geographic location, your phone’s contacts, national ID or residency (Iqama) numbers, or payment-card data, and we never ask for your bank-account password. We do not carry out any money transfers and we do not hold users’ funds; transfers take place directly between you through your own banks.</p>
+
+  <h3>3. Legal basis for processing</h3>
+  <p>We process your data based on your <b>consent</b> when you register and use the App, and as necessary to provide the service you requested (organizing the association and documenting payments). You may withdraw your consent at any time (see section 9), bearing in mind that some association records may be impossible to delete in order to protect the rights of the other members.</p>
+
+  <h3>4. How we use your data</h3>
+  <ul>
+    <li>Running associations and showing members, turns and payments.</li>
+    <li>Showing your name (or nickname), phone number and IBAN to the members and supervisor of your association, according to their permissions within that association only.</li>
+    <li>Sending operational notifications (payment, reminder, invitation, supervisor announcement) through device notifications or email.</li>
+    <li>Preparing ready-made WhatsApp messages: the App opens a WhatsApp link with pre-written text and you are the one who taps send; the App never sends WhatsApp messages automatically from your account.</li>
+    <li>Calculating and displaying the payment-commitment indicator as described in the data table above.</li>
+    <li>Protecting against misuse and fraud, and improving the service.</li>
+  </ul>
+  <p>We do not sell or rent your data, and we do not use it for advertising or marketing on behalf of third parties.</p>
+
+  <h3>5. Sharing your data</h3>
+  <ul>
+    <li><b>Your association’s members and supervisor:</b> they see only what is needed to run the association (name/nickname, phone number, payout details, payments and receipts).</li>
+    <li><b>Technical service providers (processors acting on our behalf):</b> Google Firebase (authentication, database, cloud functions and push notifications); the Sign in with Google and Sign in with Apple services; the Apple Push Notification service (APNs), through which iPhone notifications pass; EmailJS for sending emails (invitations and alerts, which include your name and the association’s name); and hosting providers and content delivery networks. They process data on our instructions and under their own security policies.</li>
+    <li><b>Competent authorities:</b> where there is a legal obligation or an official request from a competent authority in the Kingdom.</li>
+  </ul>
+
+  <h3>6. Transfer of data outside the Kingdom</h3>
+  <p>Data may be stored and processed on the servers of the cloud service providers listed above, which may be located outside the Kingdom. When this happens, we comply with the regulatory requirements for transferring personal data outside the Kingdom, we limit ourselves to providers that apply an appropriate level of protection, and we keep the transferred data to the minimum needed to run the service.</p>
+
+  <h3>7. How long we keep your data</h3>
+  <ul>
+    <li>Your account data: for as long as your account exists. When you delete your account from inside the App, your sign-in account and your profile are deleted immediately; the rest of your data linked to associations is handled as described in the “Data Deletion Instructions” section below.</li>
+    <li>Association records, payments and receipts: for the life of the association. Once the first payment has been accepted, the supervisor can no longer delete the association, in order to protect the members’ rights and records; deletion can then be requested from the App’s administration.</li>
+    <li>Notification identifiers: until you turn notifications off, sign out, or delete your account.</li>
+    <li>Activity and event logs and the commitment indicator: until you ask for them to be deleted as set out in the “Data Deletion Instructions” section.</li>
+    <li>Backups: backup copies may remain with the cloud provider for a limited period after deletion and are then erased automatically.</li>
+  </ul>
+
+  <h3>8. Data security</h3>
+  <p>We apply appropriate technical and organizational measures, including encrypted connections (HTTPS), strict database access rules that limit each user to their own associations and data, sign-in authentication through Firebase Authentication, and restriction of administrative privileges. Nevertheless, no method of transmission or storage is 100% secure. If a breach occurs that could harm you, we will notify you and SDAIA in the manner and within the time required by the regulations.</p>
+
+  <h3>9. Your rights</h3>
+  <p>The Personal Data Protection Law gives you the following rights, which you can exercise by contacting us:</p>
+  <ul>
+    <li>The right to be informed about how your data is collected and processed (the purpose of this policy).</li>
+    <li>The right to access your data and obtain a copy of it.</li>
+    <li>The right to correct or update your data (you can edit your profile inside the App).</li>
+    <li>The right to request the destruction of your data and the deletion of your account (from inside the App or by contacting us, as described in the “Data Deletion Instructions” section).</li>
+    <li>The right to withdraw your consent at any time.</li>
+  </ul>
+  <p>We will respond to your request within no more than 30 days. If you believe your rights have not been respected, you may file a complaint with the competent authority (SDAIA).</p>
+
+  <h3>10. Children</h3>
+  <p>The App is intended for people aged 18 or over, and we do not knowingly collect data from anyone under this age. If you become aware of an account belonging to a minor, please tell us so that it can be deleted.</p>
+
+  <h3>11. Cookies and local storage</h3>
+  <p>We use browser local storage and a cache (Service Worker) to save your preferences and to run the App’s interface offline. You can clear them from your browser settings, although this may affect some functionality.</p>
+
+  <h3>12. Changes to this policy</h3>
+  <p>We may update this policy when the service or the regulations change. We will publish the updated version here with its update date, and we will notify you inside the App of any material changes.</p>
+
+  <h3>13. Contact us</h3>
+  <p>For any question or request about your data: <a href="mailto:ibrahimtumbakti@gmail.com">ibrahimtumbakti@gmail.com</a></p>
+</section>
+
+<!-- ======================= Terms of Service ======================= -->
+<section class="doc en" id="terms-en" lang="en" dir="ltr">
+  <h2>Terms of Service</h2>
+  <p class="meta">Last updated: October 14, 2026</p>
+
+  <p>By using the Siwaa (سِواء) app you agree to the following terms. If you do not agree to them, please do not use the App.</p>
+
+  <h3>1. Nature of the service</h3>
+  <p>The App is an organizational tool that helps groups of individuals organize rotating savings associations among themselves, document their payments and remind members. <b>The App is not a bank, a financing company or a payment intermediary, and it does not receive, hold or transfer any money</b>, nor does it guarantee that members will meet their obligations. All transfers take place directly between members.</p>
+
+  <h3>2. Eligibility and your account</h3>
+  <ul>
+    <li>You must be at least 18 years old.</li>
+    <li>You agree to enter accurate information (name, phone number, payout details) and to update it when it changes.</li>
+    <li>You are responsible for keeping your account confidential and for all activity that takes place through it.</li>
+  </ul>
+
+  <h3>3. User responsibilities</h3>
+  <ul>
+    <li>Meeting your financial obligations to the members of your association on time.</li>
+    <li>Uploading genuine, unforged receipts and not entering false payment information.</li>
+    <li>Not using the App for any activity that violates Saudi regulations, including fraud, money laundering, unlicensed fundraising or exploiting others.</li>
+    <li>Not posting offensive or unlawful content in association chats, and not attempting to hack or disrupt the App or to access other people’s data.</li>
+  </ul>
+
+  <h3>4. Responsibility of the association supervisor</h3>
+  <p>The association’s supervisor (and the deputy, if any) is responsible for managing the association and its members and for confirming payments within the permissions granted to them in the App. Financial disputes between members and the supervisor are a private matter between them.</p>
+
+  <h3>5. Disclaimer</h3>
+  <p>The App is provided “as is”, without any warranty that it will be error-free or uninterrupted. We are not liable for financial losses arising from a member’s failure to pay, a dispute between members, or incorrect data entry, unless caused by our gross negligence as determined by the applicable regulations.</p>
+
+  <h3>6. Suspension of accounts and termination of service</h3>
+  <p>We may suspend or close any account that violates these terms or the regulations. You may also stop using the App and request deletion of your account at any time, as set out in the “Data Deletion Instructions” section below, subject to the restrictions on deleting associations in which payments have begun.</p>
+
+  <h3>7. Intellectual property</h3>
+  <p>The App, its design, logo and content belong to its owner, and may not be copied, republished or commercially exploited without permission. Your data remains yours.</p>
+
+  <h3>8. Changes to the terms</h3>
+  <p>We may amend these terms from time to time. Your continued use of the App after the changes are published means you accept them.</p>
+
+  <h3>9. Governing law</h3>
+  <p>These terms are governed by the laws of the Kingdom of Saudi Arabia, and the competent judicial authorities there have jurisdiction over any dispute.</p>
+
+  <h3>10. Trial period and pricing</h3>
+  <p>The App is free during a limited trial period. It may later become a paid app (a subscription or feature fees); we will announce this inside the App sufficiently in advance, and no fees will be charged to you without your explicit consent. In no case does this mean that the App will receive or transfer associations’ funds, as that is outside the scope of its service.</p>
+</section>
+
+<!-- ======================= Data Deletion ======================= -->
+<section class="doc en" id="data-deletion-en" lang="en" dir="ltr">
+  <h2>Data Deletion Instructions</h2>
+  <p class="meta">Last updated: October 31, 2026</p>
+
+  <p>You can request deletion of your account and the personal data linked to the Siwaa (سِواء) app at any time. This is your right under the Personal Data Protection Law.</p>
+
+  <h3>Method 1: From inside the App (immediate)</h3>
+  <ol>
+    <li>Open the App and go to <b>Profile</b>.</li>
+    <li>In the <b>Danger zone</b>, tap <b>“Delete account permanently”</b>.</li>
+    <li>Confirm the deletion by typing the confirmation word requested on screen, then re-verify your identity according to how you sign in (password, Apple or Google).</li>
+  </ol>
+
+  <h3>What is deleted immediately</h3>
+  <ul>
+    <li>Your sign-in account (Firebase Authentication).</li>
+    <li>Your profile: name, email, phone number, bank name, IBAN, nickname, profile picture and display settings.</li>
+    <li>The notification identifiers of your devices.</li>
+    <li>The link between your phone number and your account, so you can use the number later for a new account.</li>
+  </ul>
+
+  <h3>What is not deleted automatically by Method 1</h3>
+  <div class="note">
+    Deleting from inside the App does not cover what was recorded inside the associations you took part in: your membership record (name, phone number and payout details), your payments and receipts, your messages, wishes, requests and pledges and the associations’ event logs, as well as invitations linked to your email or phone number, and the activity and event logs and commitment indicator. This data stays visible to the association’s supervisor and members, according to their permissions, until you ask for it to be deleted using Method 2. If you are an association supervisor, the association remains in place for its members.
+  </div>
+
+  <h3>Method 2: By email request (to delete the rest of your data)</h3>
+  <ol>
+    <li>Send an email to <a href="mailto:ibrahimtumbakti@gmail.com?subject=Data%20Deletion%20Request%20-%20Siwaa">ibrahimtumbakti@gmail.com</a> with the subject: <b>Data Deletion Request – Siwaa</b>.</li>
+    <li>In the message, give the registered name, phone number and email address linked to your account (so that we can verify your identity), even if you have already deleted your account from the App. Please send it from the same email address registered in the App if possible.</li>
+    <li>We will confirm receipt of your request, carry out the deletion within a maximum of <b>30 days</b>, and notify you when it is complete.</li>
+  </ol>
+  <p style="text-align:center;margin-top:16px"><a class="btn" href="mailto:ibrahimtumbakti@gmail.com?subject=Data%20Deletion%20Request%20-%20Siwaa">Send a deletion request</a></p>
+
+  <h3>What we delete or anonymize at your request</h3>
+  <ul>
+    <li>Your membership records in associations, and your messages, wishes, pledges and requests in them.</li>
+    <li>Activity and event logs and the commitment indicator.</li>
+    <li>Invitations linked to your email or phone number.</li>
+    <li>Associations you created in which no payment has yet been accepted, together with their receipts and records.</li>
+  </ul>
+
+  <h3>What may be retained, and why</h3>
+  <div class="note">
+    Payment and receipt records inside an association where payments have begun also belong to other members, and deleting them would harm their rights. We therefore remove or anonymize your personal data in them (name, phone number and IBAN) as far as possible, and keep only the bare financial record needed to prove the other members’ rights until the association ends, after which we delete it. We may also retain what is required by law or by a competent authority. Backup copies may remain with the cloud provider for a limited period and are then erased automatically.
+  </div>
+
+  <h3>If you signed in with Apple</h3>
+  <p>To disconnect Siwaa from your Apple account: on your iPhone go to Settings → tap your name → Sign-In &amp; Security → Sign in with Apple → Siwaa → Stop Using Apple Account (Apple ID) with this app.</p>
+
+  <h3>A note about WhatsApp and Facebook</h3>
+  <p>The App opens WhatsApp chats with ready-made text and does not store WhatsApp conversation records. Any conversations you have with WhatsApp, or data held by Meta, are managed under Meta’s policies and are not controlled by the App.</p>
+</section>
+
 </main>
 
-<footer><a href="./">العودة إلى التطبيق</a><br>© سِواء — جميع الحقوق محفوظة</footer>
+<footer>
+  <a class="ar" href="./">العودة إلى التطبيق</a><a class="en" href="./">Back to the app</a><br>
+  <span class="ar">© سِواء — جميع الحقوق محفوظة</span><span class="en">© Siwaa — All rights reserved</span>
+</footer>
+
+<script>
+(function(){
+  var IDS=['privacy','terms','data-deletion'],root=document.documentElement;
+  function cur(){return root.getAttribute('data-lang')}
+  function go(){
+    var h=''; try{h=decodeURIComponent(location.hash.slice(1)).replace(/-en$/,'')}catch(e){}
+    if(IDS.indexOf(h)<0)return;
+    var el=document.getElementById(cur()==='en'?h+'-en':h); if(el)el.scrollIntoView();
+  }
+  document.getElementById('langBtn').addEventListener('click',function(){
+    var l=cur()==='ar'?'en':'ar';
+    try{localStorage.setItem('jm_privacy_lang',l)}catch(e){}
+    try{if(/[?&]lang=/.test(location.search))history.replaceState(null,'',location.pathname+'?lang='+l+location.hash)}catch(e){}
+    window.__applyLang(l); go();
+  });
+  window.addEventListener('hashchange',go);
+  go();
+})();
+</script>
 </body>
 </html>
