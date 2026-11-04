@@ -1110,16 +1110,14 @@ function accountFor(j, turns, cur, started, payments, uid, amount = j.amount) {
   return { n, owed, confirmed, pending, paid, remaining, credit, status, covers: amount > 0 ? r2(paid / amount) : 0, mine: payments.filter(p => p.uid === uid) };
 }
 // بطاقة الجمعية الرئيسية: «لم تبدأ بعد» أو الدورة الحالية وعدد الأيام المتبقية فيها
-// رقم الدورة يعدّله المشرف فقط (تعديله يحرّك تاريخ البداية بعدد الدورات المطلوب)
+// رقم الدورة مرتبط بتاريخ البداية ويُحسب تلقائياً (للجميع بما فيهم المشرف)
 function cycleRowHtml(j) {
   if (j.type === 'family') return '';
   const idx = monthIdx(j);
   if (idx < 0) return '<p class="text-[11px] font-bold text-amber-700 mt-1">لم تبدأ بعد</p>';
-  const mgr = j.creatorUid === state.user.uid, finished = idx >= j.count;
+  const finished = idx >= j.count;
   const cur = Math.min(idx, j.count - 1), shown = Math.min(idx + 1, j.count);
-  const body = mgr && !finished
-    ? `<input type="number" min="1" max="${j.count}" value="${shown}" dir="ltr" aria-label="رقم الدورة الحالية" class="inp !py-0 !px-1 w-12 text-center text-xs font-black"><button type="button" data-act="jam-cycle-save" data-id="${esc(j.id)}" class="px-2 py-0.5 rounded-lg bg-teal-600 text-white text-[11px] font-bold">حفظ</button>`
-    : `<b class="text-slate-700">${shown}</b>`;
+  const body = `<b class="text-slate-700">${shown}</b>`; // رقم الدورة محسوب من تاريخ البداية، لا يُعدَّل يدوياً
   let tail = '';
   if (finished) tail = '<span class="text-slate-500">• انتهت</span>';
   else {
@@ -1128,16 +1126,6 @@ function cycleRowHtml(j) {
     tail = days === 0 ? '<span class="text-rose-600 font-bold">• تنتهي اليوم</span>' : `<span class="text-slate-300">•</span><b class="text-teal-700">${nf(days)} يوم</b>`;
   }
   return `<div class="mt-1 flex items-center gap-1.5 flex-wrap text-[11px] text-slate-500" onclick="event.stopPropagation()"><span>الدورة الحالية</span>${body}<span>/ ${j.count}</span>${tail}</div>`;
-}
-async function jamCycleSave(el) {
-  const j = state.jamiyat.find(x => x.id === el.dataset.id);
-  if (!j || j.creatorUid !== state.user.uid) return toast('تعديل الدورة للمشرف فقط', 'error');
-  const n = Math.floor(Number(el.parentElement.querySelector('input').value));
-  if (!(n >= 1 && n <= j.count)) return toast(`رقم الدورة يجب أن يكون بين 1 و ${j.count}`, 'error');
-  const startDate = isoDay(periodStart(j, monthIdx(j) - (n - 1)));
-  if (startDate === j.startDate) return toast('هذه هي الدورة الحالية بالفعل', 'info');
-  try { await db.collection('jamiyat').doc(j.id).update({ startDate }); toast('حُفظت الدورة الحالية'); }
-  catch (e) { toast('تعذر الحفظ: ' + e.message, 'error'); }
 }
 function ctx() {
   const j = state.j; if (!j) return null;
@@ -5275,7 +5263,6 @@ Object.assign(actions, DB_ACTIONS);
 Object.assign(actions, ARCH_ACTIONS);
 Object.assign(actions, AP_ACTIONS);
 Object.assign(actions, { 'phone-verify': () => openPhoneVerify(), 'phone-change': () => openPhoneVerify() });
-Object.assign(actions, { 'jam-cycle-save': jamCycleSave });
 Object.assign(actions, WZ_ACTIONS);
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
