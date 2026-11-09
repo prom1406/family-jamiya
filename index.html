@@ -892,6 +892,8 @@ if (ENABLE_APP_CHECK) {
   catch (e) { console.warn('App Check غير مفعّل:', e && e.message); }
 }
 const auth = firebase.auth(), db = firebase.firestore();
+// لغة رسائل Firebase (التحقق وإعادة تعيين كلمة المرور) تتبع لغة التطبيق بدل الإنجليزية الافتراضية
+auth.languageCode = LANG;
 
 // ذاكرة محلية: عند إعادة فتح التطبيق تُحتسب التغييرات فقط بدل إعادة قراءة كل المستندات.
 // ضعها false إن كان الجهاز مشتركاً بين عدة أشخاص.
